@@ -1,7 +1,7 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 function json(data, status = 200) {
@@ -15,10 +15,53 @@ function err(msg, status = 400) {
   return json({ error: msg }, status);
 }
 
-function randomKey() {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+function randomHex(bytes = 32) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return [...arr].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── Password hashing via PBKDF2 (Web Crypto, available in CF Workers) ──────
+async function hashPassword(password) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const saltHex = [...salt].map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}`;
+}
+
+async function verifyPassword(password, stored) {
+  const [saltHex, hashHex] = stored.split(':');
+  const salt = new Uint8Array(saltHex.match(/.{2}/g).map(b => parseInt(b, 16)));
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const newHashHex = [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return newHashHex === hashHex;
+}
+
+// ── Resolve bearer token → user_id (null if missing/expired) ────────────────
+async function getUserId(request, env) {
+  const auth = request.headers.get('Authorization') ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+  if (!token) return null;
+  const row = await env.DB
+    .prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')")
+    .bind(token)
+    .first();
+  return row ? row.user_id : null;
 }
 
 export default {
@@ -31,89 +74,142 @@ export default {
     const url  = new URL(request.url);
     const path = url.pathname;
 
-    // ── POST /init ───────────────────────────────────────────────
-    // Create a new sync key, or validate an existing one.
-    // Body: {} → create new | { syncKey: "..." } → validate existing
-    if (path === '/init' && request.method === 'POST') {
-      let body = {};
-      try { body = await request.json(); } catch {}
+    // ── POST /signup ──────────────────────────────────────────────────────────
+    // Body: { email, password }
+    // Returns: { token, email }
+    if (path === '/signup' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return err('Invalid JSON'); }
 
-      if (body.syncKey) {
-        const row = await env.DB
-          .prepare('SELECT sync_key FROM sync_keys WHERE sync_key = ?')
-          .bind(body.syncKey)
-          .first();
-        if (!row) return err('Sync key not found', 404);
-        return json({ syncKey: body.syncKey, created: false });
-      }
+      const { email, password } = body ?? {};
+      if (!email || !password) return err('Missing email or password');
+      if (password.length < 8)  return err('Password must be at least 8 characters');
 
-      const key = randomKey();
-      await env.DB
-        .prepare('INSERT INTO sync_keys (sync_key) VALUES (?)')
-        .bind(key)
+      const emailLower = email.trim().toLowerCase();
+      const existing = await env.DB
+        .prepare('SELECT id FROM users WHERE email = ?')
+        .bind(emailLower)
+        .first();
+      if (existing) return err('Email already registered', 409);
+
+      const hash    = await hashPassword(password);
+      const { meta } = await env.DB
+        .prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
+        .bind(emailLower, hash)
         .run();
-      return json({ syncKey: key, created: true });
+      const userId = meta.last_row_id;
+
+      const token    = randomHex(32);
+      const expires  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+      await env.DB
+        .prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
+        .bind(token, userId, expires)
+        .run();
+
+      return json({ token, email: emailLower });
     }
 
-    // ── GET /cards?syncKey=X ─────────────────────────────────────
-    // Return all SRS cards for the given sync key.
-    if (path === '/cards' && request.method === 'GET') {
-      const syncKey = url.searchParams.get('syncKey');
-      if (!syncKey) return err('Missing syncKey');
+    // ── POST /login ───────────────────────────────────────────────────────────
+    // Body: { email, password }
+    // Returns: { token, email }
+    if (path === '/login' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return err('Invalid JSON'); }
 
-      const valid = await env.DB
-        .prepare('SELECT sync_key FROM sync_keys WHERE sync_key = ?')
-        .bind(syncKey)
+      const { email, password } = body ?? {};
+      if (!email || !password) return err('Missing email or password');
+
+      const emailLower = email.trim().toLowerCase();
+      const user = await env.DB
+        .prepare('SELECT id, password_hash FROM users WHERE email = ?')
+        .bind(emailLower)
         .first();
-      if (!valid) return err('Sync key not found', 404);
+      if (!user) return err('Invalid email or password', 401);
+
+      const ok = await verifyPassword(password, user.password_hash);
+      if (!ok) return err('Invalid email or password', 401);
+
+      const token   = randomHex(32);
+      const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+      await env.DB
+        .prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)')
+        .bind(token, user.id, expires)
+        .run();
+
+      return json({ token, email: emailLower });
+    }
+
+    // ── POST /logout ──────────────────────────────────────────────────────────
+    // Header: Authorization: Bearer <token>
+    if (path === '/logout' && request.method === 'POST') {
+      const auth  = request.headers.get('Authorization') ?? '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
+      if (token) {
+        await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(token).run();
+      }
+      return json({ ok: true });
+    }
+
+    // ── GET /cards ────────────────────────────────────────────────────────────
+    // Header: Authorization: Bearer <token>
+    // Returns all SRS cards for the authenticated user.
+    if (path === '/cards' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
 
       const { results } = await env.DB
         .prepare(
           'SELECT pool, korean, english, interval, ease_factor, repetitions, due_date ' +
-          'FROM cards WHERE sync_key = ?'
+          'FROM cards WHERE user_id = ?'
         )
-        .bind(syncKey)
+        .bind(userId)
         .all();
 
       return json({ cards: results });
     }
 
-    // ── POST /review ─────────────────────────────────────────────
-    // Upsert a single card (used after rating a card or adding one).
-    // Body: { syncKey, pool, korean, english, interval, easeFactor, repetitions, dueDate }
+    // ── POST /review ──────────────────────────────────────────────────────────
+    // Header: Authorization: Bearer <token>
+    // Body: { pool, korean, english, interval, easeFactor, repetitions, dueDate }
     if (path === '/review' && request.method === 'POST') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+
       let body;
       try { body = await request.json(); } catch { return err('Invalid JSON'); }
 
-      const { syncKey, pool, korean, english, interval, easeFactor, repetitions, dueDate } = body ?? {};
-      if (!syncKey || !pool || !korean || !dueDate) return err('Missing required fields');
+      const { pool, korean, english, interval, easeFactor, repetitions, dueDate } = body ?? {};
+      if (!pool || !korean || !dueDate) return err('Missing required fields');
 
       await env.DB
         .prepare(`
-          INSERT INTO cards (sync_key, pool, korean, english, interval, ease_factor, repetitions, due_date)
+          INSERT INTO cards (user_id, pool, korean, english, interval, ease_factor, repetitions, due_date)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(sync_key, pool, korean) DO UPDATE SET
+          ON CONFLICT(user_id, pool, korean) DO UPDATE SET
             english     = excluded.english,
             interval    = excluded.interval,
             ease_factor = excluded.ease_factor,
             repetitions = excluded.repetitions,
             due_date    = excluded.due_date
         `)
-        .bind(syncKey, pool, korean, english ?? '', interval ?? 1, easeFactor ?? 2.5, repetitions ?? 0, dueDate)
+        .bind(userId, pool, korean, english ?? '', interval ?? 1, easeFactor ?? 2.5, repetitions ?? 0, dueDate)
         .run();
 
       return json({ ok: true });
     }
 
-    // ── POST /bulk ───────────────────────────────────────────────
-    // Insert multiple new cards, ignoring ones that already exist.
-    // Body: { syncKey, cards: [{ pool, korean, english }] }
+    // ── POST /bulk ────────────────────────────────────────────────────────────
+    // Header: Authorization: Bearer <token>
+    // Body: { cards: [{ pool, korean, english }] }
     if (path === '/bulk' && request.method === 'POST') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+
       let body;
       try { body = await request.json(); } catch { return err('Invalid JSON'); }
 
-      const { syncKey, cards } = body ?? {};
-      if (!syncKey || !Array.isArray(cards)) return err('Missing required fields');
+      const { cards } = body ?? {};
+      if (!Array.isArray(cards)) return err('Missing required fields');
       if (!cards.length) return json({ ok: true, inserted: 0 });
 
       const today = new Date().toISOString().split('T')[0];
@@ -121,10 +217,10 @@ export default {
         env.DB
           .prepare(
             'INSERT OR IGNORE INTO cards ' +
-            '(sync_key, pool, korean, english, interval, ease_factor, repetitions, due_date) ' +
+            '(user_id, pool, korean, english, interval, ease_factor, repetitions, due_date) ' +
             'VALUES (?, ?, ?, ?, 1, 2.5, 0, ?)'
           )
-          .bind(syncKey, c.pool, c.korean, c.english ?? '', today)
+          .bind(userId, c.pool, c.korean, c.english ?? '', today)
       );
 
       await env.DB.batch(stmts);

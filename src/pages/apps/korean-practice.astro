@@ -207,25 +207,40 @@ import kor111 from '../../data/korean-kor111-unitized.json';
         </div>
       </div>
 
-      <!-- Cloud Sync — hidden until SRS_WORKER_URL is set in the script -->
-      <div id="srsSyncSection" class="srs-sync-section hidden">
+      <!-- Cloud Sync — email + password login -->
+      <div id="srsSyncSection" class="srs-sync-section">
         <p class="srs-add-label">Cloud Sync</p>
         <p id="srsSyncMsg" class="srs-sync-msg"></p>
-        <!-- Not connected -->
-        <div id="srsSyncEnableRow" class="btn-row hidden">
-          <button id="srsSyncEnableBtn"  class="btn btn-secondary" type="button">Enable backup</button>
-          <button id="srsSyncRestoreBtn" class="btn btn-secondary" type="button">Restore from key</button>
+        <!-- Auth area (shown when logged out) -->
+        <div id="srsSyncAuthArea" class="hidden">
+          <div class="srs-auth-tabs">
+            <button id="srsAuthTabLogin"  class="srs-auth-tab active" type="button">Log In</button>
+            <button id="srsAuthTabSignup" class="srs-auth-tab"        type="button">Sign Up</button>
+          </div>
+          <div id="srsSyncLoginForm" class="srs-auth-form">
+            <input id="srsEmailInput"    type="email"    placeholder="Email"    class="srs-sync-input" autocomplete="email" />
+            <input id="srsPasswordInput" type="password" placeholder="Password" class="srs-sync-input" autocomplete="current-password" />
+            <div class="btn-row">
+              <button id="srsLoginBtn" class="btn btn-secondary" type="button">Log In</button>
+            </div>
+          </div>
+          <div id="srsSyncSignupForm" class="srs-auth-form hidden">
+            <input id="srsSignupEmailInput"    type="email"    placeholder="Email"                  class="srs-sync-input" autocomplete="email" />
+            <input id="srsSignupPasswordInput" type="password" placeholder="Password (min 8 chars)" class="srs-sync-input" autocomplete="new-password" />
+            <div class="btn-row">
+              <button id="srsSignupBtn" class="btn btn-secondary" type="button">Sign Up</button>
+            </div>
+          </div>
         </div>
-        <!-- Restore input -->
-        <div id="srsSyncRestoreRow" class="srs-restore-row hidden">
-          <input id="srsSyncKeyInput" type="text" placeholder="Paste sync key…" class="srs-sync-input" autocomplete="off" spellcheck="false" />
-          <button id="srsSyncConnectBtn" class="btn btn-secondary" type="button">Connect</button>
-        </div>
-        <!-- Connected -->
-        <div id="srsSyncActiveRow" class="btn-row hidden">
-          <code id="srsSyncKeyDisplay" class="srs-key-display"></code>
-          <button id="srsCopyKeyBtn"       class="btn btn-secondary" type="button">Copy key</button>
-          <button id="srsSyncDisconnectBtn" class="btn btn-secondary" type="button">Disconnect</button>
+        <!-- Logged in -->
+        <div id="srsSyncActiveRow" class="hidden">
+          <div class="srs-user-row">
+            <span id="srsUserEmailDisplay" class="srs-user-email"></span>
+            <button id="srsSyncLogoutBtn" class="btn btn-ghost" type="button">Log out</button>
+          </div>
+          <div class="btn-row">
+            <button id="srsSyncNowBtn" class="btn btn-secondary" type="button">Sync now</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1170,47 +1185,143 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   });
 
   // ── SRS Cloud Sync ─────────────────────────────────────────
-  // After deploying cf-srs/ worker, set this to your worker URL:
-  const SRS_WORKER_URL  = "https://korean-srs.squaliekid55.workers.dev";
-  const SRS_SYNC_LS_KEY = "korean-srs-sync-key";
-  let srsSyncKey = localStorage.getItem(SRS_SYNC_LS_KEY) || null;
+  const SRS_WORKER_URL   = "https://korean-srs.squaliekid55.workers.dev";
+  const SRS_TOKEN_LS_KEY = "korean-srs-token";
+  const SRS_EMAIL_LS_KEY = "korean-srs-email";
+  let srsToken = localStorage.getItem(SRS_TOKEN_LS_KEY) || null;
+  let srsEmail = localStorage.getItem(SRS_EMAIL_LS_KEY) || null;
 
-  const srsSyncSection      = document.getElementById("srsSyncSection");
-  const srsSyncMsgEl        = document.getElementById("srsSyncMsg");
-  const srsSyncEnableRow    = document.getElementById("srsSyncEnableRow");
-  const srsSyncRestoreRow   = document.getElementById("srsSyncRestoreRow");
-  const srsSyncActiveRow    = document.getElementById("srsSyncActiveRow");
-  const srsSyncKeyDisplay   = document.getElementById("srsSyncKeyDisplay");
-  const srsSyncEnableBtn    = document.getElementById("srsSyncEnableBtn");
-  const srsSyncRestoreBtn   = document.getElementById("srsSyncRestoreBtn");
-  const srsSyncKeyInput     = document.getElementById("srsSyncKeyInput");
-  const srsSyncConnectBtn   = document.getElementById("srsSyncConnectBtn");
-  const srsCopyKeyBtn       = document.getElementById("srsCopyKeyBtn");
-  const srsSyncDisconnectBtn = document.getElementById("srsSyncDisconnectBtn");
+  const srsSyncMsgEl          = document.getElementById("srsSyncMsg");
+  const srsSyncAuthArea       = document.getElementById("srsSyncAuthArea");
+  const srsAuthTabLogin       = document.getElementById("srsAuthTabLogin");
+  const srsAuthTabSignup      = document.getElementById("srsAuthTabSignup");
+  const srsSyncLoginForm      = document.getElementById("srsSyncLoginForm");
+  const srsSyncSignupForm     = document.getElementById("srsSyncSignupForm");
+  const srsEmailInput         = document.getElementById("srsEmailInput");
+  const srsPasswordInput      = document.getElementById("srsPasswordInput");
+  const srsSignupEmailInput   = document.getElementById("srsSignupEmailInput");
+  const srsSignupPasswordInput = document.getElementById("srsSignupPasswordInput");
+  const srsLoginBtn           = document.getElementById("srsLoginBtn");
+  const srsSignupBtn          = document.getElementById("srsSignupBtn");
+  const srsSyncActiveRow      = document.getElementById("srsSyncActiveRow");
+  const srsUserEmailDisplay   = document.getElementById("srsUserEmailDisplay");
+  const srsSyncLogoutBtn      = document.getElementById("srsSyncLogoutBtn");
+  const srsSyncNowBtn         = document.getElementById("srsSyncNowBtn");
 
   function setSyncMsg(msg) { if (srsSyncMsgEl) srsSyncMsgEl.textContent = msg || ""; }
 
   function renderSyncUI() {
-    if (!SRS_WORKER_URL) return;
-    srsSyncSection.classList.remove("hidden");
-    if (srsSyncKey) {
-      setSyncMsg("✓ Cloud backup active — save your key to restore on other devices.");
-      srsSyncEnableRow.classList.add("hidden");
-      srsSyncRestoreRow.classList.add("hidden");
+    if (srsToken) {
+      srsSyncAuthArea.classList.add("hidden");
       srsSyncActiveRow.classList.remove("hidden");
-      srsSyncKeyDisplay.textContent = srsSyncKey;
+      srsUserEmailDisplay.textContent = srsEmail || "";
+      setSyncMsg("✓ Logged in — cards synced to cloud.");
     } else {
-      setSyncMsg("Data is only saved locally. Enable backup to protect your progress.");
-      srsSyncEnableRow.classList.remove("hidden");
-      srsSyncRestoreRow.classList.add("hidden");
+      srsSyncAuthArea.classList.remove("hidden");
       srsSyncActiveRow.classList.add("hidden");
+      setSyncMsg("Log in or sign up to sync your SRS progress across devices.");
     }
   }
 
-  async function syncFetchCards() {
-    if (!SRS_WORKER_URL || !srsSyncKey) return;
+  // Auth tab switching
+  srsAuthTabLogin.addEventListener("click", () => {
+    srsAuthTabLogin.classList.add("active");
+    srsAuthTabSignup.classList.remove("active");
+    srsSyncLoginForm.classList.remove("hidden");
+    srsSyncSignupForm.classList.add("hidden");
+    setSyncMsg("");
+  });
+
+  srsAuthTabSignup.addEventListener("click", () => {
+    srsAuthTabSignup.classList.add("active");
+    srsAuthTabLogin.classList.remove("active");
+    srsSyncSignupForm.classList.remove("hidden");
+    srsSyncLoginForm.classList.add("hidden");
+    setSyncMsg("");
+  });
+
+  async function srsDoAuth(endpoint, email, password, btn) {
+    btn.disabled = true;
+    setSyncMsg("Connecting…");
     try {
-      const res = await fetch(`${SRS_WORKER_URL}/cards?syncKey=${srsSyncKey}`);
+      const res  = await fetch(`${SRS_WORKER_URL}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSyncMsg(data.error || "Authentication failed."); btn.disabled = false; return; }
+      srsToken = data.token;
+      srsEmail = data.email;
+      localStorage.setItem(SRS_TOKEN_LS_KEY, srsToken);
+      localStorage.setItem(SRS_EMAIL_LS_KEY, srsEmail);
+      // Push any existing local cards, then pull authoritative cloud state
+      const local = Object.values(srsDb.cards);
+      if (local.length) await syncPushBulk(local);
+      await syncFetchCards();
+      renderSyncUI();
+      refreshSrsPanel();
+      setSyncMsg("✓ Synced!");
+    } catch {
+      setSyncMsg("Connection failed — try again.");
+      btn.disabled = false;
+    }
+  }
+
+  srsLoginBtn.addEventListener("click", () => {
+    const email    = srsEmailInput.value.trim();
+    const password = srsPasswordInput.value;
+    if (!email || !password) { setSyncMsg("Enter email and password."); return; }
+    srsDoAuth("login", email, password, srsLoginBtn);
+  });
+
+  srsSignupBtn.addEventListener("click", () => {
+    const email    = srsSignupEmailInput.value.trim();
+    const password = srsSignupPasswordInput.value;
+    if (!email || !password) { setSyncMsg("Enter email and password."); return; }
+    srsDoAuth("signup", email, password, srsSignupBtn);
+  });
+
+  srsPasswordInput.addEventListener("keydown",      e => { if (e.key === "Enter") srsLoginBtn.click(); });
+  srsSignupPasswordInput.addEventListener("keydown", e => { if (e.key === "Enter") srsSignupBtn.click(); });
+
+  srsSyncLogoutBtn.addEventListener("click", () => {
+    if (srsToken) {
+      fetch(`${SRS_WORKER_URL}/logout`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${srsToken}` },
+      }).catch(() => {});
+    }
+    srsToken = null; srsEmail = null;
+    localStorage.removeItem(SRS_TOKEN_LS_KEY);
+    localStorage.removeItem(SRS_EMAIL_LS_KEY);
+    renderSyncUI();
+    setSyncMsg("Logged out.");
+  });
+
+  srsSyncNowBtn.addEventListener("click", async () => {
+    srsSyncNowBtn.disabled = true;
+    setSyncMsg("Syncing…");
+    await syncFetchCards();
+    refreshSrsPanel();
+    setSyncMsg("✓ Synced!");
+    srsSyncNowBtn.disabled = false;
+  });
+
+  async function syncFetchCards() {
+    if (!SRS_WORKER_URL || !srsToken) return;
+    try {
+      const res = await fetch(`${SRS_WORKER_URL}/cards`, {
+        headers: { 'Authorization': `Bearer ${srsToken}` },
+      });
+      if (res.status === 401) {
+        srsToken = null; srsEmail = null;
+        localStorage.removeItem(SRS_TOKEN_LS_KEY);
+        localStorage.removeItem(SRS_EMAIL_LS_KEY);
+        renderSyncUI();
+        setSyncMsg("Session expired — please log in again.");
+        return;
+      }
       if (!res.ok) return;
       const { cards } = await res.json();
       cards.forEach(c => {
@@ -1226,88 +1337,29 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   }
 
   function syncPushReview(card) {
-    if (!SRS_WORKER_URL || !srsSyncKey || !card) return;
+    if (!SRS_WORKER_URL || !srsToken || !card) return;
     fetch(`${SRS_WORKER_URL}/review`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${srsToken}` },
       body: JSON.stringify({
-        syncKey: srsSyncKey, pool: card.pool, korean: card.korean,
-        english: card.english, interval: card.interval,
-        easeFactor: card.easeFactor, repetitions: card.repetitions,
-        dueDate: card.dueDate,
+        pool: card.pool, korean: card.korean, english: card.english,
+        interval: card.interval, easeFactor: card.easeFactor,
+        repetitions: card.repetitions, dueDate: card.dueDate,
       }),
     }).catch(() => {});
   }
 
-  function syncPushBulk(cards) {
-    if (!SRS_WORKER_URL || !srsSyncKey || !cards.length) return;
-    fetch(`${SRS_WORKER_URL}/bulk`, {
+  async function syncPushBulk(cards) {
+    if (!SRS_WORKER_URL || !srsToken || !cards.length) return;
+    await fetch(`${SRS_WORKER_URL}/bulk`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ syncKey: srsSyncKey, cards }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${srsToken}` },
+      body: JSON.stringify({ cards }),
     }).catch(() => {});
   }
 
-  srsSyncEnableBtn.addEventListener("click", async () => {
-    srsSyncEnableBtn.disabled = true;
-    setSyncMsg("Creating backup…");
-    try {
-      const res  = await fetch(`${SRS_WORKER_URL}/init`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      });
-      const data = await res.json();
-      srsSyncKey = data.syncKey;
-      localStorage.setItem(SRS_SYNC_LS_KEY, srsSyncKey);
-      const allCards = Object.values(srsDb.cards);
-      if (allCards.length) syncPushBulk(allCards);
-      renderSyncUI();
-    } catch {
-      setSyncMsg("Connection failed — is the worker deployed?");
-      srsSyncEnableBtn.disabled = false;
-    }
-  });
-
-  srsSyncRestoreBtn.addEventListener("click", () => {
-    srsSyncRestoreRow.classList.toggle("hidden");
-  });
-
-  srsSyncConnectBtn.addEventListener("click", async () => {
-    const key = srsSyncKeyInput.value.trim();
-    if (!key) return;
-    srsSyncConnectBtn.disabled = true;
-    setSyncMsg("Connecting…");
-    try {
-      const res = await fetch(`${SRS_WORKER_URL}/init`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ syncKey: key }),
-      });
-      if (!res.ok) { setSyncMsg("Sync key not found."); srsSyncConnectBtn.disabled = false; return; }
-      srsSyncKey = key;
-      localStorage.setItem(SRS_SYNC_LS_KEY, srsSyncKey);
-      await syncFetchCards();
-      renderSyncUI();
-      refreshSrsPanel();
-      setSyncMsg("✓ Restored! Cards loaded from cloud.");
-    } catch {
-      setSyncMsg("Connection failed.");
-      srsSyncConnectBtn.disabled = false;
-    }
-  });
-
-  srsCopyKeyBtn.addEventListener("click", () => {
-    if (!srsSyncKey) return;
-    navigator.clipboard.writeText(srsSyncKey)
-      .then(() => { srsCopyKeyBtn.textContent = "Copied!"; setTimeout(() => { srsCopyKeyBtn.textContent = "Copy key"; }, 1500); })
-      .catch(() => { setSyncMsg("Copy failed. Key: " + srsSyncKey); });
-  });
-
-  srsSyncDisconnectBtn.addEventListener("click", () => {
-    srsSyncKey = null;
-    localStorage.removeItem(SRS_SYNC_LS_KEY);
-    renderSyncUI();
-  });
-
   renderSyncUI();
+  if (srsToken) syncFetchCards().then(refreshSrsPanel);
 
   loadNewItem();
 </script>
@@ -1759,35 +1811,79 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     line-height: 1.45;
   }
 
-  .srs-restore-row {
+  .srs-auth-tabs {
     display: flex;
+    gap: 3px;
+    background: color-mix(in srgb, var(--muted), transparent 88%);
+    border-radius: 10px;
+    padding: 3px;
+    width: fit-content;
+    margin-bottom: 0.75rem;
+  }
+
+  .srs-auth-tab {
+    border: none;
+    border-radius: 7px;
+    padding: 5px 16px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .srs-auth-tab.active {
+    background: var(--bg-soft, white);
+    color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .srs-auth-form {
+    display: flex;
+    flex-direction: column;
     gap: 0.5rem;
-    margin-top: 0.5rem;
   }
 
   .srs-sync-input {
-    flex: 1;
     border: 1px solid color-mix(in srgb, var(--muted), transparent 55%);
     border-radius: 10px;
     padding: 0.48rem 0.7rem;
     font-size: 0.9rem;
-    font-family: monospace;
     background: color-mix(in srgb, var(--bg-soft), transparent 10%);
     color: var(--text);
     outline: none;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .srs-sync-input:focus { border-color: var(--accent); }
 
-  .srs-key-display {
-    font-family: monospace;
-    font-size: 0.78rem;
-    background: color-mix(in srgb, var(--muted), transparent 88%);
-    border-radius: 6px;
-    padding: 0.3rem 0.55rem;
+  .srs-user-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .srs-user-email {
+    font-size: 0.88rem;
     color: var(--muted);
-    word-break: break-all;
-    max-width: 200px;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+    color: var(--muted);
+    font-size: 0.84rem;
+    padding: 0.38rem 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .btn-ghost:hover {
+    background: color-mix(in srgb, var(--muted), transparent 88%);
   }
 
   @media (max-width: 960px) {
