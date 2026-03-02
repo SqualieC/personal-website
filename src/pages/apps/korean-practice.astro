@@ -206,6 +206,28 @@ import kor111 from '../../data/korean-kor111-unitized.json';
           <button id="srsAddKor111"    class="btn btn-secondary" type="button">+ KOR111 Vocab</button>
         </div>
       </div>
+
+      <!-- Cloud Sync — hidden until SRS_WORKER_URL is set in the script -->
+      <div id="srsSyncSection" class="srs-sync-section hidden">
+        <p class="srs-add-label">Cloud Sync</p>
+        <p id="srsSyncMsg" class="srs-sync-msg"></p>
+        <!-- Not connected -->
+        <div id="srsSyncEnableRow" class="btn-row hidden">
+          <button id="srsSyncEnableBtn"  class="btn btn-secondary" type="button">Enable backup</button>
+          <button id="srsSyncRestoreBtn" class="btn btn-secondary" type="button">Restore from key</button>
+        </div>
+        <!-- Restore input -->
+        <div id="srsSyncRestoreRow" class="srs-restore-row hidden">
+          <input id="srsSyncKeyInput" type="text" placeholder="Paste sync key…" class="srs-sync-input" autocomplete="off" spellcheck="false" />
+          <button id="srsSyncConnectBtn" class="btn btn-secondary" type="button">Connect</button>
+        </div>
+        <!-- Connected -->
+        <div id="srsSyncActiveRow" class="btn-row hidden">
+          <code id="srsSyncKeyDisplay" class="srs-key-display"></code>
+          <button id="srsCopyKeyBtn"       class="btn btn-secondary" type="button">Copy key</button>
+          <button id="srsSyncDisconnectBtn" class="btn btn-secondary" type="button">Disconnect</button>
+        </div>
+      </div>
     </div>
 
     <p class="hint">
@@ -316,7 +338,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     readAlongPanel.classList.toggle("hidden", mode !== "readalong");
     srsPanel.classList.toggle("hidden",       mode !== "srs");
     if (mode !== "srs") loadNewItem();
-    else refreshSrsPanel();
+    else { refreshSrsPanel(); syncFetchCards().then(refreshSrsPanel); }
   }
 
   // ── Audio utilities ────────────────────────────────────────
@@ -1057,8 +1079,16 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   function srsAddAllFromPool(pool) {
     const items = pools[pool] || [];
-    items.forEach(item => srsAddCard(pool, item));
+    const newCards = [];
+    items.forEach(item => {
+      const key = `${pool}:${item.korean}`;
+      if (!srsDb.cards[key]) {
+        srsAddCard(pool, item);
+        newCards.push(srsDb.cards[key]);
+      }
+    });
     saveSrsDb();
+    syncPushBulk(newCards);
     refreshSrsPanel();
   }
 
@@ -1104,6 +1134,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     const updated = sm2(srsCard, rating);
     Object.assign(srsDb.cards[key], updated);
     saveSrsDb();
+    syncPushReview(srsDb.cards[key]);
     srsDueQueue = srsDueQueue.filter(c => !(c.pool === srsCard.pool && c.korean === srsCard.korean));
     if (rating === 0) srsDueQueue.push(srsDb.cards[key]);
     if (srsDueQueue.length === 0) {
@@ -1128,11 +1159,155 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   srsAddCurrentBtn.addEventListener("click", () => {
     if (!current) return;
-    srsAddCard(current._mode, current);
-    saveSrsDb();
+    const key = `${current._mode}:${current.korean}`;
+    if (!srsDb.cards[key]) {
+      srsAddCard(current._mode, current);
+      saveSrsDb();
+      syncPushReview(srsDb.cards[key]);
+    }
     srsAddCurrentBtn.textContent = "✓ In SRS";
     srsAddCurrentBtn.disabled = true;
   });
+
+  // ── SRS Cloud Sync ─────────────────────────────────────────
+  // After deploying cf-srs/ worker, set this to your worker URL:
+  const SRS_WORKER_URL  = ""; // e.g. "https://korean-srs.squaliec.workers.dev"
+  const SRS_SYNC_LS_KEY = "korean-srs-sync-key";
+  let srsSyncKey = localStorage.getItem(SRS_SYNC_LS_KEY) || null;
+
+  const srsSyncSection      = document.getElementById("srsSyncSection");
+  const srsSyncMsgEl        = document.getElementById("srsSyncMsg");
+  const srsSyncEnableRow    = document.getElementById("srsSyncEnableRow");
+  const srsSyncRestoreRow   = document.getElementById("srsSyncRestoreRow");
+  const srsSyncActiveRow    = document.getElementById("srsSyncActiveRow");
+  const srsSyncKeyDisplay   = document.getElementById("srsSyncKeyDisplay");
+  const srsSyncEnableBtn    = document.getElementById("srsSyncEnableBtn");
+  const srsSyncRestoreBtn   = document.getElementById("srsSyncRestoreBtn");
+  const srsSyncKeyInput     = document.getElementById("srsSyncKeyInput");
+  const srsSyncConnectBtn   = document.getElementById("srsSyncConnectBtn");
+  const srsCopyKeyBtn       = document.getElementById("srsCopyKeyBtn");
+  const srsSyncDisconnectBtn = document.getElementById("srsSyncDisconnectBtn");
+
+  function setSyncMsg(msg) { if (srsSyncMsgEl) srsSyncMsgEl.textContent = msg || ""; }
+
+  function renderSyncUI() {
+    if (!SRS_WORKER_URL) return;
+    srsSyncSection.classList.remove("hidden");
+    if (srsSyncKey) {
+      setSyncMsg("✓ Cloud backup active — save your key to restore on other devices.");
+      srsSyncEnableRow.classList.add("hidden");
+      srsSyncRestoreRow.classList.add("hidden");
+      srsSyncActiveRow.classList.remove("hidden");
+      srsSyncKeyDisplay.textContent = srsSyncKey;
+    } else {
+      setSyncMsg("Data is only saved locally. Enable backup to protect your progress.");
+      srsSyncEnableRow.classList.remove("hidden");
+      srsSyncRestoreRow.classList.add("hidden");
+      srsSyncActiveRow.classList.add("hidden");
+    }
+  }
+
+  async function syncFetchCards() {
+    if (!SRS_WORKER_URL || !srsSyncKey) return;
+    try {
+      const res = await fetch(`${SRS_WORKER_URL}/cards?syncKey=${srsSyncKey}`);
+      if (!res.ok) return;
+      const { cards } = await res.json();
+      cards.forEach(c => {
+        const key = `${c.pool}:${c.korean}`;
+        srsDb.cards[key] = {
+          pool: c.pool, korean: c.korean, english: c.english,
+          interval: c.interval, easeFactor: c.ease_factor,
+          repetitions: c.repetitions, dueDate: c.due_date,
+        };
+      });
+      saveSrsDb();
+    } catch {}
+  }
+
+  function syncPushReview(card) {
+    if (!SRS_WORKER_URL || !srsSyncKey || !card) return;
+    fetch(`${SRS_WORKER_URL}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        syncKey: srsSyncKey, pool: card.pool, korean: card.korean,
+        english: card.english, interval: card.interval,
+        easeFactor: card.easeFactor, repetitions: card.repetitions,
+        dueDate: card.dueDate,
+      }),
+    }).catch(() => {});
+  }
+
+  function syncPushBulk(cards) {
+    if (!SRS_WORKER_URL || !srsSyncKey || !cards.length) return;
+    fetch(`${SRS_WORKER_URL}/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ syncKey: srsSyncKey, cards }),
+    }).catch(() => {});
+  }
+
+  srsSyncEnableBtn.addEventListener("click", async () => {
+    srsSyncEnableBtn.disabled = true;
+    setSyncMsg("Creating backup…");
+    try {
+      const res  = await fetch(`${SRS_WORKER_URL}/init`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      const data = await res.json();
+      srsSyncKey = data.syncKey;
+      localStorage.setItem(SRS_SYNC_LS_KEY, srsSyncKey);
+      const allCards = Object.values(srsDb.cards);
+      if (allCards.length) syncPushBulk(allCards);
+      renderSyncUI();
+    } catch {
+      setSyncMsg("Connection failed — is the worker deployed?");
+      srsSyncEnableBtn.disabled = false;
+    }
+  });
+
+  srsSyncRestoreBtn.addEventListener("click", () => {
+    srsSyncRestoreRow.classList.toggle("hidden");
+  });
+
+  srsSyncConnectBtn.addEventListener("click", async () => {
+    const key = srsSyncKeyInput.value.trim();
+    if (!key) return;
+    srsSyncConnectBtn.disabled = true;
+    setSyncMsg("Connecting…");
+    try {
+      const res = await fetch(`${SRS_WORKER_URL}/init`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncKey: key }),
+      });
+      if (!res.ok) { setSyncMsg("Sync key not found."); srsSyncConnectBtn.disabled = false; return; }
+      srsSyncKey = key;
+      localStorage.setItem(SRS_SYNC_LS_KEY, srsSyncKey);
+      await syncFetchCards();
+      renderSyncUI();
+      refreshSrsPanel();
+      setSyncMsg("✓ Restored! Cards loaded from cloud.");
+    } catch {
+      setSyncMsg("Connection failed.");
+      srsSyncConnectBtn.disabled = false;
+    }
+  });
+
+  srsCopyKeyBtn.addEventListener("click", () => {
+    if (!srsSyncKey) return;
+    navigator.clipboard.writeText(srsSyncKey)
+      .then(() => { srsCopyKeyBtn.textContent = "Copied!"; setTimeout(() => { srsCopyKeyBtn.textContent = "Copy key"; }, 1500); })
+      .catch(() => { setSyncMsg("Copy failed. Key: " + srsSyncKey); });
+  });
+
+  srsSyncDisconnectBtn.addEventListener("click", () => {
+    srsSyncKey = null;
+    localStorage.removeItem(SRS_SYNC_LS_KEY);
+    renderSyncUI();
+  });
+
+  renderSyncUI();
 
   loadNewItem();
 </script>
@@ -1569,6 +1744,50 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 0;
+  }
+
+  .srs-sync-section {
+    margin-top: 0.5rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+  }
+
+  .srs-sync-msg {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.2rem 0 0.5rem;
+    line-height: 1.45;
+  }
+
+  .srs-restore-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .srs-sync-input {
+    flex: 1;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 55%);
+    border-radius: 10px;
+    padding: 0.48rem 0.7rem;
+    font-size: 0.9rem;
+    font-family: monospace;
+    background: color-mix(in srgb, var(--bg-soft), transparent 10%);
+    color: var(--text);
+    outline: none;
+  }
+
+  .srs-sync-input:focus { border-color: var(--accent); }
+
+  .srs-key-display {
+    font-family: monospace;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, var(--muted), transparent 88%);
+    border-radius: 6px;
+    padding: 0.3rem 0.55rem;
+    color: var(--muted);
+    word-break: break-all;
+    max-width: 200px;
   }
 
   @media (max-width: 960px) {
