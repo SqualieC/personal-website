@@ -474,6 +474,10 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     loadNewItem();
   });
 
+  rateRange.addEventListener("input", () => {
+    if (raAudio) raAudio.playbackRate = Number(rateRange.value || 0.95);
+  });
+
   unitAllToggle.addEventListener("change", () => {
     if (unitAllToggle.checked) {
       selectedUnits = new Set(ALL_UNITS);
