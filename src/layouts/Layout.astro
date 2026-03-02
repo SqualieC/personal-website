@@ -58,11 +58,184 @@ const beaconConfig = cfAnalyticsToken ? JSON.stringify({ token: cfAnalyticsToken
         <a href="/blog">Blog</a>
         <a href="/tools">Tools</a>
         <a href="/dles">Dles</a>
+        <button id="authNavBtn" class="nav-auth-btn" type="button">Log In</button>
       </nav>
     </header>
+
+    <!-- ── Auth Modal ──────────────────────────────────────────── -->
+    <div id="authModal" class="auth-modal-overlay" aria-hidden="true">
+      <div class="auth-modal" role="dialog" aria-modal="true" aria-label="Account">
+        <div class="auth-modal-header">
+          <h2 class="auth-modal-title">Cloud Sync</h2>
+          <button id="authModalClose" class="auth-modal-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <p id="authModalMsg" class="auth-modal-msg"></p>
+
+        <!-- Guest view: login / signup tabs -->
+        <div id="authGuestView">
+          <div class="auth-tabs">
+            <button id="authTabLogin"  class="auth-tab active" type="button">Log In</button>
+            <button id="authTabSignup" class="auth-tab"        type="button">Sign Up</button>
+          </div>
+          <div id="authLoginForm" class="auth-form">
+            <input id="authEmailInput"    type="email"    placeholder="Email"    class="auth-input" autocomplete="email" />
+            <input id="authPasswordInput" type="password" placeholder="Password" class="auth-input" autocomplete="current-password" />
+            <button id="authLoginBtn" class="auth-submit-btn" type="button">Log In</button>
+          </div>
+          <div id="authSignupForm" class="auth-form" style="display:none">
+            <input id="authSignupEmail"    type="email"    placeholder="Email"                  class="auth-input" autocomplete="email" />
+            <input id="authSignupPassword" type="password" placeholder="Password (min 8 chars)" class="auth-input" autocomplete="new-password" />
+            <button id="authSignupBtn" class="auth-submit-btn" type="button">Sign Up</button>
+          </div>
+        </div>
+
+        <!-- Logged-in view -->
+        <div id="authLoggedView" style="display:none">
+          <p id="authLoggedEmail" class="auth-logged-email"></p>
+          <p class="auth-logged-note">Your SRS cards sync across devices.</p>
+          <button id="authLogoutBtn" class="auth-logout-btn" type="button">Log Out</button>
+        </div>
+      </div>
+    </div>
     <main id="main-content" class="site-main" data-pagefind-body>
       <slot />
     </main>
+    <script is:inline>
+    (function () {
+      const WORKER    = 'https://korean-srs.squaliekid55.workers.dev';
+      const TOKEN_KEY = 'korean-srs-token';
+      const EMAIL_KEY = 'korean-srs-email';
+
+      function getToken() { return localStorage.getItem(TOKEN_KEY); }
+      function getEmail() { return localStorage.getItem(EMAIL_KEY); }
+
+      function setAuth(token, email) {
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(EMAIL_KEY, email);
+        updateNavBtn();
+        document.dispatchEvent(new CustomEvent('srs-auth-changed', { detail: { token, email } }));
+      }
+
+      function clearAuth() {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(EMAIL_KEY);
+        updateNavBtn();
+        document.dispatchEvent(new CustomEvent('srs-auth-changed', { detail: { token: null, email: null } }));
+      }
+
+      function updateNavBtn() {
+        const btn = document.getElementById('authNavBtn');
+        if (!btn) return;
+        const email = getEmail();
+        btn.textContent = email ? email.split('@')[0] : 'Log In';
+        btn.classList.toggle('nav-auth-logged', !!email);
+      }
+
+      function openModal() {
+        const modal = document.getElementById('authModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        modal.removeAttribute('aria-hidden');
+        setModalView(getToken() ? 'logged' : 'guest');
+        if (!getToken()) setTimeout(() => document.getElementById('authEmailInput')?.focus(), 50);
+      }
+
+      function closeModal() {
+        const modal = document.getElementById('authModal');
+        if (!modal) return;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        setMsg('');
+      }
+
+      function setModalView(view) {
+        document.getElementById('authGuestView').style.display  = view === 'guest'  ? 'block' : 'none';
+        document.getElementById('authLoggedView').style.display = view === 'logged' ? 'block' : 'none';
+        if (view === 'logged') document.getElementById('authLoggedEmail').textContent = getEmail() || '';
+      }
+
+      function setMsg(msg) {
+        const el = document.getElementById('authModalMsg');
+        if (el) el.textContent = msg || '';
+      }
+
+      async function doAuth(endpoint, email, password, btn) {
+        btn.disabled = true;
+        setMsg('Connecting…');
+        try {
+          const res  = await fetch(`${WORKER}/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+          if (!res.ok) { setMsg(data.error || 'Authentication failed.'); btn.disabled = false; return; }
+          setAuth(data.token, data.email);
+          setMsg('✓ Logged in!');
+          setModalView('logged');
+        } catch {
+          setMsg('Connection failed — try again.');
+          btn.disabled = false;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        updateNavBtn();
+
+        const modal = document.getElementById('authModal');
+        document.getElementById('authNavBtn')?.addEventListener('click', openModal);
+        document.getElementById('authModalClose')?.addEventListener('click', closeModal);
+        modal?.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+        document.getElementById('authTabLogin')?.addEventListener('click', function () {
+          document.getElementById('authTabLogin').classList.add('active');
+          document.getElementById('authTabSignup').classList.remove('active');
+          document.getElementById('authLoginForm').style.display  = 'flex';
+          document.getElementById('authSignupForm').style.display = 'none';
+          setMsg('');
+        });
+
+        document.getElementById('authTabSignup')?.addEventListener('click', function () {
+          document.getElementById('authTabSignup').classList.add('active');
+          document.getElementById('authTabLogin').classList.remove('active');
+          document.getElementById('authSignupForm').style.display = 'flex';
+          document.getElementById('authLoginForm').style.display  = 'none';
+          setMsg('');
+        });
+
+        document.getElementById('authLoginBtn')?.addEventListener('click', function () {
+          const email = document.getElementById('authEmailInput').value.trim();
+          const pass  = document.getElementById('authPasswordInput').value;
+          if (!email || !pass) { setMsg('Enter email and password.'); return; }
+          doAuth('login', email, pass, document.getElementById('authLoginBtn'));
+        });
+
+        document.getElementById('authSignupBtn')?.addEventListener('click', function () {
+          const email = document.getElementById('authSignupEmail').value.trim();
+          const pass  = document.getElementById('authSignupPassword').value;
+          if (!email || !pass) { setMsg('Enter email and password.'); return; }
+          doAuth('signup', email, pass, document.getElementById('authSignupBtn'));
+        });
+
+        document.getElementById('authPasswordInput')?.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') document.getElementById('authLoginBtn').click();
+        });
+        document.getElementById('authSignupPassword')?.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') document.getElementById('authSignupBtn').click();
+        });
+
+        document.getElementById('authLogoutBtn')?.addEventListener('click', async function () {
+          const token = getToken();
+          if (token) fetch(`${WORKER}/logout`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(function(){});
+          clearAuth();
+          setMsg('Logged out.');
+          setModalView('guest');
+        });
+      });
+    })();
+    </script>
+
     <footer class="site-footer">
       <div class="footer-grid">
         <p>Built with Astro + TypeScript + Tailwind + MDX.</p>
