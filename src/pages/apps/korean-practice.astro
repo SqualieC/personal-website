@@ -172,8 +172,8 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     </div>
 
     <p class="hint">
-      Reading and Dictation use pre-rendered <code>ko-KR-SunHiNeural</code> audio first, with browser voice fallback.
-      Read Along uses browser TTS per syllable so the Rate slider controls each syllable's speed.
+      Playback uses pre-rendered <code>ko-KR-SunHiNeural</code> audio first. Browser voice is used as fallback.
+      Read Along highlights each syllable in sync with the SunHi audio; Rate slider adjusts playback speed.
     </p>
   </section>
 </Layout>
@@ -239,6 +239,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   let raState  = "idle";  // "idle" | "running" | "paused" | "done"
   let raTokens = [];
   let raIndex  = 0;
+  let raAudio  = null;
 
   // ── Mode switching ─────────────────────────────────────────
   readingTab.addEventListener("click",   () => switchAppMode("reading"));
@@ -766,7 +767,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   function buildRaDisplay() {
     raTextEl.innerHTML = raTokens
       .map((tok, i) =>
-        `<span class="ra-token${tok.wordEnd ? ' ra-word-end' : ''}" data-i="${i}">${esc(tok.text)}</span>`
+        `<span class="ra-token" data-i="${i}">${esc(tok.text)}</span>${tok.wordEnd ? '<span class="ra-space">&nbsp;</span>' : ''}`
       )
       .join('');
     adjustProgressWidth();
@@ -814,12 +815,13 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     raPauseBtn.disabled    = true;
     setRaStatus("Reading along…");
     window.speechSynthesis.cancel();
-    runNextRaToken();
+    runReadAlongWithAudio();
   }
 
   function pauseReadAlong() {
     raState = "paused";
-    window.speechSynthesis.cancel();
+    if (raAudio) raAudio.pause();
+    else window.speechSynthesis.cancel();
     raStartBtn.textContent = "Resume";
     setRaStatus("Paused — press Resume to continue.");
   }
@@ -828,12 +830,58 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     raState = "running";
     raStartBtn.textContent = "Pause";
     setRaStatus("Reading along…");
-    runNextRaToken();
+    if (raAudio) raAudio.play().catch(() => { raAudio = null; runNextRaToken(); });
+    else runNextRaToken();
   }
 
   function stopReadAlong() {
     raState = "idle";
+    if (raAudio) { raAudio.pause(); raAudio = null; }
     window.speechSynthesis.cancel();
+  }
+
+  // Plays SunHi pre-rendered audio; highlights each syllable via uniform time distribution
+  function runReadAlongWithAudio() {
+    const url = getPrefetchedAudioUrl(current);
+    if (!url) { runNextRaToken(); return; }
+
+    const total = raTokens.length;
+    const audio = new Audio(url);
+    audio.playbackRate = Number(rateRange.value || 0.95);
+    raAudio = audio;
+
+    let tokenStarts = null;
+    highlightRaTokens(0);
+    updateRaProgress(0);
+
+    audio.addEventListener('loadedmetadata', () => {
+      const D = audio.duration;
+      tokenStarts = raTokens.map((_, i) => (i / total) * D);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      if (raState !== 'running' || !tokenStarts) return;
+      while (raIndex + 1 < raTokens.length && audio.currentTime >= tokenStarts[raIndex + 1]) {
+        raIndex++;
+        highlightRaTokens(raIndex);
+        updateRaProgress(raIndex);
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      if (raAudio === audio) raAudio = null;
+      if (raState === 'running') finishReadAlong();
+    });
+
+    audio.addEventListener('error', () => {
+      if (raAudio === audio) raAudio = null;
+      if (raState === 'running') { raIndex = 0; runNextRaToken(); }
+    });
+
+    audio.play().catch(() => {
+      raAudio = null;
+      if (raState === 'running') runNextRaToken();
+    });
   }
 
   function finishReadAlong() {
@@ -1193,13 +1241,15 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   /* Read Along */
   .ra-text {
     flex-wrap: wrap;
-    gap: 0.15rem 0.04em;
+    gap: 0.15rem 0;
     align-items: baseline;
     line-height: 1.8;
   }
 
-  .ra-token.ra-word-end {
-    margin-right: 0.42em;
+  .ra-space {
+    display: inline-block;
+    width: 0.38em;
+    flex-shrink: 0;
   }
 
   .ra-token {
