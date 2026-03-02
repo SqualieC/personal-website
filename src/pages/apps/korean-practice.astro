@@ -759,7 +759,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   function buildRaDisplay() {
     raTextEl.innerHTML = raTokens
       .map((tok, i) => `<span class="ra-token" data-i="${i}">${esc(tok)}</span>`)
-      .join('<span class="ra-sep"> </span>');
+      .join('');
   }
 
   function highlightRaTokens(activeIdx) {
@@ -829,7 +829,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     utterance.lang   = "ko-KR";
     utterance.rate   = Number(rateRange.value || 0.95);
     const voices     = getKoreanVoices();
-    const selected   = voices.find(v => v.voiceURI === voiceSelect.value);
+    const selected   = voices.find(v => v.voiceURI === voiceSelect.value) ?? voices[0];
     if (selected) utterance.voice = selected;
 
     utterance.onend = () => {
@@ -1164,13 +1164,9 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   /* Read Along */
   .ra-text {
     flex-wrap: wrap;
-    gap: 0.15rem 0;
+    gap: 0.15rem 0.45em;
     align-items: baseline;
     line-height: 1.8;
-  }
-
-  .ra-sep {
-    display: inline;
   }
 
   .ra-token {
