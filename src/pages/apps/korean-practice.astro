@@ -172,8 +172,8 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     </div>
 
     <p class="hint">
-      Playback uses pre-rendered <code>ko-KR-SunHiNeural</code> audio first. Browser voices are used only as fallback.
-      Read Along mode uses browser voice per-token for word-by-word highlighting.
+      Reading and Dictation use pre-rendered <code>ko-KR-SunHiNeural</code> audio first, with browser voice fallback.
+      Read Along uses browser TTS per syllable so the Rate slider controls each syllable's speed.
     </p>
   </section>
 </Layout>
@@ -239,7 +239,6 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   let raState  = "idle";  // "idle" | "running" | "paused" | "done"
   let raTokens = [];
   let raIndex  = 0;
-  let raAudio  = null;   // Audio element used for SunHi playback
 
   // ── Mode switching ─────────────────────────────────────────
   readingTab.addEventListener("click",   () => switchAppMode("reading"));
@@ -735,10 +734,17 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   });
 
   function tokenizeKorean(text) {
+    // Always syllable-level so rate slider controls each syllable's duration.
+    // Preserve word boundaries as metadata so we can add visual spacing.
     const words = text.trim().split(/\s+/).filter(Boolean);
-    // Single word → split into individual syllable blocks for finer granularity
-    if (words.length <= 1) return [...text.trim()].filter(c => c.trim() !== "");
-    return words;
+    const tokens = [];
+    words.forEach((word, wi) => {
+      const syls = [...word].filter(c => c.trim() !== "");
+      syls.forEach((syl, si) => {
+        tokens.push({ text: syl, wordEnd: si === syls.length - 1 && wi < words.length - 1 });
+      });
+    });
+    return tokens.length ? tokens : [{ text: text.trim(), wordEnd: false }];
   }
 
   function renderReadAlong(item) {
@@ -759,7 +765,9 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   function buildRaDisplay() {
     raTextEl.innerHTML = raTokens
-      .map((tok, i) => `<span class="ra-token" data-i="${i}">${esc(tok)}</span>`)
+      .map((tok, i) =>
+        `<span class="ra-token${tok.wordEnd ? ' ra-word-end' : ''}" data-i="${i}">${esc(tok.text)}</span>`
+      )
       .join('');
     adjustProgressWidth();
   }
@@ -806,13 +814,12 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     raPauseBtn.disabled    = true;
     setRaStatus("Reading along…");
     window.speechSynthesis.cancel();
-    runReadAlongWithAudio();
+    runNextRaToken();
   }
 
   function pauseReadAlong() {
     raState = "paused";
-    if (raAudio) raAudio.pause();
-    else window.speechSynthesis.cancel();
+    window.speechSynthesis.cancel();
     raStartBtn.textContent = "Resume";
     setRaStatus("Paused — press Resume to continue.");
   }
@@ -821,68 +828,12 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     raState = "running";
     raStartBtn.textContent = "Pause";
     setRaStatus("Reading along…");
-    if (raAudio) raAudio.play().catch(() => { raAudio = null; runNextRaToken(); });
-    else runNextRaToken();
+    runNextRaToken();
   }
 
   function stopReadAlong() {
     raState = "idle";
-    if (raAudio) { raAudio.pause(); raAudio = null; }
     window.speechSynthesis.cancel();
-  }
-
-  // Play SunHi pre-rendered audio and advance highlights via timeupdate timing
-  function runReadAlongWithAudio() {
-    const url = getPrefetchedAudioUrl(current);
-    if (!url) { runNextRaToken(); return; }
-
-    const weights    = raTokens.map(tok => Math.max(1, [...tok].length));
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-
-    const audio = new Audio(url);
-    audio.playbackRate = Number(rateRange.value || 0.95);
-    raAudio = audio;
-
-    let tokenStarts = null; // filled once duration is known
-
-    // Highlight first token as soon as audio starts
-    highlightRaTokens(0);
-    updateRaProgress(0);
-
-    audio.addEventListener('loadedmetadata', () => {
-      const D = audio.duration;
-      let cum = 0;
-      tokenStarts = weights.map(w => {
-        const s = (cum / totalWeight) * D;
-        cum += w;
-        return s;
-      });
-      // raIndex=0 is already highlighted; advance from 1 onward via timeupdate
-    });
-
-    audio.addEventListener('timeupdate', () => {
-      if (raState !== 'running' || !tokenStarts) return;
-      while (raIndex + 1 < raTokens.length && audio.currentTime >= tokenStarts[raIndex + 1]) {
-        raIndex++;
-        highlightRaTokens(raIndex);
-        updateRaProgress(raIndex);
-      }
-    });
-
-    audio.addEventListener('ended', () => {
-      if (raAudio === audio) raAudio = null;
-      if (raState === 'running') finishReadAlong();
-    });
-
-    audio.addEventListener('error', () => {
-      if (raAudio === audio) raAudio = null;
-      if (raState === 'running') { raIndex = 0; runNextRaToken(); }
-    });
-
-    audio.play().catch(() => {
-      raAudio = null;
-      if (raState === 'running') runNextRaToken();
-    });
   }
 
   function finishReadAlong() {
@@ -903,7 +854,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     highlightRaTokens(raIndex);
     updateRaProgress(raIndex);
 
-    const utterance  = new SpeechSynthesisUtterance(raTokens[raIndex]);
+    const utterance  = new SpeechSynthesisUtterance(raTokens[raIndex].text);
     utterance.lang   = "ko-KR";
     utterance.rate   = Number(rateRange.value || 0.95);
     const voices     = getKoreanVoices();
@@ -1242,9 +1193,13 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   /* Read Along */
   .ra-text {
     flex-wrap: wrap;
-    gap: 0.15rem 0.45em;
+    gap: 0.15rem 0.04em;
     align-items: baseline;
     line-height: 1.8;
+  }
+
+  .ra-token.ra-word-end {
+    margin-right: 0.42em;
   }
 
   .ra-token {
