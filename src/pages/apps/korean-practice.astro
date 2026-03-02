@@ -23,6 +23,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     <div class="mode-toggle">
       <button id="readingTab" class="mode-tab active" type="button">Reading</button>
       <button id="dictationTab" class="mode-tab" type="button">Dictation</button>
+      <button id="readAlongTab" class="mode-tab" type="button">Read Along</button>
     </div>
 
     <div class="control-row">
@@ -151,8 +152,28 @@ import kor111 from '../../data/korean-kor111-unitized.json';
       </div>
     </div>
 
+    <!-- ── READ ALONG PANEL ──────────────────────────────── -->
+    <div id="readAlongPanel" class="hidden">
+      <div id="raText" class="sentence ra-text" aria-live="polite"></div>
+
+      <div class="ra-progress-wrap">
+        <div id="raProgressFill" class="ra-progress-fill"></div>
+      </div>
+
+      <div id="raEnglish" class="translation hidden"></div>
+
+      <div class="btn-row">
+        <button id="raStartBtn" class="btn btn-primary" type="button">Start</button>
+        <button id="raPauseBtn" class="btn btn-secondary" type="button" disabled>Pause</button>
+        <button id="raNewBtn" class="btn btn-secondary" type="button">New Item</button>
+      </div>
+
+      <div id="raStatus" class="status"></div>
+    </div>
+
     <p class="hint">
       Playback uses pre-rendered <code>ko-KR-SunHiNeural</code> audio first. Browser voices are used only as fallback.
+      Read Along mode uses browser voice per-token for word-by-word highlighting.
     </p>
   </section>
 </Layout>
@@ -164,8 +185,19 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   const rateRange     = document.getElementById("rateRange");
   const readingTab    = document.getElementById("readingTab");
   const dictationTab  = document.getElementById("dictationTab");
+  const readAlongTab  = document.getElementById("readAlongTab");
   const readingPanel  = document.getElementById("readingPanel");
   const dictationPanel = document.getElementById("dictationPanel");
+  const readAlongPanel = document.getElementById("readAlongPanel");
+
+  // Read Along
+  const raTextEl       = document.getElementById("raText");
+  const raProgressFill = document.getElementById("raProgressFill");
+  const raEnglishEl    = document.getElementById("raEnglish");
+  const raStartBtn     = document.getElementById("raStartBtn");
+  const raPauseBtn     = document.getElementById("raPauseBtn");
+  const raNewBtn       = document.getElementById("raNewBtn");
+  const raStatusEl     = document.getElementById("raStatus");
   const unitFilterRow = document.getElementById("unitFilterRow");
   const unitAllToggle = document.getElementById("unitAllToggle");
   const unit1Toggle   = document.getElementById("unit1Toggle");
@@ -199,21 +231,30 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   let current    = null;
   let activeAudio = null;
-  let appMode    = "reading";  // "reading" | "dictation"
+  let appMode    = "reading";  // "reading" | "dictation" | "readalong"
   let dictState  = "ready";    // "ready" | "wrong" | "correct"
   let selectedUnits = new Set(ALL_UNITS);
+
+  // Read Along state
+  let raState  = "idle";  // "idle" | "running" | "paused" | "done"
+  let raTokens = [];
+  let raIndex  = 0;
 
   // ── Mode switching ─────────────────────────────────────────
   readingTab.addEventListener("click",   () => switchAppMode("reading"));
   dictationTab.addEventListener("click", () => switchAppMode("dictation"));
+  readAlongTab.addEventListener("click", () => switchAppMode("readalong"));
 
   function switchAppMode(mode) {
     appMode = mode;
     stopPlayback();
-    readingTab.classList.toggle("active",    mode === "reading");
-    dictationTab.classList.toggle("active",  mode === "dictation");
-    readingPanel.classList.toggle("hidden",  mode !== "reading");
+    stopReadAlong();
+    readingTab.classList.toggle("active",     mode === "reading");
+    dictationTab.classList.toggle("active",   mode === "dictation");
+    readAlongTab.classList.toggle("active",   mode === "readalong");
+    readingPanel.classList.toggle("hidden",   mode !== "reading");
     dictationPanel.classList.toggle("hidden", mode !== "dictation");
+    readAlongPanel.classList.toggle("hidden", mode !== "readalong");
     loadNewItem();
   }
 
@@ -356,6 +397,8 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     dictPlayBtn.disabled = disabled;
     dictSkipBtn.disabled = disabled;
     dictNextBtn.disabled = disabled;
+    raNewBtn.disabled = disabled;
+    if (disabled) { raStartBtn.disabled = true; raPauseBtn.disabled = true; }
   }
 
   function metadataHtml(item) {
@@ -418,8 +461,10 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     dictNextBtn.disabled = false;
     if (appMode === "reading") {
       renderReading(current);
-    } else {
+    } else if (appMode === "dictation") {
       renderDictation(current);
+    } else {
+      renderReadAlong(current);
     }
   }
 
@@ -668,6 +713,138 @@ import kor111 from '../../data/korean-kor111-unitized.json';
       _handleJamo((e.shiftKey && key.dataset.shift) ? key.dataset.shift : key.dataset.char);
     });
   });
+
+  // ── Read Along mode ───────────────────────────────────────
+  raNewBtn.addEventListener("click", loadNewItem);
+
+  raStartBtn.addEventListener("click", () => {
+    if (raState === "running") {
+      pauseReadAlong();
+    } else if (raState === "paused") {
+      resumeReadAlong();
+    } else {
+      raIndex = 0;
+      startReadAlong();
+    }
+  });
+
+  raPauseBtn.addEventListener("click", () => {
+    if (raState === "running") pauseReadAlong();
+    else if (raState === "paused") resumeReadAlong();
+  });
+
+  function tokenizeKorean(text) {
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    // Single word → split into individual syllable blocks for finer granularity
+    if (words.length <= 1) return [...text.trim()].filter(c => c.trim() !== "");
+    return words;
+  }
+
+  function renderReadAlong(item) {
+    stopReadAlong();
+    raTokens = tokenizeKorean(item.korean);
+    raIndex  = 0;
+    raState  = "idle";
+    raEnglishEl.textContent = item.english;
+    raEnglishEl.classList.add("hidden");
+    buildRaDisplay();
+    updateRaProgress(0);
+    setRaStatus("Press Start to read along with the audio.");
+    raStartBtn.textContent  = "Start";
+    raStartBtn.disabled     = false;
+    raPauseBtn.disabled     = true;
+    raPauseBtn.textContent  = "Pause";
+  }
+
+  function buildRaDisplay() {
+    raTextEl.innerHTML = raTokens
+      .map((tok, i) => `<span class="ra-token" data-i="${i}">${esc(tok)}</span>`)
+      .join('<span class="ra-sep"> </span>');
+  }
+
+  function highlightRaTokens(activeIdx) {
+    raTextEl.querySelectorAll(".ra-token").forEach((el, i) => {
+      el.classList.remove("ra-active", "ra-done");
+      if      (i < activeIdx)  el.classList.add("ra-done");
+      else if (i === activeIdx) el.classList.add("ra-active");
+    });
+  }
+
+  function updateRaProgress(idx) {
+    const pct = raTokens.length ? (idx / raTokens.length) * 100 : 0;
+    raProgressFill.style.width = `${pct}%`;
+  }
+
+  function setRaStatus(msg) { raStatusEl.textContent = msg || ""; }
+
+  function startReadAlong() {
+    if (!current) return;
+    raState = "running";
+    raStartBtn.textContent = "Pause";
+    raStartBtn.disabled    = false;
+    raPauseBtn.disabled    = true;   // raStartBtn doubles as pause
+    setRaStatus("Reading along…");
+    window.speechSynthesis.cancel();
+    runNextRaToken();
+  }
+
+  function pauseReadAlong() {
+    raState = "paused";
+    window.speechSynthesis.cancel();
+    raStartBtn.textContent = "Resume";
+    setRaStatus("Paused — press Resume to continue.");
+  }
+
+  function resumeReadAlong() {
+    raState = "running";
+    raStartBtn.textContent = "Pause";
+    setRaStatus("Reading along…");
+    runNextRaToken();
+  }
+
+  function stopReadAlong() {
+    raState = "idle";
+    window.speechSynthesis.cancel();
+  }
+
+  function finishReadAlong() {
+    raState = "done";
+    updateRaProgress(raTokens.length);
+    highlightRaTokens(-1);
+    raEnglishEl.classList.remove("hidden");
+    setRaStatus("Done! Press New Item for the next one.");
+    raStartBtn.textContent = "Restart";
+    raStartBtn.disabled    = false;
+    raPauseBtn.disabled    = true;
+  }
+
+  function runNextRaToken() {
+    if (raState !== "running") return;
+    if (raIndex >= raTokens.length) { finishReadAlong(); return; }
+
+    highlightRaTokens(raIndex);
+    updateRaProgress(raIndex);
+
+    const utterance  = new SpeechSynthesisUtterance(raTokens[raIndex]);
+    utterance.lang   = "ko-KR";
+    utterance.rate   = Number(rateRange.value || 0.95);
+    const voices     = getKoreanVoices();
+    const selected   = voices.find(v => v.voiceURI === voiceSelect.value);
+    if (selected) utterance.voice = selected;
+
+    utterance.onend = () => {
+      if (raState !== "running") return;
+      raIndex++;
+      setTimeout(runNextRaToken, 90);
+    };
+    utterance.onerror = () => {
+      if (raState !== "running") return;
+      raIndex++;
+      setTimeout(runNextRaToken, 90);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
 
   // ── Init ──────────────────────────────────────────────────
   if ("speechSynthesis" in window) {
@@ -983,6 +1160,54 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   .kb-row-btm { justify-content: center; gap: 6px; margin-top: 2px; }
   .kb-space { width: 38%; aspect-ratio: 38 / 9; font-size: 0.65rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; }
   .kb-bksp  { width: 12%; font-size: 1rem; }
+
+  /* Read Along */
+  .ra-text {
+    flex-wrap: wrap;
+    gap: 0.15rem 0;
+    align-items: baseline;
+    line-height: 1.8;
+  }
+
+  .ra-sep {
+    display: inline;
+  }
+
+  .ra-token {
+    display: inline;
+    border-radius: 4px;
+    padding: 0.05em 0.08em;
+    text-decoration: underline 2px transparent;
+    text-underline-offset: 5px;
+    transition: color 0.12s, background 0.12s, text-decoration-color 0.12s;
+  }
+
+  .ra-token.ra-active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent), transparent 86%);
+    text-decoration-color: var(--accent);
+    border-radius: 4px;
+  }
+
+  .ra-token.ra-done {
+    color: var(--muted);
+  }
+
+  .ra-progress-wrap {
+    height: 5px;
+    background: color-mix(in srgb, var(--muted), transparent 78%);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.2rem;
+  }
+
+  .ra-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    width: 0%;
+    transition: width 0.18s ease;
+  }
 
   @media (max-width: 960px) {
     .control-row {
