@@ -5,4 +5,4 @@ compatibility_date = "2026-02-28"
 [[d1_databases]]
 binding       = "DB"
 database_name = "korean-srs-db"
-database_id   = "REPLACE_WITH_ID_FROM_WRANGLER_D1_CREATE"
+database_id   = "17d29743-2af4-4130-adcf-f8f9acf2cf50"
