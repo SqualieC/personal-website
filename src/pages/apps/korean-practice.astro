@@ -1270,7 +1270,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       srsRevealBtn.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
       if (appMode === "srs") {
-        playSrsBothSeq(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
+        playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
       }
     } else {
       const backLang = srsCardDirection === "kor_to_eng" ? "english" : "korean";
@@ -1327,11 +1327,10 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   srsRevealBtn.addEventListener("click",  () => { srsPhase = "back"; renderSrsCard(); });
   srsReplayBtn.addEventListener("click", () => {
     if (!srsCard) return;
-    if (srsPhase === "front") {
-      playSrsBothSeq(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
-    } else {
-      playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "english" : "korean");
-    }
+    const lang = srsPhase === "front"
+      ? (srsCardDirection === "kor_to_eng" ? "korean" : "english")
+      : (srsCardDirection === "kor_to_eng" ? "english" : "korean");
+    playSrsSide(srsCard, lang);
   });
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
   srsHardBtn.addEventListener("click",    () => rateCard(1));
