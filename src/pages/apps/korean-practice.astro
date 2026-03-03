@@ -179,9 +179,18 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
     <!-- ── SRS PANEL ─────────────────────────────────────────── -->
     <div id="srsPanel" class="hidden">
-      <div class="srs-stats-row">
+      <div class="mode-toggle" style="margin-bottom:0.75rem">
+        <button id="srsModeBtn"   class="mode-tab active" type="button">SRS</button>
+        <button id="flashModeBtn" class="mode-tab"        type="button">Flashcard</button>
+      </div>
+
+      <div id="srsStatsRow" class="srs-stats-row">
         <span class="srs-stat"><strong id="srsDueCount">0</strong> due today</span>
         <span class="srs-stat"><strong id="srsTotalCount">0</strong> total cards</span>
+      </div>
+      <div id="flashStatsRow" class="srs-stats-row hidden">
+        <span class="srs-stat"><strong id="flashRemainingCount">0</strong> remaining</span>
+        <span class="srs-stat"><strong id="flashMasteredCount">0</strong> mastered</span>
       </div>
 
       <div class="srs-card-area">
@@ -189,6 +198,10 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
         <div id="srsBack"  class="srs-back  hidden"></div>
         <div id="srsEmptyMsg" class="srs-message hidden">No cards yet for the selected units. They will appear here once added.</div>
         <div id="srsDoneMsg"  class="srs-message hidden">All done for today! Come back tomorrow.</div>
+        <div id="flashDoneMsg" class="srs-message hidden">
+          Session complete!
+          <button id="flashRestartBtn" class="btn btn-secondary" type="button" style="margin-top:0.5rem">Restart</button>
+        </div>
       </div>
 
       <div class="btn-row">
@@ -201,6 +214,10 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
         <button id="srsHardBtn"  class="btn srs-btn-hard"  type="button">Hard</button>
         <button id="srsGoodBtn"  class="btn srs-btn-good"  type="button">Good</button>
         <button id="srsEasyBtn"  class="btn srs-btn-easy"  type="button">Easy</button>
+      </div>
+      <div id="flashRatingRow" class="btn-row hidden">
+        <button id="flashAgainBtn" class="btn srs-btn-again" type="button">Again</button>
+        <button id="flashGotItBtn" class="btn srs-btn-good"  type="button">Got It!</button>
       </div>
 
       <!-- Units to study -->
@@ -313,7 +330,18 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   const srsEasyBtn      = document.getElementById("srsEasyBtn");
   const srsDueCountEl   = document.getElementById("srsDueCount");
   const srsTotalCountEl = document.getElementById("srsTotalCount");
-  const srsAddCurrentBtn = document.getElementById("srsAddCurrentBtn");
+  const srsAddCurrentBtn  = document.getElementById("srsAddCurrentBtn");
+  const srsModeBtn        = document.getElementById("srsModeBtn");
+  const flashModeBtn      = document.getElementById("flashModeBtn");
+  const srsStatsRow       = document.getElementById("srsStatsRow");
+  const flashStatsRow     = document.getElementById("flashStatsRow");
+  const flashRemainingEl  = document.getElementById("flashRemainingCount");
+  const flashMasteredEl   = document.getElementById("flashMasteredCount");
+  const flashDoneMsgEl    = document.getElementById("flashDoneMsg");
+  const flashRestartBtn   = document.getElementById("flashRestartBtn");
+  const flashRatingRow    = document.getElementById("flashRatingRow");
+  const flashAgainBtn     = document.getElementById("flashAgainBtn");
+  const flashGotItBtn     = document.getElementById("flashGotItBtn");
 
   // ── State ─────────────────────────────────────────────────
   const pools = { sentences, words, kor111 };
@@ -1046,6 +1074,14 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   let srsCard     = null;
   let srsPhase    = "front"; // "front" | "back" | "empty" | "done"
   let srsLastCardState = null; // snapshot for undo (Shift+Z)
+  let srsSubMode       = "srs"; // "srs" | "flashcard"
+
+  // Flashcard session state
+  let flashQueue      = [];   // cards remaining this session
+  let flashCard       = null;
+  let flashPhase      = "front"; // "front" | "back" | "empty" | "done"
+  let flashSessionMap = {};   // key → correct count this session (needs 2 to graduate)
+  let flashMastered   = 0;
 
   // Direction is encoded in pool: base pool = kor→eng, pool+'_rev' = eng→kor
   function isRevCard(card) { return card && card.pool.endsWith('_rev'); }
@@ -1215,6 +1251,99 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     playSrsSide(card, "korean");
   }
 
+  // ── Flashcard mode ─────────────────────────────────────────
+  function flashCardKey(card) { return `${card.pool}:${card.korean}`; }
+
+  function initFlashSession() {
+    const allCards = srsActivePools.size === 0
+      ? Object.values(srsDb.cards)
+      : Object.values(srsDb.cards).filter(c => { const k = cardPoolKey(c); return k && srsActivePools.has(k); });
+    // Shuffle
+    flashQueue = [...allCards].sort(() => Math.random() - 0.5);
+    flashSessionMap = {};
+    flashMastered = 0;
+    flashCard = flashQueue[0] ?? null;
+    flashPhase = flashQueue.length ? "front" : "empty";
+    updateFlashStats();
+    renderFlashCard();
+  }
+
+  function updateFlashStats() {
+    flashRemainingEl.textContent = flashQueue.length;
+    flashMasteredEl.textContent  = flashMastered;
+  }
+
+  function renderFlashCard() {
+    srsFrontEl.classList.add("hidden");
+    srsBackEl.classList.add("hidden");
+    srsRevealBtn.classList.add("hidden");
+    srsReplayBtn.classList.add("hidden");
+    flashRatingRow.classList.add("hidden");
+    srsEmptyMsgEl.classList.add("hidden");
+    flashDoneMsgEl.classList.add("hidden");
+
+    if (flashPhase === "empty") { srsEmptyMsgEl.classList.remove("hidden"); return; }
+    if (flashPhase === "done")  { flashDoneMsgEl.classList.remove("hidden"); return; }
+
+    const isRev = isRevCard(flashCard);
+    srsFrontEl.textContent = isRev ? flashCard.english : flashCard.korean;
+    srsFrontEl.classList.remove("hidden");
+
+    if (flashPhase === "front") {
+      srsRevealBtn.classList.remove("hidden");
+      srsReplayBtn.classList.remove("hidden");
+      if (appMode === "srs") playSrsSide(flashCard, isRev ? "english" : "korean");
+    } else {
+      const backLang = isRev ? "korean" : "english";
+      srsBackEl.textContent = isRev ? flashCard.korean : flashCard.english;
+      srsBackEl.classList.remove("hidden");
+      flashRatingRow.classList.remove("hidden");
+      srsReplayBtn.classList.remove("hidden");
+      if (appMode === "srs") playSrsSide(flashCard, backLang);
+    }
+  }
+
+  function rateFlashCard(correct) {
+    if (!flashCard) return;
+    const key = flashCardKey(flashCard);
+    if (correct) {
+      flashSessionMap[key] = (flashSessionMap[key] ?? 0) + 1;
+      if (flashSessionMap[key] >= 2) {
+        // Graduate: remove from queue
+        flashQueue = flashQueue.filter(c => flashCardKey(c) !== key);
+        flashMastered++;
+      } else {
+        // One correct so far — move to back of queue
+        flashQueue = flashQueue.filter(c => flashCardKey(c) !== key);
+        flashQueue.push(flashCard);
+      }
+    } else {
+      // Again: reset count, move to back of queue
+      flashSessionMap[key] = 0;
+      flashQueue = flashQueue.filter(c => flashCardKey(c) !== key);
+      flashQueue.push(flashCard);
+    }
+    flashCard  = flashQueue[0] ?? null;
+    flashPhase = flashQueue.length ? "front" : "done";
+    updateFlashStats();
+    renderFlashCard();
+  }
+
+  function showSrsSubMode(mode) {
+    srsSubMode = mode;
+    srsModeBtn.classList.toggle("active",   mode === "srs");
+    flashModeBtn.classList.toggle("active", mode === "flashcard");
+    srsStatsRow.classList.toggle("hidden",   mode !== "srs");
+    flashStatsRow.classList.toggle("hidden", mode !== "flashcard");
+    srsRatingRow.classList.add("hidden"); // always reset before re-render
+    flashRatingRow.classList.add("hidden");
+    if (mode === "srs") {
+      refreshSrsPanel();
+    } else {
+      initFlashSession();
+    }
+  }
+
   function handlePoolCheck(poolKey, checked) {
     if (checked) {
       srsActivePools.add(poolKey);
@@ -1326,13 +1455,24 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     renderSrsCard();
   }
 
-  srsRevealBtn.addEventListener("click",  () => { srsPhase = "back"; renderSrsCard(); });
+  srsModeBtn.addEventListener("click",   () => showSrsSubMode("srs"));
+  flashModeBtn.addEventListener("click", () => showSrsSubMode("flashcard"));
+  flashAgainBtn.addEventListener("click", () => rateFlashCard(false));
+  flashGotItBtn.addEventListener("click", () => rateFlashCard(true));
+  flashRestartBtn.addEventListener("click", () => initFlashSession());
+
+  srsRevealBtn.addEventListener("click", () => {
+    if (srsSubMode === "flashcard") { flashPhase = "back"; renderFlashCard(); }
+    else { srsPhase = "back"; renderSrsCard(); }
+  });
   srsReplayBtn.addEventListener("click", () => {
-    if (!srsCard) return;
-    const lang = srsPhase === "front"
-      ? (isRevCard(srsCard) ? "english" : "korean")
-      : (isRevCard(srsCard) ? "korean"  : "english");
-    playSrsSide(srsCard, lang);
+    const card  = srsSubMode === "flashcard" ? flashCard : srsCard;
+    const phase = srsSubMode === "flashcard" ? flashPhase : srsPhase;
+    if (!card) return;
+    const lang = phase === "front"
+      ? (isRevCard(card) ? "english" : "korean")
+      : (isRevCard(card) ? "korean"  : "english");
+    playSrsSide(card, lang);
   });
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
   srsHardBtn.addEventListener("click",    () => rateCard(1));
@@ -1340,27 +1480,39 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   srsEasyBtn.addEventListener("click",    () => rateCard(3));
   srsTab.addEventListener("click",        () => switchAppMode("srs"));
 
-  // SRS keyboard shortcuts (only active when on SRS tab)
+  // SRS / Flashcard keyboard shortcuts (only active when on SRS tab)
   document.addEventListener("keydown", e => {
     if (appMode !== "srs") return;
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-    // Shift+Z = undo last rating
-    if (e.key.toLowerCase() === "z" && e.shiftKey) {
-      e.preventDefault();
-      undoLastCard();
+
+    if (srsSubMode === "flashcard") {
+      const phase = flashPhase;
+      if (phase === "front") {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault(); flashPhase = "back"; renderFlashCard();
+        }
+        return;
+      }
+      if (phase !== "back") return;
+      // Space/Enter/2/3/4 = Got It, 1 = Again
+      if (e.key === "1") { e.preventDefault(); rateFlashCard(false); }
+      else if (e.key === " " || e.key === "Enter" || e.key === "2" || e.key === "3" || e.key === "4") {
+        e.preventDefault(); rateFlashCard(true);
+      }
       return;
     }
-    // Space or Enter on front = reveal answer
+
+    // SRS sub-mode
+    if (e.key.toLowerCase() === "z" && e.shiftKey) {
+      e.preventDefault(); undoLastCard(); return;
+    }
     if (srsPhase === "front") {
       if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        srsPhase = "back";
-        renderSrsCard();
+        e.preventDefault(); srsPhase = "back"; renderSrsCard();
       }
       return;
     }
     if (srsPhase !== "back") return;
-    // 1=Again, 2=Hard, 3/Space/Enter=Good, 4=Easy
     switch (e.key) {
       case "1": e.preventDefault(); rateCard(0); break;
       case "2": e.preventDefault(); rateCard(1); break;
