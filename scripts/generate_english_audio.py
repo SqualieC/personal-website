@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 from pathlib import Path
 
 import edge_tts
@@ -32,7 +33,7 @@ async def generate_audio(force: bool) -> None:
         mode_dir.mkdir(parents=True, exist_ok=True)
 
         for index, item in enumerate(items):
-            text = str(item.get("english", "")).strip()
+            text = re.sub(r'\s*\[.*?\]', '', str(item.get("english", ""))).strip()
             if not text:
                 continue
 
