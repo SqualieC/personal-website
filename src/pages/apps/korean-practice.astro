@@ -224,6 +224,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       <!-- Browse Panel -->
       <div id="browsePanel" class="hidden">
         <div class="browse-toolbar">
+          <input id="browseSearch" type="search" class="browse-search-input" placeholder="Search Korean or English…" />
           <select id="browsePoolFilter" class="browse-filter-select">
             <option value="">All pools</option>
           </select>
@@ -377,6 +378,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   const srsActionRow      = document.getElementById("srsActionRow");
   const browseModeBtn     = document.getElementById("browseModeBtn");
   const browsePanel       = document.getElementById("browsePanel");
+  const browseSearchEl    = document.getElementById("browseSearch");
   const browsePoolFilter  = document.getElementById("browsePoolFilter");
   const browseSelInfoEl   = document.getElementById("browseSelInfo");
   const browseActionsEl   = document.getElementById("browseActions");
@@ -1449,12 +1451,23 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   function renderBrowseTable() {
     const filterVal = browsePoolFilter.value;
-    const cards = Object.values(srsDb.cards)
+    const q = browseSearchEl.value.trim().toLowerCase();
+
+    // 1. Active-pools filter (respects the unit checkboxes)
+    let base = Object.values(srsDb.cards);
+    if (srsActivePools.size > 0) {
+      base = base.filter(c => { const k = cardPoolKey(c); return k && srsActivePools.has(k); });
+    }
+
+    // 2. Pool-dropdown filter
+    // 3. Search filter (Korean or English, case-insensitive)
+    const cards = base
       .filter(c => !filterVal || basePool(c.pool) === filterVal)
+      .filter(c => !q || c.korean.toLowerCase().includes(q) || c.english.toLowerCase().includes(q))
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-    // Rebuild pool filter options (keep current selection)
-    const poolSet = [...new Set(Object.values(srsDb.cards).map(c => basePool(c.pool)))].sort();
+    // Rebuild pool filter options from the active-pool subset only
+    const poolSet = [...new Set(base.map(c => basePool(c.pool)))].sort();
     while (browsePoolFilter.options.length > 1) browsePoolFilter.remove(1);
     const poolLabels = { sentences: 'Sentences', words: 'Words', kor111: 'KOR111' };
     poolSet.forEach(p => {
@@ -1531,6 +1544,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       initFlashSession();
     } else {
       browseSelected.clear();
+      browseSearchEl.value = '';
+      browsePoolFilter.value = '';
       renderBrowseTable();
     }
   }
@@ -1652,6 +1667,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   flashModeBtn.addEventListener("click",  () => showSrsSubMode("flashcard"));
   browseModeBtn.addEventListener("click", () => showSrsSubMode("browse"));
 
+  browseSearchEl.addEventListener("input",  renderBrowseTable);
   browsePoolFilter.addEventListener("change", renderBrowseTable);
 
   browseSelectAllEl.addEventListener("change", () => {
@@ -2437,6 +2453,17 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     gap: 0.6rem;
     flex-wrap: wrap;
     margin-bottom: 0.5rem;
+  }
+
+  .browse-search-input {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.3rem 0.55rem;
+    border-radius: 7px;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 55%);
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: 0.85rem;
   }
 
   .browse-filter-select,
