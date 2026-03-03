@@ -1178,6 +1178,33 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     });
   }
 
+  // Play firstLang then secondLang in sequence.
+  function playSrsBothSeq(card, firstLang) {
+    if (!card) return;
+    const secondLang = firstLang === "korean" ? "english" : "korean";
+    const url1 = firstLang  === "korean" ? getSrsCardAudioUrl(card) : getEnglishAudioUrl(card);
+    const url2 = secondLang === "korean" ? getSrsCardAudioUrl(card) : getEnglishAudioUrl(card);
+    if (!url1) { console.error("No pre-rendered audio for", firstLang, card); return; }
+    stopPlayback();
+    const rate = Number(rateRange.value || 0.95);
+    const a1 = new Audio(url1);
+    a1.playbackRate = rate;
+    activeAudio = a1;
+    a1.onended = () => {
+      if (activeAudio !== a1) return;
+      activeAudio = null;
+      if (!url2) { console.error("No pre-rendered audio for", secondLang, card); return; }
+      const a2 = new Audio(url2);
+      a2.playbackRate = rate;
+      activeAudio = a2;
+      a2.onended = () => { if (activeAudio === a2) activeAudio = null; };
+      a2.onerror = () => { if (activeAudio === a2) activeAudio = null; console.error("Audio load error:", url2); };
+      a2.play().catch(err => { if (activeAudio === a2) activeAudio = null; console.error("Audio play error:", url2, err); });
+    };
+    a1.onerror = () => { if (activeAudio === a1) activeAudio = null; console.error("Audio load error:", url1); };
+    a1.play().catch(err => { if (activeAudio === a1) activeAudio = null; console.error("Audio play error:", url1, err); });
+  }
+
   function playSrsAudio(card) {
     playSrsSide(card, "korean");
   }
@@ -1243,14 +1270,15 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       srsRevealBtn.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
       if (appMode === "srs") {
-        playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
+        playSrsBothSeq(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
       }
     } else {
-      srsBackEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.english : srsCard.korean;
+      const backLang = srsCardDirection === "kor_to_eng" ? "english" : "korean";
+      srsBackEl.textContent = backLang === "english" ? srsCard.english : srsCard.korean;
       srsBackEl.classList.remove("hidden");
       srsRatingRow.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
-      if (srsCardDirection === "eng_to_kor" && appMode === "srs") playSrsSide(srsCard, "korean");
+      if (appMode === "srs") playSrsSide(srsCard, backLang);
     }
   }
 
@@ -1299,10 +1327,11 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   srsRevealBtn.addEventListener("click",  () => { srsPhase = "back"; renderSrsCard(); });
   srsReplayBtn.addEventListener("click", () => {
     if (!srsCard) return;
-    const showsKorean =
-      (srsPhase === "front" && srsCardDirection === "kor_to_eng") ||
-      (srsPhase === "back"  && srsCardDirection === "eng_to_kor");
-    playSrsSide(srsCard, showsKorean ? "korean" : "english");
+    if (srsPhase === "front") {
+      playSrsBothSeq(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
+    } else {
+      playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "english" : "korean");
+    }
   });
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
   srsHardBtn.addEventListener("click",    () => rateCard(1));
