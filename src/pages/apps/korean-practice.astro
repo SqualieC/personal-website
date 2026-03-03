@@ -1045,8 +1045,11 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   let srsDueQueue = [];
   let srsCard     = null;
   let srsPhase    = "front"; // "front" | "back" | "empty" | "done"
-  let srsCardDirection = "kor_to_eng"; // "kor_to_eng" | "eng_to_kor"
   let srsLastCardState = null; // snapshot for undo (Shift+Z)
+
+  // Direction is encoded in pool: base pool = kor→eng, pool+'_rev' = eng→kor
+  function isRevCard(card) { return card && card.pool.endsWith('_rev'); }
+  function basePool(pool)  { return pool.endsWith('_rev') ? pool.slice(0, -4) : pool; }
 
   // Build kor111 unit lookup: korean text → unit number
   const kor111UnitMap = Object.fromEntries(pools.kor111.map(x => [x.korean, x.unit]));
@@ -1061,11 +1064,12 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     localStorage.setItem(ACTIVE_POOLS_LS_KEY, JSON.stringify([...srsActivePools]));
   }
   function cardPoolKey(card) {
-    if (card.pool === 'kor111') {
+    const pool = basePool(card.pool);
+    if (pool === 'kor111') {
       const unit = kor111UnitMap[card.korean];
       return unit !== undefined ? `kor111:${unit}` : null;
     }
-    return card.pool;
+    return (pool === 'sentences' || pool === 'words') ? pool : null;
   }
   let srsActivePools = loadActivePools();
 
@@ -1133,30 +1137,32 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   function getSrsCardAudioUrl(card) {
     if (!card) return null;
-    if (card.pool === 'kor111') {
+    const pool = basePool(card.pool);
+    if (pool === 'kor111') {
       const item = pools.kor111.find(x => x.korean === card.korean);
       if (!item || !item.audioFile) return null;
       return `${PREFETCHED_AUDIO_BASE}/kor111/${item.audioFile}`;
     }
-    const poolArr = card.pool === 'sentences' ? pools.sentences : card.pool === 'words' ? pools.words : null;
+    const poolArr = pool === 'sentences' ? pools.sentences : pool === 'words' ? pools.words : null;
     if (!poolArr) return null;
     const idx = poolArr.findIndex(x => x.korean === card.korean);
     if (idx < 0) return null;
-    return `${PREFETCHED_AUDIO_BASE}/${card.pool}/${idx}.mp3`;
+    return `${PREFETCHED_AUDIO_BASE}/${pool}/${idx}.mp3`;
   }
 
   function getEnglishAudioUrl(card) {
     if (!card) return null;
-    if (card.pool === 'kor111') {
+    const pool = basePool(card.pool);
+    if (pool === 'kor111') {
       const item = pools.kor111.find(x => x.korean === card.korean);
       if (!item || !item.audioFile) return null;
       return `/audio/english/kor111/${item.audioFile}`;
     }
-    const poolArr = card.pool === 'sentences' ? pools.sentences : card.pool === 'words' ? pools.words : null;
+    const poolArr = pool === 'sentences' ? pools.sentences : pool === 'words' ? pools.words : null;
     if (!poolArr) return null;
     const idx = poolArr.findIndex(x => x.korean === card.korean);
     if (idx < 0) return null;
-    return `/audio/english/${card.pool}/${idx}.mp3`;
+    return `/audio/english/${pool}/${idx}.mp3`;
   }
 
   function playSrsSide(card, language) {
@@ -1216,11 +1222,10 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       const newCards = [];
       items.forEach(item => {
         const pool = item._pool || poolKey;
-        const key  = `${pool}:${item.korean}`;
-        if (!srsDb.cards[key]) {
-          srsAddCard(pool, item);
-          newCards.push(srsDb.cards[key]);
-        }
+        const fwdKey = `${pool}:${item.korean}`;
+        const revKey = `${pool}_rev:${item.korean}`;
+        if (!srsDb.cards[fwdKey]) { srsAddCard(pool, item);          newCards.push(srsDb.cards[fwdKey]); }
+        if (!srsDb.cards[revKey]) { srsAddCard(pool + '_rev', item); newCards.push(srsDb.cards[revKey]); }
       });
       if (newCards.length) { saveSrsDb(); syncPushBulk(newCards); }
     } else {
@@ -1249,7 +1254,6 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     } else {
       srsCard  = srsDueQueue[0];
       srsPhase = "front";
-      srsCardDirection = Math.random() < 0.5 ? "kor_to_eng" : "eng_to_kor";
     }
     renderSrsCard();
   }
@@ -1264,17 +1268,18 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     srsDoneMsgEl.classList.add("hidden");
     if (srsPhase === "empty") { srsEmptyMsgEl.classList.remove("hidden"); return; }
     if (srsPhase === "done")  { srsDoneMsgEl.classList.remove("hidden");  return; }
-    srsFrontEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.korean : srsCard.english;
+    const isRev = isRevCard(srsCard);
+    srsFrontEl.textContent = isRev ? srsCard.english : srsCard.korean;
     srsFrontEl.classList.remove("hidden");
     if (srsPhase === "front") {
       srsRevealBtn.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
       if (appMode === "srs") {
-        playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
+        playSrsSide(srsCard, isRev ? "english" : "korean");
       }
     } else {
-      const backLang = srsCardDirection === "kor_to_eng" ? "english" : "korean";
-      srsBackEl.textContent = backLang === "english" ? srsCard.english : srsCard.korean;
+      const backLang = isRev ? "korean" : "english";
+      srsBackEl.textContent = isRev ? srsCard.korean : srsCard.english;
       srsBackEl.classList.remove("hidden");
       srsRatingRow.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
@@ -1290,7 +1295,6 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       cardSnapshot: { ...srsDb.cards[key] },
       queue: [...srsDueQueue],
       card: srsCard,
-      direction: srsCardDirection,
     };
     const updated = sm2(srsCard, rating);
     Object.assign(srsDb.cards[key], updated);
@@ -1303,7 +1307,6 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     } else {
       srsCard  = srsDueQueue[0];
       srsPhase = "front";
-      srsCardDirection = Math.random() < 0.5 ? "kor_to_eng" : "eng_to_kor";
     }
     srsDueCountEl.textContent = srsDueQueue.length;
     renderSrsCard();
@@ -1311,14 +1314,13 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   function undoLastCard() {
     if (!srsLastCardState) return;
-    const { cardKey, cardSnapshot, queue, card, direction } = srsLastCardState;
+    const { cardKey, cardSnapshot, queue, card } = srsLastCardState;
     srsDb.cards[cardKey] = cardSnapshot;
     saveSrsDb();
     syncPushReview(srsDb.cards[cardKey]);
     srsDueQueue = queue;
     srsCard = card;
     srsPhase = "front";
-    srsCardDirection = direction;
     srsDueCountEl.textContent = srsDueQueue.length;
     srsLastCardState = null;
     renderSrsCard();
@@ -1328,8 +1330,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   srsReplayBtn.addEventListener("click", () => {
     if (!srsCard) return;
     const lang = srsPhase === "front"
-      ? (srsCardDirection === "kor_to_eng" ? "korean" : "english")
-      : (srsCardDirection === "kor_to_eng" ? "english" : "korean");
+      ? (isRevCard(srsCard) ? "english" : "korean")
+      : (isRevCard(srsCard) ? "korean"  : "english");
     playSrsSide(srsCard, lang);
   });
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
@@ -1377,12 +1379,13 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   srsAddCurrentBtn.addEventListener("click", () => {
     if (!current) return;
-    const key = `${current._mode}:${current.korean}`;
-    if (!srsDb.cards[key]) {
-      srsAddCard(current._mode, current);
-      saveSrsDb();
-      syncPushReview(srsDb.cards[key]);
-    }
+    const pool   = current._mode;
+    const fwdKey = `${pool}:${current.korean}`;
+    const revKey = `${pool}_rev:${current.korean}`;
+    const newCards = [];
+    if (!srsDb.cards[fwdKey]) { srsAddCard(pool,          current); newCards.push(srsDb.cards[fwdKey]); }
+    if (!srsDb.cards[revKey]) { srsAddCard(pool + '_rev', current); newCards.push(srsDb.cards[revKey]); }
+    if (newCards.length) { saveSrsDb(); newCards.forEach(c => syncPushReview(c)); }
     srsAddCurrentBtn.textContent = "✓ In SRS";
     srsAddCurrentBtn.disabled = true;
   });
@@ -1499,6 +1502,20 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       setSyncMsg("✓ Synced!");
     }
   });
+
+  // Migrate existing cards to directional: create _rev counterpart for any card that lacks one.
+  (function migrateToDirectionalCards() {
+    const toAdd = [];
+    Object.values(srsDb.cards).forEach(card => {
+      if (card.pool.endsWith('_rev')) return;
+      const revKey = `${card.pool}_rev:${card.korean}`;
+      if (!srsDb.cards[revKey]) {
+        srsAddCard(card.pool + '_rev', card);
+        toAdd.push(srsDb.cards[revKey]);
+      }
+    });
+    if (toAdd.length) { saveSrsDb(); syncPushBulk(toAdd); }
+  })();
 
   renderSyncUI();
   if (getSrsToken()) syncFetchCards().then(refreshSrsPanel);
