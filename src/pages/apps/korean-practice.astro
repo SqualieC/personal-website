@@ -193,6 +193,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
       <div class="btn-row">
         <button id="srsRevealBtn" class="btn btn-primary hidden" type="button">Show Answer</button>
+        <button id="srsReplayBtn" class="btn btn-secondary hidden" type="button">&#128266; Replay</button>
       </div>
 
       <div id="srsRatingRow" class="btn-row hidden">
@@ -304,6 +305,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   const srsEmptyMsgEl   = document.getElementById("srsEmptyMsg");
   const srsDoneMsgEl    = document.getElementById("srsDoneMsg");
   const srsRevealBtn    = document.getElementById("srsRevealBtn");
+  const srsReplayBtn    = document.getElementById("srsReplayBtn");
   const srsRatingRow    = document.getElementById("srsRatingRow");
   const srsAgainBtn     = document.getElementById("srsAgainBtn");
   const srsHardBtn      = document.getElementById("srsHardBtn");
@@ -1204,6 +1206,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     srsFrontEl.classList.add("hidden");
     srsBackEl.classList.add("hidden");
     srsRevealBtn.classList.add("hidden");
+    srsReplayBtn.classList.add("hidden");
     srsRatingRow.classList.add("hidden");
     srsEmptyMsgEl.classList.add("hidden");
     srsDoneMsgEl.classList.add("hidden");
@@ -1213,11 +1216,15 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     srsFrontEl.classList.remove("hidden");
     if (srsPhase === "front") {
       srsRevealBtn.classList.remove("hidden");
-      if (srsCardDirection === "kor_to_eng" && appMode === "srs") playSrsAudio(srsCard);
+      if (srsCardDirection === "kor_to_eng" && appMode === "srs") {
+        playSrsAudio(srsCard);
+        srsReplayBtn.classList.remove("hidden");
+      }
     } else {
       srsBackEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.english : srsCard.korean;
       srsBackEl.classList.remove("hidden");
       srsRatingRow.classList.remove("hidden");
+      srsReplayBtn.classList.remove("hidden");
       if (srsCardDirection === "eng_to_kor" && appMode === "srs") playSrsAudio(srsCard);
     }
   }
@@ -1265,6 +1272,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   }
 
   srsRevealBtn.addEventListener("click",  () => { srsPhase = "back"; renderSrsCard(); });
+  srsReplayBtn.addEventListener("click",  () => playSrsAudio(srsCard));
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
   srsHardBtn.addEventListener("click",    () => rateCard(1));
   srsGoodBtn.addEventListener("click",    () => rateCard(2));
@@ -1558,7 +1566,9 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     min-height: 44px;
   }
 
-  .translation.hidden { visibility: hidden; }
+  .hidden { display: none; }
+  /* translation keeps its space when hidden so layout doesn't jump */
+  .translation.hidden { display: block; visibility: hidden; }
 
   .item-meta {
     min-height: 30px;
