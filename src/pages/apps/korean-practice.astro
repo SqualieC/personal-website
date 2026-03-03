@@ -1133,7 +1133,11 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   function getSrsCardAudioUrl(card) {
     if (!card) return null;
-    // kor111 audio files are not pre-rendered; fall through to browser TTS
+    if (card.pool === 'kor111') {
+      const item = pools.kor111.find(x => x.korean === card.korean);
+      if (!item || !item.audioFile) return null;
+      return `${PREFETCHED_AUDIO_BASE}/kor111/${item.audioFile}`;
+    }
     const poolArr = card.pool === 'sentences' ? pools.sentences : card.pool === 'words' ? pools.words : null;
     if (!poolArr) return null;
     const idx = poolArr.findIndex(x => x.korean === card.korean);
