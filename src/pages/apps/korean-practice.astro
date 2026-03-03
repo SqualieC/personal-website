@@ -1459,22 +1459,28 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       base = base.filter(c => { const k = cardPoolKey(c); return k && srsActivePools.has(k); });
     }
 
-    // 2. Pool-dropdown filter
+    // 2. Pool-dropdown filter (uses cardPoolKey values for unit granularity)
     // 3. Search filter (Korean or English, case-insensitive)
     const cards = base
-      .filter(c => !filterVal || basePool(c.pool) === filterVal)
+      .filter(c => !filterVal || cardPoolKey(c) === filterVal)
       .filter(c => !q || c.korean.toLowerCase().includes(q) || c.english.toLowerCase().includes(q))
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
     // Rebuild pool filter options from the active-pool subset only
-    const poolSet = [...new Set(base.map(c => basePool(c.pool)))].sort();
+    const poolKeyLabel = k => {
+      if (!k) return k;
+      if (k === 'sentences') return 'Sentences';
+      if (k === 'words')     return 'Words';
+      if (k.startsWith('kor111:')) return `KOR111 Unit ${k.split(':')[1]}`;
+      return k;
+    };
+    const poolSet = [...new Set(base.map(c => cardPoolKey(c)).filter(Boolean))].sort();
     while (browsePoolFilter.options.length > 1) browsePoolFilter.remove(1);
-    const poolLabels = { sentences: 'Sentences', words: 'Words', kor111: 'KOR111' };
-    poolSet.forEach(p => {
+    poolSet.forEach(k => {
       const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = poolLabels[p] ?? p;
-      if (p === filterVal) opt.selected = true;
+      opt.value = k;
+      opt.textContent = poolKeyLabel(k);
+      if (k === filterVal) opt.selected = true;
       browsePoolFilter.appendChild(opt);
     });
 
@@ -1568,6 +1574,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     }
     saveActivePools();
     refreshSrsPanel();
+    if (srsSubMode === "browse") renderBrowseTable();
   }
 
   function refreshSrsPanel() {
