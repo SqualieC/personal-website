@@ -6,9 +6,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
+import sys
 from pathlib import Path
 
 import edge_tts
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 VOICE = "ko-KR-SunHiNeural"
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +36,7 @@ async def generate_audio(force: bool) -> None:
         mode_dir.mkdir(parents=True, exist_ok=True)
 
         for index, item in enumerate(items):
-            text = str(item.get("korean", "")).strip()
+            text = re.sub(r'\s*\(.*?\)', '', str(item.get("korean", ""))).strip()
             if not text:
                 continue
 
