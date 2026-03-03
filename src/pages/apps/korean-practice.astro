@@ -1133,11 +1133,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
 
   function getSrsCardAudioUrl(card) {
     if (!card) return null;
-    if (card.pool === 'kor111') {
-      const item = pools.kor111.find(x => x.korean === card.korean);
-      if (!item || !item.audioFile) return null;
-      return `${PREFETCHED_AUDIO_BASE}/kor111/${item.audioFile}`;
-    }
+    // kor111 audio files are not pre-rendered; fall through to browser TTS
     const poolArr = card.pool === 'sentences' ? pools.sentences : card.pool === 'words' ? pools.words : null;
     if (!poolArr) return null;
     const idx = poolArr.findIndex(x => x.korean === card.korean);
@@ -1146,15 +1142,25 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   }
 
   function playSrsAudio(card) {
+    if (!card) return;
     const url = getSrsCardAudioUrl(card);
-    if (!url) return;
     stopPlayback();
-    const audio = new Audio(url);
-    audio.playbackRate = Number(rateRange.value || 0.95);
-    activeAudio = audio;
-    audio.onended = () => { if (activeAudio === audio) activeAudio = null; };
-    audio.onerror = () => { if (activeAudio === audio) activeAudio = null; };
-    audio.play().catch(() => { if (activeAudio === audio) activeAudio = null; });
+    if (url) {
+      const audio = new Audio(url);
+      audio.playbackRate = Number(rateRange.value || 0.95);
+      activeAudio = audio;
+      audio.onended = () => { if (activeAudio === audio) activeAudio = null; };
+      audio.onerror = () => {
+        if (activeAudio === audio) activeAudio = null;
+        speakBrowserVoice(card.korean, () => {});
+      };
+      audio.play().catch(() => {
+        if (activeAudio === audio) activeAudio = null;
+        speakBrowserVoice(card.korean, () => {});
+      });
+    } else {
+      speakBrowserVoice(card.korean, () => {});
+    }
   }
 
   function handlePoolCheck(poolKey, checked) {
