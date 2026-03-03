@@ -1133,22 +1133,65 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     });
   }
 
-  function sm2(card, rating) {
-    let { interval, easeFactor, repetitions } = card;
-    if (rating < 2) {
-      repetitions = 0;
-      interval = 1;
+  // ── FSRS-5 ────────────────────────────────────────────────────────────────
+  const FSRS_W = [0.2487, 1.4899, 5.1687, 6.7905, 7.0427, 0.8069, 1.6838, 0.0010,
+                  1.8202, 0.0000, 1.2660, 1.9319, 0.1229, 0.2200, 2.1515, 0.1213,
+                  2.6859, 0.5386, 0.7037];
+  const FSRS_DECAY     = -0.5;
+  const FSRS_FACTOR    = Math.pow(0.9, 1 / FSRS_DECAY) - 1; // ≈ 19/81 ≈ 0.2346
+  const FSRS_RETENTION = 0.91;
+
+  function daysBetween(a, b) {
+    return Math.round((new Date(b) - new Date(a)) / 86400000);
+  }
+
+  function fsrsInterval(stability) {
+    const raw = stability / FSRS_FACTOR * (Math.pow(FSRS_RETENTION, 1 / FSRS_DECAY) - 1);
+    return Math.max(1, Math.round(raw));
+  }
+
+  function fsrs(card, rating) {
+    const r1 = rating + 1; // 0-based → 1-based (1=Again, 2=Hard, 3=Good, 4=Easy)
+    let { stability, difficulty, interval, repetitions, dueDate } = card;
+
+    if (repetitions === 0) {
+      // New card: initialise from first rating
+      stability  = Math.max(0.01, FSRS_W[r1 - 1]);
+      difficulty = Math.min(10, Math.max(1, FSRS_W[4] - Math.exp(FSRS_W[5] * (r1 - 1)) + 1));
     } else {
-      repetitions += 1;
-      if (repetitions === 1) interval = 1;
-      else if (repetitions === 2) interval = 6;
-      else interval = Math.round(interval * easeFactor);
-      easeFactor += 0.1 - (3 - rating) * (0.08 + (3 - rating) * 0.02);
-      if (easeFactor < 1.3) easeFactor = 1.3;
+      // Elapsed days: scheduled interval + any overdue days
+      const elapsed = Math.max(1, (interval || 1) + Math.max(0, daysBetween(dueDate, todayStr())));
+      const R = Math.pow(1 + FSRS_FACTOR * elapsed / stability, FSRS_DECAY);
+      const d = difficulty;
+
+      if (r1 === 1) {
+        // Again → forget stability
+        stability = Math.max(0.01,
+          FSRS_W[11] * Math.pow(d, -FSRS_W[12]) *
+          (Math.pow(stability + 1, FSRS_W[13]) - 1) *
+          Math.exp(FSRS_W[14] * (1 - R))
+        );
+      } else {
+        // Hard / Good / Easy → recall stability
+        const hp = r1 === 2 ? FSRS_W[15] : 1;
+        const eb = r1 === 4 ? FSRS_W[16] : 1;
+        stability = Math.max(0.01,
+          stability * (1 + Math.exp(FSRS_W[8]) * (11 - d) *
+          Math.pow(stability, -FSRS_W[9]) *
+          (Math.exp(FSRS_W[10] * (1 - R)) - 1) * hp * eb)
+        );
+      }
+      // Update difficulty with mean-reversion toward D0(Good)
+      const d0Good = FSRS_W[4] - Math.exp(FSRS_W[5] * 2) + 1;
+      const nextD  = d - FSRS_W[6] * (r1 - 3);
+      difficulty   = Math.min(10, Math.max(1, FSRS_W[7] * d0Good + (1 - FSRS_W[7]) * nextD));
     }
-    const due = new Date();
+
+    interval    = r1 === 1 ? 1 : fsrsInterval(stability);
+    repetitions = r1 === 1 ? 0 : repetitions + 1;
+    const due   = new Date();
     due.setDate(due.getDate() + interval);
-    return { interval, easeFactor, repetitions, dueDate: due.toISOString().split("T")[0] };
+    return { stability, difficulty, interval, repetitions, dueDate: due.toISOString().split("T")[0] };
   }
 
   function srsAddCard(pool, item) {
@@ -1156,7 +1199,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     if (!srsDb.cards[key]) {
       srsDb.cards[key] = {
         pool, korean: item.korean, english: item.english || "",
-        interval: 1, easeFactor: 2.5, repetitions: 0, dueDate: todayStr()
+        stability: 0, difficulty: 5.0, interval: 1, repetitions: 0, dueDate: todayStr()
       };
     }
   }
@@ -1425,7 +1468,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       queue: [...srsDueQueue],
       card: srsCard,
     };
-    const updated = sm2(srsCard, rating);
+    const updated = fsrs(srsCard, rating);
     Object.assign(srsDb.cards[key], updated);
     saveSrsDb();
     syncPushReview(srsDb.cards[key]);
@@ -1608,8 +1651,9 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
         const key = `${c.pool}:${c.korean}`;
         srsDb.cards[key] = {
           pool: c.pool, korean: c.korean, english: c.english,
-          interval: c.interval, easeFactor: c.ease_factor,
-          repetitions: c.repetitions, dueDate: c.due_date,
+          stability: c.ease_factor,       // ease_factor column stores stability
+          difficulty: c.difficulty ?? 5.0,
+          interval: c.interval, repetitions: c.repetitions, dueDate: c.due_date,
         };
       });
       saveSrsDb();
@@ -1626,7 +1670,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         pool: card.pool, korean: card.korean, english: card.english,
-        interval: card.interval, easeFactor: card.easeFactor,
+        interval: card.interval, easeFactor: card.stability,  // ease_factor column stores stability
+        difficulty: card.difficulty,
         repetitions: card.repetitions, dueDate: card.dueDate,
       }),
     }).catch(() => {});
@@ -1667,6 +1712,20 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       }
     });
     if (toAdd.length) { saveSrsDb(); syncPushBulk(toAdd); }
+  })();
+
+  // Migrate existing SM-2 cards to FSRS-5 format.
+  (function migrateToFsrs() {
+    let changed = false;
+    Object.values(srsDb.cards).forEach(card => {
+      if (card.stability === undefined) {
+        card.stability  = card.interval ?? 1;
+        card.difficulty = 5.0;
+        delete card.easeFactor;
+        changed = true;
+      }
+    });
+    if (changed) saveSrsDb();
   })();
 
   renderSyncUI();

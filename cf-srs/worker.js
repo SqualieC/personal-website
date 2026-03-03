@@ -29,7 +29,7 @@ async function hashPassword(password) {
   );
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 10_000, hash: 'SHA-256' },
     keyMaterial, 256
   );
   const saltHex = [...salt].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -45,7 +45,7 @@ async function verifyPassword(password, stored) {
     'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 200_000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 10_000, hash: 'SHA-256' },
     keyMaterial, 256
   );
   const newHashHex = [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -159,7 +159,7 @@ export default {
 
       const { results } = await env.DB
         .prepare(
-          'SELECT pool, korean, english, interval, ease_factor, repetitions, due_date ' +
+          'SELECT pool, korean, english, interval, ease_factor, repetitions, due_date, difficulty ' +
           'FROM cards WHERE user_id = ?'
         )
         .bind(userId)
@@ -178,21 +178,22 @@ export default {
       let body;
       try { body = await request.json(); } catch { return err('Invalid JSON'); }
 
-      const { pool, korean, english, interval, easeFactor, repetitions, dueDate } = body ?? {};
+      const { pool, korean, english, interval, easeFactor, repetitions, dueDate, difficulty } = body ?? {};
       if (!pool || !korean || !dueDate) return err('Missing required fields');
 
       await env.DB
         .prepare(`
-          INSERT INTO cards (user_id, pool, korean, english, interval, ease_factor, repetitions, due_date)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO cards (user_id, pool, korean, english, interval, ease_factor, repetitions, due_date, difficulty)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(user_id, pool, korean) DO UPDATE SET
             english     = excluded.english,
             interval    = excluded.interval,
             ease_factor = excluded.ease_factor,
             repetitions = excluded.repetitions,
-            due_date    = excluded.due_date
+            due_date    = excluded.due_date,
+            difficulty  = excluded.difficulty
         `)
-        .bind(userId, pool, korean, english ?? '', interval ?? 1, easeFactor ?? 2.5, repetitions ?? 0, dueDate)
+        .bind(userId, pool, korean, english ?? '', interval ?? 1, easeFactor ?? 0, repetitions ?? 0, dueDate, difficulty ?? 5.0)
         .run();
 
       return json({ ok: true });
@@ -217,8 +218,8 @@ export default {
         env.DB
           .prepare(
             'INSERT OR IGNORE INTO cards ' +
-            '(user_id, pool, korean, english, interval, ease_factor, repetitions, due_date) ' +
-            'VALUES (?, ?, ?, ?, 1, 2.5, 0, ?)'
+            '(user_id, pool, korean, english, interval, ease_factor, repetitions, due_date, difficulty) ' +
+            'VALUES (?, ?, ?, ?, 1, 0, 0, ?, 5.0)'
           )
           .bind(userId, c.pool, c.korean, c.english ?? '', today)
       );
