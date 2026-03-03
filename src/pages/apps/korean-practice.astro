@@ -1165,7 +1165,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     if (!url) { console.error("No pre-rendered audio for", language, card); return; }
     stopPlayback();
     const audio = new Audio(url);
-    audio.playbackRate = Number(rateRange.value || 0.95);
+    audio.playbackRate = language === "korean" ? Number(rateRange.value || 0.95) : 1.0;
     activeAudio = audio;
     audio.onended = () => { if (activeAudio === audio) activeAudio = null; };
     audio.onerror = () => {
