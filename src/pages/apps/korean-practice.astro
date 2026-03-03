@@ -180,8 +180,9 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     <!-- ── SRS PANEL ─────────────────────────────────────────── -->
     <div id="srsPanel" class="hidden">
       <div class="mode-toggle" style="margin-bottom:0.75rem">
-        <button id="srsModeBtn"   class="mode-tab active" type="button">SRS</button>
-        <button id="flashModeBtn" class="mode-tab"        type="button">Flashcard</button>
+        <button id="srsModeBtn"    class="mode-tab active" type="button">SRS</button>
+        <button id="flashModeBtn"  class="mode-tab"        type="button">Flashcard</button>
+        <button id="browseModeBtn" class="mode-tab"        type="button">Browse</button>
       </div>
 
       <div id="srsStatsRow" class="srs-stats-row">
@@ -204,7 +205,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
         </div>
       </div>
 
-      <div class="btn-row">
+      <div id="srsActionRow" class="btn-row">
         <button id="srsRevealBtn" class="btn btn-primary hidden" type="button">Show Answer</button>
         <button id="srsReplayBtn" class="btn btn-secondary hidden" type="button">&#128266; Replay</button>
       </div>
@@ -218,6 +219,37 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       <div id="flashRatingRow" class="btn-row hidden">
         <button id="flashAgainBtn" class="btn srs-btn-again" type="button">Again</button>
         <button id="flashGotItBtn" class="btn srs-btn-good"  type="button">Got It!</button>
+      </div>
+
+      <!-- Browse Panel -->
+      <div id="browsePanel" class="hidden">
+        <div class="browse-toolbar">
+          <select id="browsePoolFilter" class="browse-filter-select">
+            <option value="">All pools</option>
+          </select>
+          <span id="browseSelInfo" class="browse-sel-info"></span>
+          <div id="browseActions" class="browse-actions hidden">
+            <button id="browseDueNowBtn" class="btn btn-secondary" type="button">Due Now</button>
+            <input id="browseDatePicker" type="date" class="browse-date-input" />
+            <button id="browseSetDateBtn" class="btn btn-secondary" type="button">Set Date</button>
+          </div>
+        </div>
+        <div class="browse-table-wrap">
+          <table class="browse-table">
+            <thead>
+              <tr>
+                <th class="browse-th-cb"><input type="checkbox" id="browseSelectAll" /></th>
+                <th>Front</th>
+                <th>Back</th>
+                <th>Pool</th>
+                <th>Due</th>
+                <th>Shown</th>
+                <th>Good %</th>
+              </tr>
+            </thead>
+            <tbody id="browseTableBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Units to study -->
@@ -342,6 +374,17 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   const flashRatingRow    = document.getElementById("flashRatingRow");
   const flashAgainBtn     = document.getElementById("flashAgainBtn");
   const flashGotItBtn     = document.getElementById("flashGotItBtn");
+  const srsActionRow      = document.getElementById("srsActionRow");
+  const browseModeBtn     = document.getElementById("browseModeBtn");
+  const browsePanel       = document.getElementById("browsePanel");
+  const browsePoolFilter  = document.getElementById("browsePoolFilter");
+  const browseSelInfoEl   = document.getElementById("browseSelInfo");
+  const browseActionsEl   = document.getElementById("browseActions");
+  const browseDueNowBtn   = document.getElementById("browseDueNowBtn");
+  const browseDatePickerEl= document.getElementById("browseDatePicker");
+  const browseSetDateBtn  = document.getElementById("browseSetDateBtn");
+  const browseSelectAllEl = document.getElementById("browseSelectAll");
+  const browseTableBodyEl = document.getElementById("browseTableBody");
 
   // ── State ─────────────────────────────────────────────────
   const pools = { sentences, words, kor111 };
@@ -1074,7 +1117,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   let srsCard     = null;
   let srsPhase    = "front"; // "front" | "back" | "empty" | "done"
   let srsLastCardState = null; // snapshot for undo (Shift+Z)
-  let srsSubMode       = "srs"; // "srs" | "flashcard"
+  let srsSubMode       = "srs"; // "srs" | "flashcard" | "browse"
+  let browseSelected   = new Set(); // card keys selected in browse view
 
   // Flashcard session state
   let flashQueue      = [];   // cards remaining this session
@@ -1199,7 +1243,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     if (!srsDb.cards[key]) {
       srsDb.cards[key] = {
         pool, korean: item.korean, english: item.english || "",
-        stability: 0, difficulty: 5.0, interval: 1, repetitions: 0, dueDate: todayStr()
+        stability: 0, difficulty: 5.0, interval: 1, repetitions: 0, dueDate: todayStr(),
+        reviews: 0, goodCount: 0,
       };
     }
   }
@@ -1372,18 +1417,121 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     renderFlashCard();
   }
 
+  // ── Browse helpers ────────────────────────────────────────────────────────
+  function displayPoolName(card) {
+    const isRev = card.pool.endsWith('_rev');
+    const pool  = basePool(card.pool);
+    const suffix = isRev ? " ↺" : "";
+    if (pool === 'sentences') return "Sentences" + suffix;
+    if (pool === 'words')     return "Words" + suffix;
+    if (pool === 'kor111') {
+      const unit = kor111UnitMap[card.korean];
+      return unit !== undefined ? `KOR111 U${unit}${suffix}` : `KOR111${suffix}`;
+    }
+    return pool + suffix;
+  }
+
+  function dueDateLabel(dueDate) {
+    const days = daysBetween(todayStr(), dueDate);
+    if (days < 0)  return { text: `${-days}d overdue`, cls: "due-overdue" };
+    if (days === 0) return { text: "Today",            cls: "due-today"   };
+    return { text: `in ${days}d`, cls: "due-future" };
+  }
+
+  function updateBrowseSelInfo() {
+    const total = browseTableBodyEl.rows.length;
+    const sel   = browseSelected.size;
+    browseSelInfoEl.textContent = sel > 0 ? `${sel} of ${total} selected` : `${total} cards`;
+    browseActionsEl.classList.toggle("hidden", sel === 0);
+    browseSelectAllEl.indeterminate = sel > 0 && sel < total;
+    browseSelectAllEl.checked = sel > 0 && sel === total;
+  }
+
+  function renderBrowseTable() {
+    const filterVal = browsePoolFilter.value;
+    const cards = Object.values(srsDb.cards)
+      .filter(c => !filterVal || basePool(c.pool) === filterVal)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+    // Rebuild pool filter options (keep current selection)
+    const poolSet = [...new Set(Object.values(srsDb.cards).map(c => basePool(c.pool)))].sort();
+    while (browsePoolFilter.options.length > 1) browsePoolFilter.remove(1);
+    const poolLabels = { sentences: 'Sentences', words: 'Words', kor111: 'KOR111' };
+    poolSet.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = poolLabels[p] ?? p;
+      if (p === filterVal) opt.selected = true;
+      browsePoolFilter.appendChild(opt);
+    });
+
+    browseTableBodyEl.innerHTML = '';
+    cards.forEach(card => {
+      const key      = `${card.pool}:${card.korean}`;
+      const isRev    = isRevCard(card);
+      const front    = isRev ? card.english : card.korean;
+      const back     = isRev ? card.korean  : card.english;
+      const reviews  = card.reviews   ?? 0;
+      const good     = card.goodCount ?? 0;
+      const goodStr  = reviews > 0
+        ? `${good}/${reviews} (${Math.round(good / reviews * 100)}%)`
+        : '—';
+      const due = dueDateLabel(card.dueDate);
+
+      const tr = document.createElement('tr');
+      tr.dataset.key = key;
+
+      const mkTd = (cls, text) => {
+        const td = document.createElement('td');
+        if (cls) td.className = cls;
+        td.textContent = text;
+        return td;
+      };
+
+      const tdCb = document.createElement('td');
+      const cb   = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'browse-cb'; cb.dataset.key = key;
+      cb.checked = browseSelected.has(key);
+      tdCb.appendChild(cb);
+
+      const tdDue = mkTd('browse-due ' + due.cls, due.text);
+
+      tr.append(
+        tdCb,
+        mkTd('browse-front', front),
+        mkTd('browse-back',  back),
+        mkTd('browse-pool',  displayPoolName(card)),
+        tdDue,
+        mkTd('browse-reviews', String(reviews)),
+        mkTd('browse-good',    goodStr),
+      );
+      browseTableBodyEl.appendChild(tr);
+    });
+
+    updateBrowseSelInfo();
+  }
+
   function showSrsSubMode(mode) {
     srsSubMode = mode;
-    srsModeBtn.classList.toggle("active",   mode === "srs");
-    flashModeBtn.classList.toggle("active", mode === "flashcard");
+    srsModeBtn.classList.toggle("active",    mode === "srs");
+    flashModeBtn.classList.toggle("active",  mode === "flashcard");
+    browseModeBtn.classList.toggle("active", mode === "browse");
     srsStatsRow.classList.toggle("hidden",   mode !== "srs");
     flashStatsRow.classList.toggle("hidden", mode !== "flashcard");
-    srsRatingRow.classList.add("hidden"); // always reset before re-render
+    srsRatingRow.classList.add("hidden");
     flashRatingRow.classList.add("hidden");
+    // Card area + action row visible only in SRS/Flashcard modes
+    const inBrowse = mode === "browse";
+    document.querySelector('.srs-card-area').classList.toggle("hidden", inBrowse);
+    srsActionRow.classList.toggle("hidden", inBrowse);
+    browsePanel.classList.toggle("hidden", !inBrowse);
     if (mode === "srs") {
       refreshSrsPanel();
-    } else {
+    } else if (mode === "flashcard") {
       initFlashSession();
+    } else {
+      browseSelected.clear();
+      renderBrowseTable();
     }
   }
 
@@ -1470,6 +1618,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     };
     const updated = fsrs(srsCard, rating);
     Object.assign(srsDb.cards[key], updated);
+    srsDb.cards[key].reviews   = (srsDb.cards[key].reviews   ?? 0) + 1;
+    if (rating >= 2) srsDb.cards[key].goodCount = (srsDb.cards[key].goodCount ?? 0) + 1;
     saveSrsDb();
     syncPushReview(srsDb.cards[key]);
     srsDueQueue = srsDueQueue.filter(c => !(c.pool === srsCard.pool && c.korean === srsCard.korean));
@@ -1498,8 +1648,50 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     renderSrsCard();
   }
 
-  srsModeBtn.addEventListener("click",   () => showSrsSubMode("srs"));
-  flashModeBtn.addEventListener("click", () => showSrsSubMode("flashcard"));
+  srsModeBtn.addEventListener("click",    () => showSrsSubMode("srs"));
+  flashModeBtn.addEventListener("click",  () => showSrsSubMode("flashcard"));
+  browseModeBtn.addEventListener("click", () => showSrsSubMode("browse"));
+
+  browsePoolFilter.addEventListener("change", renderBrowseTable);
+
+  browseSelectAllEl.addEventListener("change", () => {
+    const checked = browseSelectAllEl.checked;
+    browseTableBodyEl.querySelectorAll('.browse-cb').forEach(cb => {
+      cb.checked = checked;
+      if (checked) browseSelected.add(cb.dataset.key);
+      else         browseSelected.delete(cb.dataset.key);
+    });
+    updateBrowseSelInfo();
+  });
+
+  browseTableBodyEl.addEventListener("change", e => {
+    const cb = e.target.closest('.browse-cb');
+    if (!cb) return;
+    if (cb.checked) browseSelected.add(cb.dataset.key);
+    else            browseSelected.delete(cb.dataset.key);
+    updateBrowseSelInfo();
+  });
+
+  browseDueNowBtn.addEventListener("click", () => {
+    const today = todayStr();
+    browseSelected.forEach(key => {
+      if (srsDb.cards[key]) { srsDb.cards[key].dueDate = today; syncPushReview(srsDb.cards[key]); }
+    });
+    saveSrsDb();
+    browseSelected.clear();
+    renderBrowseTable();
+  });
+
+  browseSetDateBtn.addEventListener("click", () => {
+    const date = browseDatePickerEl.value;
+    if (!date) return;
+    browseSelected.forEach(key => {
+      if (srsDb.cards[key]) { srsDb.cards[key].dueDate = date; syncPushReview(srsDb.cards[key]); }
+    });
+    saveSrsDb();
+    browseSelected.clear();
+    renderBrowseTable();
+  });
   flashAgainBtn.addEventListener("click", () => rateFlashCard(false));
   flashGotItBtn.addEventListener("click", () => rateFlashCard(true));
   flashRestartBtn.addEventListener("click", () => initFlashSession());
@@ -1649,11 +1841,14 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       const { cards } = await res.json();
       cards.forEach(c => {
         const key = `${c.pool}:${c.korean}`;
+        const existing = srsDb.cards[key];
         srsDb.cards[key] = {
           pool: c.pool, korean: c.korean, english: c.english,
           stability: c.ease_factor,       // ease_factor column stores stability
           difficulty: c.difficulty ?? 5.0,
           interval: c.interval, repetitions: c.repetitions, dueDate: c.due_date,
+          reviews:   existing?.reviews   ?? 0,
+          goodCount: existing?.goodCount ?? 0,
         };
       });
       saveSrsDb();
@@ -2234,4 +2429,104 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
       margin-top: 0.2rem;
     }
   }
+
+  /* ── Browse ─────────────────────────────────────────────────── */
+  .browse-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+
+  .browse-filter-select,
+  .browse-date-input {
+    padding: 0.3rem 0.55rem;
+    border-radius: 7px;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 55%);
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+
+  .browse-sel-info {
+    font-size: 0.84rem;
+    color: var(--muted);
+    flex: 1;
+  }
+
+  .browse-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .browse-table-wrap {
+    overflow: auto;
+    max-height: 420px;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 72%);
+    border-radius: 10px;
+  }
+
+  .browse-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+
+  .browse-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-soft);
+    padding: 0.45rem 0.7rem;
+    text-align: left;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 65%);
+    white-space: nowrap;
+  }
+
+  .browse-th-cb { width: 2rem; }
+
+  .browse-table td {
+    padding: 0.4rem 0.7rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
+    vertical-align: middle;
+  }
+
+  .browse-table tr:last-child td { border-bottom: none; }
+
+  .browse-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent), transparent 93%);
+  }
+
+  .browse-front {
+    font-weight: 600;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .browse-back {
+    color: var(--muted);
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .browse-pool, .browse-reviews, .browse-good {
+    font-size: 0.8rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .due-overdue { color: #e74c3c; font-weight: 600; }
+  .due-today   { color: #e67e22; font-weight: 600; }
+  .due-future  { color: var(--muted); }
 </style>
