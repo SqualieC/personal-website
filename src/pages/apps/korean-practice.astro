@@ -3,6 +3,10 @@ import Layout from '../../layouts/Layout.astro';
 import sentences from '../../data/korean-sentences.json';
 import words from '../../data/korean-words.json';
 import kor111 from '../../data/korean-kor111-unitized.json';
+
+const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
+  .sort((a, b) => a - b)
+  .map(u => ({ num: u, title: (kor111 as any[]).find(x => x.unit === u)?.unitTitle ?? '' }));
 ---
 
 <Layout
@@ -183,7 +187,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
       <div class="srs-card-area">
         <div id="srsFront" class="srs-front hidden"></div>
         <div id="srsBack"  class="srs-back  hidden"></div>
-        <div id="srsEmptyMsg" class="srs-message hidden">No cards yet. Use the buttons below to add a deck, or click <strong>+ SRS</strong> on any card in Reading mode.</div>
+        <div id="srsEmptyMsg" class="srs-message hidden">No cards yet for the selected units. They will appear here once added.</div>
         <div id="srsDoneMsg"  class="srs-message hidden">All done for today! Come back tomorrow.</div>
       </div>
 
@@ -198,12 +202,24 @@ import kor111 from '../../data/korean-kor111-unitized.json';
         <button id="srsEasyBtn"  class="btn srs-btn-easy"  type="button">Easy</button>
       </div>
 
-      <div class="srs-add-section">
-        <p class="srs-add-label">Add a deck:</p>
-        <div class="btn-row">
-          <button id="srsAddSentences" class="btn btn-secondary" type="button">+ Everyday Sentences</button>
-          <button id="srsAddWords"     class="btn btn-secondary" type="button">+ Beginner Words</button>
-          <button id="srsAddKor111"    class="btn btn-secondary" type="button">+ KOR111 Vocab</button>
+      <!-- Units to study -->
+      <div class="srs-units-section">
+        <p class="srs-add-label">Units to study</p>
+        <div class="srs-unit-checks">
+          <label class="unit-chip">
+            <input type="checkbox" class="srs-pool-check" data-pool="sentences" />
+            Everyday Sentences
+          </label>
+          <label class="unit-chip">
+            <input type="checkbox" class="srs-pool-check" data-pool="words" />
+            Beginner Words
+          </label>
+          {kor111Units.map(u => (
+            <label class="unit-chip">
+              <input type="checkbox" class="srs-pool-check" data-pool="kor111" data-unit={String(u.num)} />
+              KOR111 Unit {u.num}
+            </label>
+          ))}
         </div>
       </div>
 
@@ -219,6 +235,7 @@ import kor111 from '../../data/korean-kor111-unitized.json';
         <div id="srsSyncActiveRow" class="hidden">
           <div class="srs-user-row">
             <span id="srsUserEmailDisplay" class="srs-user-email"></span>
+            <span id="srsLastSyncedEl" class="srs-last-synced"></span>
           </div>
           <div class="btn-row">
             <button id="srsSyncNowBtn" class="btn btn-secondary" type="button">Sync now</button>
@@ -294,9 +311,6 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   const srsEasyBtn      = document.getElementById("srsEasyBtn");
   const srsDueCountEl   = document.getElementById("srsDueCount");
   const srsTotalCountEl = document.getElementById("srsTotalCount");
-  const srsAddSentences = document.getElementById("srsAddSentences");
-  const srsAddWords     = document.getElementById("srsAddWords");
-  const srsAddKor111    = document.getElementById("srsAddKor111");
   const srsAddCurrentBtn = document.getElementById("srsAddCurrentBtn");
 
   // ── State ─────────────────────────────────────────────────
@@ -1022,11 +1036,33 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   syncUnitControlsFromState();
 
   // ── SRS (Spaced Repetition) ────────────────────────────────
-  const SRS_LS_KEY = "korean-srs-v1";
+  const SRS_LS_KEY          = "korean-srs-v1";
+  const ACTIVE_POOLS_LS_KEY = "korean-srs-active-pools";
   let srsDb       = loadSrsDb();
   let srsDueQueue = [];
   let srsCard     = null;
   let srsPhase    = "front"; // "front" | "back" | "empty" | "done"
+
+  // Build kor111 unit lookup: korean text → unit number
+  const kor111UnitMap = Object.fromEntries(pools.kor111.map(x => [x.korean, x.unit]));
+
+  function loadActivePools() {
+    try {
+      const saved = localStorage.getItem(ACTIVE_POOLS_LS_KEY);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  }
+  function saveActivePools() {
+    localStorage.setItem(ACTIVE_POOLS_LS_KEY, JSON.stringify([...srsActivePools]));
+  }
+  function cardPoolKey(card) {
+    if (card.pool === 'kor111') {
+      const unit = kor111UnitMap[card.korean];
+      return unit !== undefined ? `kor111:${unit}` : null;
+    }
+    return card.pool;
+  }
+  let srsActivePools = loadActivePools();
 
   function loadSrsDb() {
     try { return JSON.parse(localStorage.getItem(SRS_LS_KEY) || '{"cards":{}}'); }
@@ -1043,7 +1079,13 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   function getDueCards() {
     const t = todayStr();
-    return Object.values(srsDb.cards).filter(c => c.dueDate <= t);
+    return Object.values(srsDb.cards).filter(c => {
+      if (srsActivePools.size > 0) {
+        const key = cardPoolKey(c);
+        if (!key || !srsActivePools.has(key)) return false;
+      }
+      return c.dueDate <= t;
+    });
   }
 
   function sm2(card, rating) {
@@ -1074,28 +1116,51 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     }
   }
 
-  function srsAddAllFromPool(pool) {
-    const items = pools[pool] || [];
-    const newCards = [];
-    items.forEach(item => {
-      const key = `${pool}:${item.korean}`;
-      if (!srsDb.cards[key]) {
-        srsAddCard(pool, item);
-        newCards.push(srsDb.cards[key]);
-      }
-    });
-    saveSrsDb();
-    syncPushBulk(newCards);
+  function getItemsForPoolKey(poolKey) {
+    if (poolKey === 'sentences') return (pools.sentences || []).map(x => ({ ...x, _pool: 'sentences' }));
+    if (poolKey === 'words')     return (pools.words     || []).map(x => ({ ...x, _pool: 'words' }));
+    if (poolKey.startsWith('kor111:')) {
+      const unit = Number(poolKey.split(':')[1]);
+      return pools.kor111.filter(x => x.unit === unit).map(x => ({ ...x, _pool: 'kor111' }));
+    }
+    return [];
+  }
+
+  function handlePoolCheck(poolKey, checked) {
+    if (checked) {
+      srsActivePools.add(poolKey);
+      const items = getItemsForPoolKey(poolKey);
+      const newCards = [];
+      items.forEach(item => {
+        const pool = item._pool || poolKey;
+        const key  = `${pool}:${item.korean}`;
+        if (!srsDb.cards[key]) {
+          srsAddCard(pool, item);
+          newCards.push(srsDb.cards[key]);
+        }
+      });
+      if (newCards.length) { saveSrsDb(); syncPushBulk(newCards); }
+    } else {
+      srsActivePools.delete(poolKey);
+    }
+    saveActivePools();
     refreshSrsPanel();
   }
 
   function refreshSrsPanel() {
     srsDueQueue = getDueCards();
-    const total = Object.keys(srsDb.cards).length;
-    srsDueCountEl.textContent  = srsDueQueue.length;
+    const activeCards = srsActivePools.size === 0
+      ? Object.values(srsDb.cards)
+      : Object.values(srsDb.cards).filter(c => { const k = cardPoolKey(c); return k && srsActivePools.has(k); });
+    const total = activeCards.length;
+    srsDueCountEl.textContent   = srsDueQueue.length;
     srsTotalCountEl.textContent = total;
-    if (total === 0) {
+    if (srsActivePools.size === 0) {
       srsPhase = "empty"; srsCard = null;
+      srsEmptyMsgEl.textContent = "Check the units above to start studying, or click + SRS on any card in Reading mode.";
+    } else if (total === 0) {
+      srsPhase = "empty"; srsCard = null;
+      srsEmptyMsgEl.textContent = "No cards yet for the selected units. They will appear here once added.";
     } else if (srsDueQueue.length === 0) {
       srsPhase = "done"; srsCard = null;
     } else {
@@ -1150,9 +1215,14 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   srsGoodBtn.addEventListener("click",    () => rateCard(2));
   srsEasyBtn.addEventListener("click",    () => rateCard(3));
   srsTab.addEventListener("click",        () => switchAppMode("srs"));
-  srsAddSentences.addEventListener("click", () => srsAddAllFromPool("sentences"));
-  srsAddWords.addEventListener("click",     () => srsAddAllFromPool("words"));
-  srsAddKor111.addEventListener("click",    () => srsAddAllFromPool("kor111"));
+  // Initialise pool checkboxes from saved state
+  document.querySelectorAll('.srs-pool-check').forEach(cb => {
+    const pool    = cb.dataset.pool;
+    const unit    = cb.dataset.unit;
+    const poolKey = unit ? `${pool}:${unit}` : pool;
+    cb.checked = srsActivePools.has(poolKey);
+    cb.addEventListener('change', () => handlePoolCheck(poolKey, cb.checked));
+  });
 
   srsAddCurrentBtn.addEventListener("click", () => {
     if (!current) return;
@@ -1177,17 +1247,28 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   const srsSyncGuestRow     = document.getElementById("srsSyncGuestRow");
   const srsSyncActiveRow    = document.getElementById("srsSyncActiveRow");
   const srsUserEmailDisplay = document.getElementById("srsUserEmailDisplay");
+  const srsLastSyncedEl     = document.getElementById("srsLastSyncedEl");
   const srsSyncNowBtn       = document.getElementById("srsSyncNowBtn");
+
+  let lastSyncedAt = null;
 
   function getSrsToken() { return localStorage.getItem(SRS_TOKEN_LS_KEY) || null; }
   function getSrsEmail() { return localStorage.getItem(SRS_EMAIL_LS_KEY) || null; }
   function setSyncMsg(msg) { if (srsSyncMsgEl) srsSyncMsgEl.textContent = msg || ""; }
+
+  function updateLastSyncedDisplay() {
+    if (!srsLastSyncedEl) return;
+    if (!lastSyncedAt) { srsLastSyncedEl.textContent = ''; return; }
+    const mins = Math.round((Date.now() - lastSyncedAt) / 60_000);
+    srsLastSyncedEl.textContent = mins < 1 ? 'Synced just now' : `Synced ${mins}m ago`;
+  }
 
   function renderSyncUI() {
     const token = getSrsToken();
     srsSyncGuestRow.classList.toggle("hidden",   !!token);
     srsSyncActiveRow.classList.toggle("hidden",  !token);
     if (token) srsUserEmailDisplay.textContent = getSrsEmail() || "";
+    updateLastSyncedDisplay();
   }
 
   srsSyncNowBtn.addEventListener("click", async () => {
@@ -1195,6 +1276,8 @@ import kor111 from '../../data/korean-kor111-unitized.json';
     setSyncMsg("Syncing…");
     await syncFetchCards();
     refreshSrsPanel();
+    lastSyncedAt = Date.now();
+    updateLastSyncedDisplay();
     setSyncMsg("✓ Synced!");
     srsSyncNowBtn.disabled = false;
   });
@@ -1224,6 +1307,8 @@ import kor111 from '../../data/korean-kor111-unitized.json';
         };
       });
       saveSrsDb();
+      lastSyncedAt = Date.now();
+      updateLastSyncedDisplay();
     } catch {}
   }
 
@@ -1266,6 +1351,16 @@ import kor111 from '../../data/korean-kor111-unitized.json';
 
   renderSyncUI();
   if (getSrsToken()) syncFetchCards().then(refreshSrsPanel);
+
+  // Auto-sync every 5 minutes when logged in
+  setInterval(async () => {
+    if (!getSrsToken()) return;
+    await syncFetchCards();
+    if (appMode === "srs") refreshSrsPanel();
+  }, 5 * 60 * 1000);
+
+  // Update "last synced" timestamp display every minute
+  setInterval(updateLastSyncedDisplay, 60_000);
 
   loadNewItem();
 </script>
@@ -1690,10 +1785,17 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   }
   .srs-btn-easy:hover { filter: brightness(1.1); }
 
-  .srs-add-section {
+  .srs-units-section {
     margin-top: 0.5rem;
     padding-top: 0.9rem;
     border-top: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+  }
+
+  .srs-unit-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
   }
 
   .srs-add-label {
@@ -1725,12 +1827,21 @@ import kor111 from '../../data/korean-kor111-unitized.json';
   }
 
   .srs-user-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
     margin-bottom: 0.4rem;
   }
 
   .srs-user-email {
     font-size: 0.88rem;
     color: var(--muted);
+  }
+
+  .srs-last-synced {
+    font-size: 0.8rem;
+    color: color-mix(in srgb, var(--muted), transparent 35%);
   }
 
   @media (max-width: 960px) {
