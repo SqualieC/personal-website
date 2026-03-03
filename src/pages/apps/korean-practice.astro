@@ -1043,6 +1043,8 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   let srsDueQueue = [];
   let srsCard     = null;
   let srsPhase    = "front"; // "front" | "back" | "empty" | "done"
+  let srsCardDirection = "kor_to_eng"; // "kor_to_eng" | "eng_to_kor"
+  let srsLastCardState = null; // snapshot for undo (Shift+Z)
 
   // Build kor111 unit lookup: korean text → unit number
   const kor111UnitMap = Object.fromEntries(pools.kor111.map(x => [x.korean, x.unit]));
@@ -1127,6 +1129,32 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     return [];
   }
 
+  function getSrsCardAudioUrl(card) {
+    if (!card) return null;
+    if (card.pool === 'kor111') {
+      const item = pools.kor111.find(x => x.korean === card.korean);
+      if (!item || !item.audioFile) return null;
+      return `${PREFETCHED_AUDIO_BASE}/kor111/${item.audioFile}`;
+    }
+    const poolArr = card.pool === 'sentences' ? pools.sentences : card.pool === 'words' ? pools.words : null;
+    if (!poolArr) return null;
+    const idx = poolArr.findIndex(x => x.korean === card.korean);
+    if (idx < 0) return null;
+    return `${PREFETCHED_AUDIO_BASE}/${card.pool}/${idx}.mp3`;
+  }
+
+  function playSrsAudio(card) {
+    const url = getSrsCardAudioUrl(card);
+    if (!url) return;
+    stopPlayback();
+    const audio = new Audio(url);
+    audio.playbackRate = Number(rateRange.value || 0.95);
+    activeAudio = audio;
+    audio.onended = () => { if (activeAudio === audio) activeAudio = null; };
+    audio.onerror = () => { if (activeAudio === audio) activeAudio = null; };
+    audio.play().catch(() => { if (activeAudio === audio) activeAudio = null; });
+  }
+
   function handlePoolCheck(poolKey, checked) {
     if (checked) {
       srsActivePools.add(poolKey);
@@ -1167,6 +1195,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     } else {
       srsCard  = srsDueQueue[0];
       srsPhase = "front";
+      srsCardDirection = Math.random() < 0.5 ? "kor_to_eng" : "eng_to_kor";
     }
     renderSrsCard();
   }
@@ -1180,20 +1209,29 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     srsDoneMsgEl.classList.add("hidden");
     if (srsPhase === "empty") { srsEmptyMsgEl.classList.remove("hidden"); return; }
     if (srsPhase === "done")  { srsDoneMsgEl.classList.remove("hidden");  return; }
-    srsFrontEl.textContent = srsCard.korean;
+    srsFrontEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.korean : srsCard.english;
     srsFrontEl.classList.remove("hidden");
     if (srsPhase === "front") {
       srsRevealBtn.classList.remove("hidden");
+      if (srsCardDirection === "kor_to_eng" && appMode === "srs") playSrsAudio(srsCard);
     } else {
-      srsBackEl.textContent = srsCard.english;
+      srsBackEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.english : srsCard.korean;
       srsBackEl.classList.remove("hidden");
       srsRatingRow.classList.remove("hidden");
+      if (srsCardDirection === "eng_to_kor" && appMode === "srs") playSrsAudio(srsCard);
     }
   }
 
   function rateCard(rating) {
     if (!srsCard) return;
     const key = `${srsCard.pool}:${srsCard.korean}`;
+    srsLastCardState = {
+      cardKey: key,
+      cardSnapshot: { ...srsDb.cards[key] },
+      queue: [...srsDueQueue],
+      card: srsCard,
+      direction: srsCardDirection,
+    };
     const updated = sm2(srsCard, rating);
     Object.assign(srsDb.cards[key], updated);
     saveSrsDb();
@@ -1205,8 +1243,24 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     } else {
       srsCard  = srsDueQueue[0];
       srsPhase = "front";
+      srsCardDirection = Math.random() < 0.5 ? "kor_to_eng" : "eng_to_kor";
     }
     srsDueCountEl.textContent = srsDueQueue.length;
+    renderSrsCard();
+  }
+
+  function undoLastCard() {
+    if (!srsLastCardState) return;
+    const { cardKey, cardSnapshot, queue, card, direction } = srsLastCardState;
+    srsDb.cards[cardKey] = cardSnapshot;
+    saveSrsDb();
+    syncPushReview(srsDb.cards[cardKey]);
+    srsDueQueue = queue;
+    srsCard = card;
+    srsPhase = "front";
+    srsCardDirection = direction;
+    srsDueCountEl.textContent = srsDueQueue.length;
+    srsLastCardState = null;
     renderSrsCard();
   }
 
@@ -1216,6 +1270,35 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   srsGoodBtn.addEventListener("click",    () => rateCard(2));
   srsEasyBtn.addEventListener("click",    () => rateCard(3));
   srsTab.addEventListener("click",        () => switchAppMode("srs"));
+
+  // SRS keyboard shortcuts (only active when on SRS tab)
+  document.addEventListener("keydown", e => {
+    if (appMode !== "srs") return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    // Shift+Z = undo last rating
+    if (e.key.toLowerCase() === "z" && e.shiftKey) {
+      e.preventDefault();
+      undoLastCard();
+      return;
+    }
+    // Space or Enter on front = reveal answer
+    if (srsPhase === "front") {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        srsPhase = "back";
+        renderSrsCard();
+      }
+      return;
+    }
+    if (srsPhase !== "back") return;
+    // 1=Again, 2=Hard, 3/Space/Enter=Good, 4=Easy
+    switch (e.key) {
+      case "1": e.preventDefault(); rateCard(0); break;
+      case "2": e.preventDefault(); rateCard(1); break;
+      case "3": case " ": case "Enter": e.preventDefault(); rateCard(2); break;
+      case "4": e.preventDefault(); rateCard(3); break;
+    }
+  });
   // Initialise pool checkboxes from saved state
   document.querySelectorAll('.srs-pool-check').forEach(cb => {
     const pool    = cb.dataset.pool;
