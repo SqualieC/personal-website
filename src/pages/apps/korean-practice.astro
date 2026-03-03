@@ -1145,6 +1145,21 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     return `${PREFETCHED_AUDIO_BASE}/${card.pool}/${idx}.mp3`;
   }
 
+  function playSrsSide(card, language) {
+    if (!card) return;
+    if (language === "korean") {
+      playSrsAudio(card);
+    } else {
+      stopPlayback();
+      if (!("speechSynthesis" in window) || !card.english) return;
+      const utterance = new SpeechSynthesisUtterance(card.english);
+      utterance.lang = "en-US";
+      utterance.rate = Number(rateRange.value || 0.95);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
   function playSrsAudio(card) {
     if (!card) return;
     const url = getSrsCardAudioUrl(card);
@@ -1226,16 +1241,16 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
     srsFrontEl.classList.remove("hidden");
     if (srsPhase === "front") {
       srsRevealBtn.classList.remove("hidden");
-      if (srsCardDirection === "kor_to_eng" && appMode === "srs") {
-        playSrsAudio(srsCard);
-        srsReplayBtn.classList.remove("hidden");
+      srsReplayBtn.classList.remove("hidden");
+      if (appMode === "srs") {
+        playSrsSide(srsCard, srsCardDirection === "kor_to_eng" ? "korean" : "english");
       }
     } else {
       srsBackEl.textContent = srsCardDirection === "kor_to_eng" ? srsCard.english : srsCard.korean;
       srsBackEl.classList.remove("hidden");
       srsRatingRow.classList.remove("hidden");
       srsReplayBtn.classList.remove("hidden");
-      if (srsCardDirection === "eng_to_kor" && appMode === "srs") playSrsAudio(srsCard);
+      if (srsCardDirection === "eng_to_kor" && appMode === "srs") playSrsSide(srsCard, "korean");
     }
   }
 
@@ -1282,7 +1297,13 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   }
 
   srsRevealBtn.addEventListener("click",  () => { srsPhase = "back"; renderSrsCard(); });
-  srsReplayBtn.addEventListener("click",  () => playSrsAudio(srsCard));
+  srsReplayBtn.addEventListener("click", () => {
+    if (!srsCard) return;
+    const showsKorean =
+      (srsPhase === "front" && srsCardDirection === "kor_to_eng") ||
+      (srsPhase === "back"  && srsCardDirection === "eng_to_kor");
+    playSrsSide(srsCard, showsKorean ? "korean" : "english");
+  });
   srsAgainBtn.addEventListener("click",   () => rateCard(0));
   srsHardBtn.addEventListener("click",    () => rateCard(1));
   srsGoodBtn.addEventListener("click",    () => rateCard(2));
