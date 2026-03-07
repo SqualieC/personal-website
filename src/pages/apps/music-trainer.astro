@@ -667,20 +667,10 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         if (Math.abs(denom) > 1e-8) tau = tau + 0.5 * (x0 - x2) / denom;
       }
 
-      let freq         = sr / tau;
+      const freq       = sr / tau;
       const cmndTauInt = Math.round(Math.min(tau, tauMax));
       const confidence = Math.max(0, Math.min(1, 1 - cmnd[cmndTauInt]));
       if (confidence < 0.5) return null;
-
-      // Sub-octave correction: if detected freq is in mid-bass range, check if
-      // the sub-octave (freq/2) is in the bass fundamental range and has low CMND.
-      // This corrects for YIN latching on to the 2nd harmonic of low E/A strings.
-      if (freq > 55 && freq < 170) {
-        const tauDouble = Math.round(2 * Math.min(tau, tauMax / 2));
-        if (tauDouble <= tauMax && cmnd[tauDouble] < 0.25) {
-          freq = sr / (2 * tau);
-        }
-      }
 
       return { freq, confidence };
     }
@@ -719,7 +709,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         });
         const src = ctx.createMediaStreamSource(micStream);
         analyser = ctx.createAnalyser();
-        analyser.fftSize = 4096;
+        analyser.fftSize = 8192;
         analyser.smoothingTimeConstant = 0;
         src.connect(analyser);
         setMicStatus('Microphone active', 'var(--accent)');
@@ -780,7 +770,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     /* ═══════════════════════════════════════════════════════════
        RAF PITCH LOOP
     ═══════════════════════════════════════════════════════════ */
-    const pitchBuf = new Float32Array(4096);
+    const pitchBuf = new Float32Array(8192);
 
     function startRaf() {
       if (rafId) return;
