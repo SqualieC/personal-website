@@ -1,0 +1,861 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Music Reading | SqualieC">
+
+  <section class="practice-shell">
+
+    <h2 class="page-heading">Music Reading Trainer</h2>
+    <p class="page-sub">Bass clef sight-reading with live pitch detection.</p>
+
+    <!-- ── Mode tabs ──────────────────────────────────────── -->
+    <div class="mode-toggle" role="tablist">
+      <button class="mode-tab active" data-tab="notes"  role="tab">Note Reading</button>
+      <button class="mode-tab"        data-tab="scales" role="tab">Scale Reading</button>
+    </div>
+
+    <!-- ── Mic bar ────────────────────────────────────────── -->
+    <div class="mic-bar">
+      <button id="micBtn" class="btn btn-secondary" type="button">Enable Microphone</button>
+      <span   id="micStatus" class="mic-status"></span>
+      <span class="vol-wrap" aria-hidden="true">
+        <span id="volFill" class="vol-fill"></span>
+      </span>
+    </div>
+
+    <!-- ── Staff display ──────────────────────────────────── -->
+    <div class="staff-card">
+      <div id="staffContainer"></div>
+    </div>
+
+    <!-- ── NOTE READING ───────────────────────────────────── -->
+    <div id="notesPanel" class="tab-panel">
+      <div class="practice-controls">
+        <div class="ctrl-row">
+          <label>Fret range</label>
+          <input id="fretLow"  type="number" min="0" max="24" value="0"  class="fret-input" />
+          <span class="ctrl-sep">to</span>
+          <input id="fretHigh" type="number" min="0" max="24" value="12" class="fret-input" />
+          <input id="noteNaturalOnly" type="checkbox" style="margin-left:0.75rem" />
+          <label for="noteNaturalOnly">Natural notes only</label>
+        </div>
+        <div class="ctrl-row">
+          <input id="notePlayRef" type="checkbox" checked />
+          <label for="notePlayRef">Play reference tone</label>
+          <input id="noteShowName" type="checkbox" style="margin-left:1rem" />
+          <label for="noteShowName">Show note name</label>
+        </div>
+      </div>
+
+      <div class="target-display">
+        <div id="noteNameDisplay" class="target-note" style="visibility:hidden;min-height:1.4em">--</div>
+        <div id="noteHints" class="note-hints"></div>
+      </div>
+
+      <div id="noteResult" class="note-result"></div>
+
+      <div class="score-row">
+        <span id="noteScore"  class="score-text">Score: 0 / 0</span>
+        <span id="noteStreak" class="streak-text"></span>
+      </div>
+
+      <div class="btn-row">
+        <button id="noteStartBtn" class="btn btn-primary"   type="button">Start Practice</button>
+        <button id="noteNextBtn"  class="btn btn-secondary" type="button" disabled>Next Note</button>
+        <button id="noteResetBtn" class="btn btn-secondary" type="button">Reset Score</button>
+      </div>
+    </div>
+
+    <!-- ── SCALE READING ──────────────────────────────────── -->
+    <div id="scalesPanel" class="tab-panel hidden">
+      <div class="practice-controls">
+        <div class="ctrl-row">
+          <label for="scaleRoot">Root</label>
+          <select id="scaleRoot" class="trainer-select"></select>
+          <label for="scaleOctave">Octave</label>
+          <select id="scaleOctave" class="trainer-select">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+          </select>
+          <label for="scaleType">Type</label>
+          <select id="scaleType" class="trainer-select">
+            <option value="major">Major</option>
+            <option value="minor">Natural Minor</option>
+          </select>
+        </div>
+        <div class="ctrl-row">
+          <input id="scalePlayRef" type="checkbox" checked />
+          <label for="scalePlayRef">Play reference tones</label>
+        </div>
+      </div>
+
+      <div class="target-display">
+        <div id="scaleProgress" class="target-label">Note 1 / 8</div>
+        <div id="scaleHints" class="note-hints"></div>
+      </div>
+
+      <div id="scaleResult" class="note-result"></div>
+
+      <div class="btn-row">
+        <button id="scaleStartBtn" class="btn btn-primary"   type="button">Start Scale</button>
+        <button id="scaleSkipBtn"  class="btn btn-secondary" type="button" disabled>Skip Note</button>
+      </div>
+    </div>
+
+    <!-- ── Fretboard ───────────────────────────────────────── -->
+    <div class="fretboard-wrap">
+      <canvas id="fretboard" class="fretboard-canvas"></canvas>
+      <div class="fretboard-labels" aria-hidden="true">
+        <span>G</span><span>D</span><span>A</span><span>E</span>
+      </div>
+    </div>
+
+  </section>
+
+  <style>
+    .practice-shell { padding: 1.4rem; }
+    .page-heading { font-size: 1.4rem; font-weight: 700; color: var(--text); margin: 0 0 0.25rem; }
+    .page-sub     { font-size: 0.88rem; color: var(--muted); margin: 0 0 1.1rem; }
+
+    /* ── Tab toggle ── */
+    .mode-toggle {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      background: color-mix(in srgb, var(--muted), transparent 88%);
+      border-radius: 12px; padding: 4px; width: fit-content; margin-bottom: 1.1rem;
+    }
+    .mode-tab {
+      border: none; border-radius: 8px; padding: 7px 18px;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted); font-family: inherit;
+      transition: background 0.12s, color 0.12s;
+    }
+    .mode-tab.active {
+      background: var(--card); color: var(--accent);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
+
+    /* ── Mic bar ── */
+    .mic-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+    .mic-status { font-size: 0.84rem; color: var(--muted); }
+    .vol-wrap { width: 80px; height: 8px; background: color-mix(in srgb, var(--muted), transparent 78%); border-radius: 4px; overflow: hidden; }
+    .vol-fill { display: block; height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.05s; }
+
+    /* ── Visibility ── */
+    .tab-panel { display: block; }
+    .hidden    { display: none !important; }
+
+    /* ── Staff card ── */
+    .staff-card {
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 0 0 4px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
+      min-height: 130px;
+    }
+    #staffContainer { width: 100%; }
+    #staffContainer svg { display: block; width: 100% !important; }
+
+    /* ── Target display ── */
+    .target-display { text-align: center; padding: 0.5rem 0 0.4rem; }
+    .target-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+    .target-note  { font-size: clamp(2.5rem, 8vw, 4rem); font-weight: 700; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; }
+    .note-hints   { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 0.5rem; }
+    .hint-chip    { background: color-mix(in srgb, var(--accent), transparent 82%); color: color-mix(in srgb, var(--accent), white 20%); border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 600; }
+
+    /* ── Result / score ── */
+    .note-result { text-align: center; min-height: 2rem; font-size: 1.15rem; font-weight: 700; margin: 0.4rem 0; }
+    .result-correct  { color: #27ae60; }
+    .result-wrong    { color: #e74c3c; }
+    .result-detected { color: var(--accent); }
+    .score-row   { display: flex; gap: 1.2rem; align-items: center; margin-bottom: 0.6rem; }
+    .score-text  { font-size: 0.9rem; color: var(--muted); }
+    .streak-text { font-size: 0.9rem; color: var(--accent); font-weight: 600; }
+
+    /* ── Controls ── */
+    .practice-controls { margin-bottom: 0.8rem; }
+    .ctrl-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .ctrl-row label { font-size: 0.85rem; color: var(--muted); }
+    .ctrl-sep       { font-size: 0.85rem; color: var(--muted); }
+    .trainer-select {
+      background: color-mix(in srgb, var(--bg), transparent 5%);
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+      color: var(--text); border-radius: 8px; padding: 0.3rem 0.6rem;
+      font-size: 0.88rem; font-family: inherit; cursor: pointer;
+    }
+    .fret-input {
+      background: color-mix(in srgb, var(--bg), transparent 5%);
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+      color: var(--text); border-radius: 8px; padding: 0.3rem 0.5rem;
+      font-size: 0.88rem; width: 4rem; text-align: center; font-family: inherit;
+    }
+    .btn-row { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    /* ── Fretboard ── */
+    .fretboard-wrap { position: relative; margin-top: 1.4rem; display: flex; align-items: stretch; }
+    .fretboard-labels { display: flex; flex-direction: column; justify-content: space-between; padding: 14px 6px 14px 0; font-size: 0.75rem; font-weight: 700; color: color-mix(in srgb, var(--muted), transparent 30%); user-select: none; }
+    .fretboard-canvas { flex: 1; height: 160px; border-radius: 10px; display: block; }
+  </style>
+
+  <script is:inline>
+  (function () {
+    'use strict';
+
+    /* ═══════════════════════════════════════════════════════════
+       CONSTANTS
+    ═══════════════════════════════════════════════════════════ */
+    const NOTE_NAMES      = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const VEX_NOTE_NAMES  = ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
+    const SHARP_CLASSES   = new Set([1,3,6,8,10]);
+    const NATURAL_CLASSES = new Set([0,2,4,5,7,9,11]);
+    const BASS_STRINGS    = [
+      { name:'E', midi:28 },
+      { name:'A', midi:33 },
+      { name:'D', midi:38 },
+      { name:'G', midi:43 },
+    ];
+    const MAJOR_SCALE = [0,2,4,5,7,9,11,12];
+    const MINOR_SCALE = [0,2,3,5,7,8,10,12];
+    const INLAY_FRETS = [3,5,7,9,12,15,17,19,21,24];
+
+    /* ═══════════════════════════════════════════════════════════
+       NOTE UTILITIES
+    ═══════════════════════════════════════════════════════════ */
+    function midiToName(m)     { return NOTE_NAMES[((m % 12) + 12) % 12]; }
+    function midiToOctave(m)   { return Math.floor(m / 12) - 1; }
+    function midiToFullName(m) { return midiToName(m) + midiToOctave(m); }
+    function midiToFreq(m)     { return 440 * Math.pow(2, (m - 69) / 12); }
+    function freqToMidi(f)     { return 69 + 12 * Math.log2(f / 440); }
+
+    function bassPositions(midi) {
+      const out = [];
+      for (const s of BASS_STRINGS) {
+        const fret = midi - s.midi;
+        if (fret >= 0 && fret <= 24) out.push({ string: s.name, fret });
+      }
+      return out;
+    }
+
+    function hintsHtml(midi) {
+      return bassPositions(midi)
+        .map(p => `<span class="hint-chip">${p.string} str · fret ${p.fret}</span>`)
+        .join('');
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       VEXFLOW  (lazy-load from CDN)
+    ═══════════════════════════════════════════════════════════ */
+    let vfReady = false;
+    let vfQueue = [];
+
+    function withVF(fn) {
+      if (vfReady) { fn(); return; }
+      vfQueue.push(fn);
+      if (document.getElementById('vfScript')) return;
+      const s = document.createElement('script');
+      s.id  = 'vfScript';
+      s.src = 'https://unpkg.com/vexflow@3.0.9/releases/vexflow-min.js';
+      s.onload = () => { vfReady = true; vfQueue.forEach(f => f()); vfQueue = []; };
+      s.onerror = () => console.warn('VexFlow failed to load from CDN');
+      document.head.appendChild(s);
+    }
+
+    // Keep track of last drawn midi so ResizeObserver can redraw correctly
+    let staffCurrentMidi = null;
+
+    function drawStaff(midi) {
+      staffCurrentMidi = midi;
+      withVF(() => _doDrawStaff(midi));
+    }
+
+    function _doDrawStaff(midi) {
+      const container = document.getElementById('staffContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const VF  = Vex.Flow;
+      const W   = Math.max(container.clientWidth || 400, 200);
+      // Extra height so low-bass ledger lines (E1 = 4 lines below staff) don't clip
+      const H   = 190;
+
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+      renderer.resize(W, H);
+      const ctx = renderer.getContext();
+
+      // Push stave down so there's room for ledger lines above
+      const stave = new VF.Stave(10, 60, W - 20).addClef('bass');
+      stave.setContext(ctx).draw();
+
+      if (midi === null || midi === undefined) return;
+
+      const cls = ((midi % 12) + 12) % 12;
+      const oct = Math.floor(midi / 12) - 1;
+      const key = VEX_NOTE_NAMES[cls] + '/' + oct;
+
+      const note = new VF.StaveNote({ clef: 'bass', keys: [key], duration: 'w' });
+      if (SHARP_CLASSES.has(cls)) note.addAccidental(0, new VF.Accidental('#'));
+
+      const voice = new VF.Voice({ num_beats: 4, beat_value: 4 })
+        .setMode(VF.Voice.Mode.SOFT);
+      voice.addTickables([note]);
+
+      new VF.Formatter().joinVoices([voice]).format([voice], W - 100);
+      voice.draw(ctx, stave);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       YIN PITCH DETECTION
+    ═══════════════════════════════════════════════════════════ */
+    function yin(buf, sr, fmin, fmax) {
+      fmin = fmin || 28.0;
+      fmax = fmax || 2000.0;
+      const N      = buf.length;
+      const tauMin = Math.max(2, Math.floor(sr / fmax));
+      const tauMax = Math.min(Math.floor(sr / fmin), N - 2);
+      if (tauMin >= tauMax) return null;
+
+      const d = new Float32Array(tauMax + 1);
+      for (let tau = 1; tau <= tauMax; tau++) {
+        const end = N - tau;
+        for (let j = 0; j < end; j++) {
+          const diff = buf[j] - buf[j + tau];
+          d[tau] += diff * diff;
+        }
+      }
+
+      const cmnd = new Float32Array(tauMax + 1);
+      cmnd[0] = 1;
+      let running = 0;
+      for (let tau = 1; tau <= tauMax; tau++) {
+        running += d[tau];
+        cmnd[tau] = running > 0 ? d[tau] * tau / running : 1;
+      }
+
+      const threshold = 0.10;
+      let tau = tauMin, found = false;
+      for (let t = tauMin; t <= tauMax; t++) {
+        if (cmnd[t] < threshold) {
+          tau = t;
+          while (tau + 1 <= tauMax && cmnd[tau + 1] < cmnd[tau]) tau++;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        let minVal = Infinity;
+        for (let t = tauMin; t <= tauMax; t++) {
+          if (cmnd[t] < minVal) { minVal = cmnd[t]; tau = t; }
+        }
+        if (minVal > 0.35) return null;
+      }
+
+      if (tau > 0 && tau < tauMax) {
+        const x0 = cmnd[tau - 1], x1 = cmnd[tau], x2 = cmnd[tau + 1];
+        const denom = x0 - 2 * x1 + x2;
+        if (Math.abs(denom) > 1e-8) tau = tau + 0.5 * (x0 - x2) / denom;
+      }
+
+      const freq = sr / tau;
+      const ci   = Math.round(Math.min(tau, tauMax));
+      const confidence = Math.max(0, Math.min(1, 1 - cmnd[ci]));
+      if (confidence < 0.5) return null;
+
+      return { freq, confidence };
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       AUDIO STATE
+    ═══════════════════════════════════════════════════════════ */
+    let audioCtx  = null;
+    let analyser  = null;
+    let micStream = null;
+    let rafId     = null;
+
+    function getCtx() {
+      if (!audioCtx || audioCtx.state === 'closed')
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    async function startMic() {
+      try {
+        const ctx = getCtx();
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+          video: false,
+        });
+        const src = ctx.createMediaStreamSource(micStream);
+        analyser  = ctx.createAnalyser();
+        analyser.fftSize = 8192;
+        analyser.smoothingTimeConstant = 0;
+        src.connect(analyser);
+        setMicStatus('Microphone active', 'var(--accent)');
+        startRaf();
+        return true;
+      } catch (err) {
+        setMicStatus('Microphone denied: ' + err.message, '#e74c3c');
+        return false;
+      }
+    }
+
+    function stopMic() {
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      if (analyser)  { analyser.disconnect(); analyser = null; }
+      stopRaf();
+      setMicStatus('', '');
+    }
+
+    function setMicStatus(msg, color) {
+      const el = document.getElementById('micStatus');
+      if (el) { el.textContent = msg; el.style.color = color; }
+    }
+
+    function playRefTone(midi, duration) {
+      duration = duration || 0.8;
+      const ctx  = getCtx();
+      const freq = midiToFreq(midi);
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const lp   = ctx.createBiquadFilter();
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq;
+      lp.type = 'lowpass';
+      lp.frequency.value = Math.min(freq * 6, 3000);
+      lp.Q.value = 0.5;
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.28, now + 0.01);
+      gain.gain.setValueAtTime(0.28, now + duration * 0.7);
+      gain.gain.linearRampToValueAtTime(0, now + duration);
+      osc.connect(lp); lp.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + duration);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       RAF PITCH LOOP
+    ═══════════════════════════════════════════════════════════ */
+    const pitchBuf = new Float32Array(8192);
+
+    function startRaf() {
+      if (rafId) return;
+      function loop() {
+        rafId = requestAnimationFrame(loop);
+        if (!analyser) return;
+        analyser.getFloatTimeDomainData(pitchBuf);
+        let rms = 0;
+        for (let i = 0; i < pitchBuf.length; i++) rms += pitchBuf[i] * pitchBuf[i];
+        rms = Math.sqrt(rms / pitchBuf.length);
+        const vf = document.getElementById('volFill');
+        if (vf) vf.style.width = Math.min(100, rms * 400) + '%';
+        const result = rms > 0.002 ? yin(pitchBuf, audioCtx.sampleRate) : null;
+        onPitchResult(result);
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+
+    function stopRaf() { if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+
+    /* ═══════════════════════════════════════════════════════════
+       PITCH DISPATCH
+    ═══════════════════════════════════════════════════════════ */
+    let currentTab = 'notes';
+
+    function onPitchResult(result) {
+      if (currentTab === 'notes')  updateNoteDetect(result);
+      if (currentTab === 'scales') updateScaleDetect(result);
+
+      if (result) {
+        const nearest = Math.round(freqToMidi(result.freq));
+        if (nearest !== fbDetectedMidi) { fbDetectedMidi = nearest; refreshFretboard(); }
+      } else if (fbDetectedMidi !== null) {
+        fbDetectedMidi = null; refreshFretboard();
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       NOTE READING
+    ═══════════════════════════════════════════════════════════ */
+    const noteState = {
+      active: false, targetMidi: null,
+      stableFrames: 0, lastMidi: null, waiting: false,
+      score: { correct: 0, total: 0 }, streak: 0,
+    };
+    const NOTE_STABLE = 6;
+    let noteAutoTimer = null;
+
+    function notePickTarget() {
+      const lo = parseInt(document.getElementById('fretLow').value,  10) || 0;
+      const hi = parseInt(document.getElementById('fretHigh').value, 10) || 12;
+      const natOnly = document.getElementById('noteNaturalOnly').checked;
+      const valid = [];
+      for (const s of BASS_STRINGS) {
+        for (let f = lo; f <= hi; f++) {
+          const m = s.midi + f;
+          if (natOnly && !NATURAL_CLASSES.has(m % 12)) continue;
+          if (!valid.includes(m)) valid.push(m);
+        }
+      }
+      if (!valid.length) return null;
+      return valid[Math.floor(Math.random() * valid.length)];
+    }
+
+    function noteStart() {
+      if (!analyser) { setMicStatus('Enable microphone first!', '#e74c3c'); return; }
+      noteState.active = false; noteState.waiting = false;
+      noteState.targetMidi = notePickTarget();
+      if (!noteState.targetMidi) return;
+      document.getElementById('noteStartBtn').textContent = 'New Target';
+      document.getElementById('noteNextBtn').disabled     = true;
+      noteShowTarget();
+      noteState.active = true;
+      if (document.getElementById('notePlayRef').checked) playRefTone(noteState.targetMidi, 0.9);
+    }
+
+    function noteShowTarget() {
+      const midi   = noteState.targetMidi;
+      drawStaff(midi);
+      const nameEl = document.getElementById('noteNameDisplay');
+      nameEl.textContent       = midiToFullName(midi);
+      nameEl.style.visibility  = document.getElementById('noteShowName').checked ? 'visible' : 'hidden';
+      document.getElementById('noteHints').innerHTML = hintsHtml(midi);
+      setNoteResult('', '');
+      noteState.stableFrames = 0; noteState.lastMidi = null; noteState.waiting = false;
+      fbTargetMidi = midi; refreshFretboard();
+    }
+
+    function noteNext() {
+      if (noteAutoTimer) { clearTimeout(noteAutoTimer); noteAutoTimer = null; }
+      noteState.targetMidi = notePickTarget();
+      if (!noteState.targetMidi) return;
+      noteShowTarget();
+      document.getElementById('noteNextBtn').disabled = true;
+      if (document.getElementById('notePlayRef').checked) playRefTone(noteState.targetMidi, 0.9);
+    }
+
+    function setNoteResult(text, cls) {
+      const el = document.getElementById('noteResult');
+      el.textContent = text;
+      el.className   = 'note-result' + (cls ? ' ' + cls : '');
+    }
+
+    function updateNoteDetect(result) {
+      if (!noteState.active || noteState.waiting || !result) {
+        if (!result && noteState.active && !noteState.waiting) {
+          noteState.stableFrames = 0; noteState.lastMidi = null;
+        }
+        return;
+      }
+      const rawMidi = freqToMidi(result.freq);
+      const nearest = Math.round(rawMidi);
+      const cents   = Math.abs((rawMidi - nearest) * 100);
+      setNoteResult('Hearing: ' + midiToFullName(nearest), 'result-detected');
+
+      if (nearest === noteState.targetMidi && cents < 30) {
+        if (noteState.lastMidi === nearest) noteState.stableFrames++;
+        else { noteState.lastMidi = nearest; noteState.stableFrames = 1; }
+
+        if (noteState.stableFrames >= NOTE_STABLE) {
+          noteState.waiting = true;
+          noteState.score.correct++; noteState.score.total++; noteState.streak++;
+          // Always reveal name on correct
+          document.getElementById('noteNameDisplay').style.visibility = 'visible';
+          setNoteResult('Correct! \u2713', 'result-correct');
+          updateNoteScore();
+          document.getElementById('noteNextBtn').disabled = false;
+          if (noteAutoTimer) clearTimeout(noteAutoTimer);
+          noteAutoTimer = setTimeout(() => {
+            noteAutoTimer = null;
+            if (noteState.waiting) noteNext();
+          }, 1200);
+        }
+      } else {
+        noteState.lastMidi = nearest; noteState.stableFrames = 0;
+      }
+    }
+
+    function updateNoteScore() {
+      const { correct, total } = noteState.score;
+      document.getElementById('noteScore').textContent  = 'Score: ' + correct + ' / ' + total;
+      const s = noteState.streak;
+      document.getElementById('noteStreak').textContent = s > 2 ? '\uD83D\uDD25 ' + s + ' streak!' : '';
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SCALE READING
+    ═══════════════════════════════════════════════════════════ */
+    const scaleState = {
+      active: false, waiting: false,
+      notes: [], idx: 0, stableFrames: 0, lastMidi: null,
+    };
+    const SCALE_STABLE = 8;
+
+    function scaleBuild() {
+      const root   = parseInt(document.getElementById('scaleRoot').value,   10);
+      const octave = parseInt(document.getElementById('scaleOctave').value, 10);
+      const type   = document.getElementById('scaleType').value;
+      const pattern = type === 'major' ? MAJOR_SCALE : MINOR_SCALE;
+      return pattern.map(s => root + (octave + 1) * 12 + s);
+    }
+
+    function scaleStart() {
+      if (!analyser) { setMicStatus('Enable microphone first!', '#e74c3c'); return; }
+      scaleState.notes  = scaleBuild();
+      scaleState.idx    = 0; scaleState.active = true; scaleState.waiting = false;
+      scaleState.stableFrames = 0; scaleState.lastMidi = null;
+      document.getElementById('scaleStartBtn').textContent = 'Restart Scale';
+      document.getElementById('scaleSkipBtn').disabled     = false;
+      scaleShowCurrent();
+    }
+
+    function scaleShowCurrent() {
+      const midi  = scaleState.notes[scaleState.idx];
+      const total = scaleState.notes.length;
+      document.getElementById('scaleProgress').textContent = 'Note ' + (scaleState.idx + 1) + ' / ' + total;
+      document.getElementById('scaleHints').innerHTML      = hintsHtml(midi);
+      setScaleResult('', '');
+      scaleState.waiting = false; scaleState.stableFrames = 0; scaleState.lastMidi = null;
+      fbTargetMidi = midi; refreshFretboard();
+      drawStaff(midi);
+      if (document.getElementById('scalePlayRef').checked) playRefTone(midi, 0.6);
+    }
+
+    function scaleSkip() { if (scaleState.active) scaleAdvance(); }
+
+    function scaleAdvance() {
+      scaleState.idx++;
+      if (scaleState.idx >= scaleState.notes.length) {
+        setScaleResult('Scale complete! \uD83C\uDF89', 'result-correct');
+        document.getElementById('scaleProgress').textContent = 'Done!';
+        document.getElementById('scaleHints').innerHTML      = '';
+        document.getElementById('scaleSkipBtn').disabled     = true;
+        scaleState.active = false;
+        drawStaff(null);
+      } else {
+        scaleShowCurrent();
+      }
+    }
+
+    function setScaleResult(text, cls) {
+      const el = document.getElementById('scaleResult');
+      el.textContent = text;
+      el.className   = 'note-result' + (cls ? ' ' + cls : '');
+    }
+
+    function updateScaleDetect(result) {
+      if (!scaleState.active || scaleState.waiting || !result) {
+        if (!result && !scaleState.waiting) { scaleState.stableFrames = 0; scaleState.lastMidi = null; }
+        return;
+      }
+      const rawMidi = freqToMidi(result.freq);
+      const nearest = Math.round(rawMidi);
+      const cents   = Math.abs((rawMidi - nearest) * 100);
+      const target  = scaleState.notes[scaleState.idx];
+      setScaleResult('Hearing: ' + midiToFullName(nearest), 'result-detected');
+
+      if (nearest === target && cents < 30) {
+        if (scaleState.lastMidi === nearest) scaleState.stableFrames++;
+        else { scaleState.lastMidi = nearest; scaleState.stableFrames = 1; }
+        if (scaleState.stableFrames >= SCALE_STABLE) {
+          scaleState.waiting = true;
+          setScaleResult('\u2713', 'result-correct');
+          setTimeout(() => scaleAdvance(), 500);
+        }
+      } else {
+        scaleState.lastMidi = nearest; scaleState.stableFrames = 0;
+      }
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FRETBOARD CANVAS
+    ═══════════════════════════════════════════════════════════ */
+    function drawFretboard(targetPositions, detectedMidi) {
+      const canvas = document.getElementById('fretboard');
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const dW  = canvas.clientWidth, dH = canvas.clientHeight;
+      if (canvas.width  !== Math.round(dW * dpr) ||
+          canvas.height !== Math.round(dH * dpr)) {
+        canvas.width  = Math.round(dW * dpr);
+        canvas.height = Math.round(dH * dpr);
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.save(); ctx.scale(dpr, dpr);
+      const W = dW, H = dH, pad = 14;
+      const lx = pad, rx = W - pad, ty = pad, by = H - pad;
+      const rw = rx - lx, rh = by - ty;
+      const frets = 12, strs = 4;
+
+      ctx.fillStyle = '#1c1f24'; ctx.fillRect(0, 0, W, H);
+
+      ctx.lineWidth = 2;
+      for (let s = 0; s < strs; s++) {
+        const y = ty + (rh * s) / (strs - 1);
+        ctx.strokeStyle = '#c8cbd1';
+        ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(rx, y); ctx.stroke();
+      }
+      for (let f = 0; f <= frets; f++) {
+        const x = lx + (rw * f) / frets;
+        ctx.strokeStyle = f === 0 ? '#e2a86f' : '#3a3f47';
+        ctx.lineWidth   = f === 0 ? 4 : 1;
+        ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x, by); ctx.stroke();
+      }
+
+      ctx.fillStyle = '#596070';
+      const cy = ty + rh / 2;
+      for (const fret of INLAY_FRETS) {
+        if (fret > frets) continue;
+        const x = lx + (rw * (fret - 0.5)) / frets;
+        if (fret === 12 || fret === 24) {
+          const off = rh * 0.26;
+          ctx.beginPath(); ctx.arc(x, cy - off, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x, cy + off, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(x, cy, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      function dotY(si) { return ty + (rh * (strs - 1 - si)) / (strs - 1); }
+      function dotX(f)  { return lx + (rw * f) / frets; }
+
+      function drawDots(positions, color, radius, labelColor) {
+        for (const pos of positions) {
+          const { stringIndex, fret: f, label } = pos;
+          if (f < 0 || f > frets) continue;
+          const x = dotX(f), y = dotY(stringIndex);
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+          if (label) {
+            ctx.fillStyle = labelColor || '#0b0e12';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(label, x, y);
+          }
+        }
+      }
+
+      drawDots(targetPositions || [], '#3ddc84', 9, '#0b0e12');
+      if (detectedMidi !== null && detectedMidi !== undefined) {
+        const detPos = bassPositions(detectedMidi).map(p => ({
+          stringIndex: BASS_STRINGS.findIndex(s => s.name === p.string),
+          fret: p.fret, label: '',
+        }));
+        drawDots(detPos, '#56a3ff', 7, '#0b0e12');
+      }
+      ctx.restore();
+    }
+
+    function midiToFretPositions(midi) {
+      return bassPositions(midi).map(p => ({
+        stringIndex: BASS_STRINGS.findIndex(s => s.name === p.string),
+        fret: p.fret, label: midiToName(midi),
+      }));
+    }
+
+    let fbTargetMidi = null, fbDetectedMidi = null;
+
+    function refreshFretboard() {
+      const targets = fbTargetMidi !== null ? midiToFretPositions(fbTargetMidi) : [];
+      drawFretboard(targets, fbDetectedMidi);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       UI INIT
+    ═══════════════════════════════════════════════════════════ */
+    function populateSelects() {
+      const sel = document.getElementById('scaleRoot');
+      if (!sel) return;
+      NOTE_NAMES.forEach((n, i) => {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = n;
+        sel.appendChild(opt);
+      });
+    }
+
+    function initTabs() {
+      document.querySelectorAll('.mode-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const tab = btn.dataset.tab;
+          currentTab = tab;
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+          const panel = document.getElementById(tab + 'Panel');
+          if (panel) panel.classList.remove('hidden');
+          fbTargetMidi = null; refreshFretboard();
+          drawStaff(null);
+        });
+      });
+    }
+
+    function initMicBtn() {
+      const btn = document.getElementById('micBtn');
+      btn.addEventListener('click', async () => {
+        if (micStream) {
+          stopMic();
+          btn.textContent = 'Enable Microphone';
+          noteState.active  = false;
+          scaleState.active = false;
+        } else {
+          btn.textContent = 'Connecting…'; btn.disabled = true;
+          const ok = await startMic();
+          btn.disabled    = false;
+          btn.textContent = ok ? 'Disable Microphone' : 'Enable Microphone';
+        }
+      });
+    }
+
+    function initNotePanel() {
+      document.getElementById('noteStartBtn').addEventListener('click', noteStart);
+      document.getElementById('noteNextBtn').addEventListener('click', () => {
+        if (!noteState.active && noteState.targetMidi) noteState.active = true;
+        noteNext();
+      });
+      document.getElementById('noteResetBtn').addEventListener('click', () => {
+        noteState.score = { correct: 0, total: 0 }; noteState.streak = 0;
+        updateNoteScore(); setNoteResult('', '');
+      });
+      document.getElementById('noteShowName').addEventListener('change', function () {
+        if (noteState.targetMidi) {
+          document.getElementById('noteNameDisplay').style.visibility =
+            this.checked ? 'visible' : 'hidden';
+        }
+      });
+    }
+
+    function initScalesPanel() {
+      document.getElementById('scaleStartBtn').addEventListener('click', scaleStart);
+      document.getElementById('scaleSkipBtn').addEventListener('click', scaleSkip);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       BOOT
+    ═══════════════════════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', function () {
+      populateSelects();
+      initTabs();
+      initMicBtn();
+      initNotePanel();
+      initScalesPanel();
+
+      refreshFretboard();
+      drawStaff(null); // triggers VexFlow load + draws empty staff
+
+      const ro = new ResizeObserver(() => {
+        refreshFretboard();
+        if (staffCurrentMidi !== null) drawStaff(staffCurrentMidi);
+        else drawStaff(null);
+      });
+      const canvas = document.getElementById('fretboard');
+      if (canvas) ro.observe(canvas);
+      const staffCard = document.querySelector('.staff-card');
+      if (staffCard) ro.observe(staffCard);
+    });
+
+  })();
+  </script>
+
+</Layout>
