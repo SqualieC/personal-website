@@ -834,7 +834,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     ═══════════════════════════════════════════════════════════ */
     const TUNER_STABLE_FRAMES = 6;   // frames before note name commits
     const MIDI_EMA_ALPHA      = 0.13; // lower = smoother MIDI trace
-    const CENTS_EMA_ALPHA     = 0.06; // lower = smoother needle
+    const CENTS_EMA_ALPHA     = 0.18; // lower = smoother needle
 
     let tunerSmoothedMidi  = null;  // EMA of raw MIDI
     let tunerSmoothedCents = 0;     // EMA of cents offset
