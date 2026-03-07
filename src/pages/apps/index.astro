@@ -1,0 +1,53 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const apps = [
+  {
+    title: 'Korean Practice',
+    href: '/apps/korean-practice',
+    description: 'Read and listen to Korean flashcards with neural TTS audio. Includes reading, dictation, read-along, and spaced-repetition (SRS) modes.',
+    tags: ['Language', 'SRS', 'Audio'],
+  },
+  {
+    title: 'Music Trainer',
+    href: '/apps/music-trainer',
+    description: 'Browser-based bass practice tool. Chromatic tuner, random note and scale drills, interval training, metronome, and tone generator — all via your microphone.',
+    tags: ['Music', 'Bass', 'Web Audio'],
+  },
+];
+---
+
+<Layout
+  title="Web Apps | SqualieC"
+  description="Interactive browser-based tools: Korean language practice and bass music training."
+>
+  <section class="hero hero-surface">
+    <p class="eyebrow">Web Apps</p>
+    <h1>Apps</h1>
+    <p class="lead">Interactive tools that run entirely in your browser.</p>
+  </section>
+
+  <section class="projects-list">
+    <div class="grid">
+      {apps.map(app => (
+        <a href={app.href} class="card app-card">
+          <h3>{app.title}</h3>
+          <p>{app.description}</p>
+          <div class="meta-row">
+            {app.tags.map(tag => <span class="badge">{tag}</span>)}
+          </div>
+          <span class="cta">Open app</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <style>
+    .app-card {
+      text-decoration: none;
+      display: block;
+      cursor: pointer;
+    }
+    .app-card h3 { color: var(--text); }
+  </style>
+</Layout>
