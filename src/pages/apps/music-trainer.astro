@@ -358,7 +358,6 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       border-radius: 2px;
       transform: translateX(-50%);
       box-shadow: 0 0 6px rgba(0,0,0,0.5);
-      transition: left 0.07s linear;
     }
     .cents-value {
       text-align: center;
@@ -613,7 +612,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
        YIN PITCH DETECTION
     ═══════════════════════════════════════════════════════════ */
     function yin(buf, sr, fmin, fmax) {
-      fmin = fmin || 40.0;
+      fmin = fmin || 28.0;
       fmax = fmax || 2000.0;
       const N       = buf.length;
       const tauMin  = Math.max(2, Math.floor(sr / fmax));
@@ -668,10 +667,21 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         if (Math.abs(denom) > 1e-8) tau = tau + 0.5 * (x0 - x2) / denom;
       }
 
-      const freq       = sr / tau;
+      let freq         = sr / tau;
       const cmndTauInt = Math.round(Math.min(tau, tauMax));
       const confidence = Math.max(0, Math.min(1, 1 - cmnd[cmndTauInt]));
-      if (confidence < 0.6) return null;
+      if (confidence < 0.5) return null;
+
+      // Sub-octave correction: if detected freq is in mid-bass range, check if
+      // the sub-octave (freq/2) is in the bass fundamental range and has low CMND.
+      // This corrects for YIN latching on to the 2nd harmonic of low E/A strings.
+      if (freq > 55 && freq < 170) {
+        const tauDouble = Math.round(2 * Math.min(tau, tauMax / 2));
+        if (tauDouble <= tauMax && cmnd[tauDouble] < 0.25) {
+          freq = sr / (2 * tau);
+        }
+      }
+
       return { freq, confidence };
     }
 
@@ -694,7 +704,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
     function getCtx() {
       if (!audioCtx || audioCtx.state === 'closed') {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
       }
       if (audioCtx.state === 'suspended') audioCtx.resume();
       return audioCtx;
@@ -703,7 +713,10 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     async function startMic() {
       try {
         const ctx = getCtx();
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+          video: false
+        });
         const src = ctx.createMediaStreamSource(micStream);
         analyser = ctx.createAnalyser();
         analyser.fftSize = 4096;
@@ -768,14 +781,11 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
        RAF PITCH LOOP
     ═══════════════════════════════════════════════════════════ */
     const pitchBuf = new Float32Array(4096);
-    let   lastRafTime = 0;
 
     function startRaf() {
       if (rafId) return;
-      function loop(ts) {
+      function loop() {
         rafId = requestAnimationFrame(loop);
-        if (ts - lastRafTime < 33) return; // ~30 fps
-        lastRafTime = ts;
         if (!analyser) return;
 
         analyser.getFloatTimeDomainData(pitchBuf);
@@ -789,7 +799,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         const vf = document.getElementById('volFill');
         if (vf) vf.style.width = Math.min(100, rms * 400) + '%';
 
-        const result = rms > 0.004 ? yin(pitchBuf, audioCtx.sampleRate) : null;
+        const result = rms > 0.002 ? yin(pitchBuf, audioCtx.sampleRate) : null;
         onPitchResult(result);
       }
       rafId = requestAnimationFrame(loop);
@@ -832,9 +842,9 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
            frames landing on the same semitone (within ±30 ¢)
          - Silence clears state so the needle snaps back to centre
     ═══════════════════════════════════════════════════════════ */
-    const TUNER_STABLE_FRAMES = 4;   // ~130 ms at 30 fps before note name commits
+    const TUNER_STABLE_FRAMES = 4;   // frames before note name commits
     const MIDI_EMA_ALPHA      = 0.20; // lower = smoother MIDI trace
-    const CENTS_EMA_ALPHA     = 0.12; // lower = smoother needle
+    const CENTS_EMA_ALPHA     = 0.09; // lower = smoother needle
 
     let tunerSmoothedMidi  = null;  // EMA of raw MIDI
     let tunerSmoothedCents = 0;     // EMA of cents offset
