@@ -942,6 +942,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       streak: 0,
     };
     const NOTE_STABLE_REQUIRED = 6; // ~200ms
+    let noteAutoTimer = null;
 
     function noteGetFretRange() {
       const lo = parseInt(document.getElementById('fretLow').value, 10)  || 0;
@@ -996,6 +997,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     }
 
     function noteNext() {
+      if (noteAutoTimer) { clearTimeout(noteAutoTimer); noteAutoTimer = null; }
       noteState.targetMidi = notePickTarget();
       if (!noteState.targetMidi) return;
       noteShowTarget();
@@ -1042,6 +1044,11 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
           setNoteResult('Correct! \u2713', 'result-correct');
           updateNoteScore();
           document.getElementById('noteNextBtn').disabled = false;
+          if (noteAutoTimer) clearTimeout(noteAutoTimer);
+          noteAutoTimer = setTimeout(() => {
+            noteAutoTimer = null;
+            if (noteState.waiting) noteNext();
+          }, 1000);
         }
       } else {
         noteState.lastMidi     = nearest;
@@ -1061,6 +1068,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     ═══════════════════════════════════════════════════════════ */
     const scaleState = {
       active:   false,
+      waiting:  false,  // true after correct note, prevents re-triggering
       notes:    [],   // MIDI values for current scale
       idx:      0,
       stableFrames: 0,
@@ -1079,9 +1087,10 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
     function scaleStart() {
       if (!analyser) { setMicStatus('Enable microphone first!', '#e74c3c'); return; }
-      scaleState.notes  = scaleBuild();
-      scaleState.idx    = 0;
-      scaleState.active = true;
+      scaleState.notes   = scaleBuild();
+      scaleState.idx     = 0;
+      scaleState.active  = true;
+      scaleState.waiting = false;
       scaleState.stableFrames = 0;
       scaleState.lastMidi     = null;
       document.getElementById('scaleStartBtn').textContent = 'Restart Scale';
@@ -1096,6 +1105,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       document.getElementById('scaleTarget').textContent   = midiToFullName(midi);
       document.getElementById('scaleHints').innerHTML      = hintsHtml(midi);
       setScaleResult('', '');
+      scaleState.waiting      = false;
       scaleState.stableFrames = 0;
       scaleState.lastMidi     = null;
       fbTargetMidi = midi;
@@ -1131,8 +1141,8 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     }
 
     function updateScaleDetect(result) {
-      if (!scaleState.active || !result) {
-        if (!result) { scaleState.stableFrames = 0; scaleState.lastMidi = null; }
+      if (!scaleState.active || scaleState.waiting || !result) {
+        if (!result && !scaleState.waiting) { scaleState.stableFrames = 0; scaleState.lastMidi = null; }
         return;
       }
       const rawMidi = freqToMidi(result.freq);
@@ -1150,8 +1160,9 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
           scaleState.stableFrames = 1;
         }
         if (scaleState.stableFrames >= SCALE_STABLE_REQUIRED) {
+          scaleState.waiting = true;
           setScaleResult('\u2713', 'result-correct');
-          setTimeout(() => scaleAdvance(), 300);
+          setTimeout(() => scaleAdvance(), 500);
         }
       } else {
         scaleState.lastMidi     = nearest;
@@ -1171,6 +1182,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       lastMidi:     null,
     };
     const INT_STABLE_REQUIRED = 6;
+    let intAutoTimer = null;
 
     function intBuild() {
       const random = document.getElementById('intRandom').checked;
@@ -1196,6 +1208,7 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     }
 
     function intStart() {
+      if (intAutoTimer) { clearTimeout(intAutoTimer); intAutoTimer = null; }
       if (!analyser) { setMicStatus('Enable microphone first!', '#e74c3c'); return; }
       const { rootMidi, targetMidi } = intBuild();
       intState.rootMidi   = rootMidi;
@@ -1274,6 +1287,11 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
             setIntResult('Interval complete! \uD83C\uDF89', 'result-correct');
             intState.active = false;
             document.getElementById('intNextBtn').disabled = false;
+            if (intAutoTimer) clearTimeout(intAutoTimer);
+            intAutoTimer = setTimeout(() => {
+              intAutoTimer = null;
+              if (!intState.active) intStart();
+            }, 1000);
           }
         }
       } else {
