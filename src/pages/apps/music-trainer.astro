@@ -825,7 +825,23 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
     /* ═══════════════════════════════════════════════════════════
        TUNER PANEL
+       Smoothing strategy:
+         - EMA on raw MIDI value (alpha=0.2) to reduce note-name flicker
+         - Separate EMA on cents (alpha=0.15) for a silky needle
+         - Note name only commits after TUNER_STABLE_FRAMES consecutive
+           frames landing on the same semitone (within ±30 ¢)
+         - Silence clears state so the needle snaps back to centre
     ═══════════════════════════════════════════════════════════ */
+    const TUNER_STABLE_FRAMES = 4;   // ~130 ms at 30 fps before note name commits
+    const MIDI_EMA_ALPHA      = 0.20; // lower = smoother MIDI trace
+    const CENTS_EMA_ALPHA     = 0.12; // lower = smoother needle
+
+    let tunerSmoothedMidi  = null;  // EMA of raw MIDI
+    let tunerSmoothedCents = 0;     // EMA of cents offset
+    let tunerStableMidi    = null;  // committed semitone (shown in display)
+    let tunerStableCount   = 0;     // consecutive frames on same semitone
+    let tunerSilenceCount  = 0;     // frames without a valid result
+
     function updateTuner(result) {
       const noteEl   = document.getElementById('tunerNote');
       const octaveEl = document.getElementById('tunerOctave');
@@ -836,30 +852,63 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       if (!noteEl) return;
 
       if (!result) {
-        noteEl.textContent   = '--';
-        noteEl.classList.remove('in-tune');
-        octaveEl.textContent = '';
-        freqEl.textContent   = '';
-        needleEl.style.left  = '50%';
-        centsEl.textContent  = '-- ¢';
-        confEl.textContent   = '';
+        tunerSilenceCount++;
+        // After a few silent frames, reset everything cleanly
+        if (tunerSilenceCount > 6) {
+          tunerSmoothedMidi  = null;
+          tunerStableMidi    = null;
+          tunerStableCount   = 0;
+          tunerSmoothedCents = 0;
+          noteEl.textContent   = '--';
+          noteEl.classList.remove('in-tune');
+          octaveEl.textContent = '';
+          freqEl.textContent   = '';
+          needleEl.style.left  = '50%';
+          centsEl.textContent  = '-- ¢';
+          centsEl.style.color  = '';
+          confEl.textContent   = '';
+        }
         return;
       }
+      tunerSilenceCount = 0;
 
-      const rawMidi  = freqToMidi(result.freq);
-      const nearest  = Math.round(rawMidi);
-      const cents    = (rawMidi - nearest) * 100;
-      const inTune   = Math.abs(cents) < 5;
+      // ── EMA on raw MIDI ──────────────────────────────────
+      const rawMidi = freqToMidi(result.freq);
+      if (tunerSmoothedMidi === null) {
+        tunerSmoothedMidi = rawMidi;
+      } else {
+        tunerSmoothedMidi = MIDI_EMA_ALPHA * rawMidi + (1 - MIDI_EMA_ALPHA) * tunerSmoothedMidi;
+      }
 
-      noteEl.textContent   = midiToName(nearest);
-      octaveEl.textContent = 'Oct ' + midiToOctave(nearest);
+      const nearest = Math.round(tunerSmoothedMidi);
+      const rawCents = (tunerSmoothedMidi - nearest) * 100;
+
+      // ── EMA on cents for silky needle ────────────────────
+      tunerSmoothedCents = CENTS_EMA_ALPHA * rawCents + (1 - CENTS_EMA_ALPHA) * tunerSmoothedCents;
+
+      // ── Note name stability gate ──────────────────────────
+      if (nearest === tunerStableMidi) {
+        tunerStableCount++;
+      } else {
+        // Only allow note change if we're reasonably confident and smoothed
+        if (Math.abs(rawCents) < 30) {
+          tunerStableCount = tunerStableMidi === null ? TUNER_STABLE_FRAMES : 1;
+          tunerStableMidi  = nearest;
+        }
+      }
+      const showMidi = tunerStableCount >= TUNER_STABLE_FRAMES ? nearest : (tunerStableMidi ?? nearest);
+
+      // ── Update display ────────────────────────────────────
+      noteEl.textContent   = midiToName(showMidi);
+      octaveEl.textContent = 'Oct ' + midiToOctave(showMidi);
       freqEl.textContent   = result.freq.toFixed(1) + ' Hz';
 
-      // Needle: map -50..+50 cents to 0..100%
-      const pct = 50 + cents;
+      const cents  = tunerSmoothedCents;
+      const pct    = 50 + cents;
       needleEl.style.left = Math.max(2, Math.min(98, pct)) + '%';
       centsEl.textContent = (cents >= 0 ? '+' : '') + cents.toFixed(1) + ' ¢';
 
+      const inTune = Math.abs(cents) < 5;
       if (inTune) {
         noteEl.classList.add('in-tune');
         centsEl.style.color = '#27ae60';
