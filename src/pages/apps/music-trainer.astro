@@ -177,8 +177,8 @@ import Layout from '../../layouts/Layout.astro';
     <!-- ── STAFF ──────────────────────────────────────── -->
     <div id="staffPanel" class="tab-panel hidden">
 
-      <!-- Clef + mode controls -->
-      <div class="ctrl-row staff-top-row">
+      <!-- Clef + mode + key + label controls -->
+      <div class="ctrl-row staff-top-row" style="flex-wrap:wrap;gap:0.5rem 0.75rem;">
         <span class="ctrl-sep">Clef</span>
         <div class="seg-group" id="clefToggle">
           <button class="seg-btn active" data-clef="bass"   type="button">Bass</button>
@@ -189,6 +189,42 @@ import Layout from '../../layouts/Layout.astro';
           <button class="seg-btn active" data-mode="reading" type="button">Reading</button>
           <button class="seg-btn"        data-mode="writing" type="button">Writing</button>
         </div>
+        <span class="ctrl-sep">Key</span>
+        <select id="staffKeySelect" class="trainer-select">
+          <optgroup label="Major">
+            <option value="C">C (none)</option>
+            <option value="G">G (1♯)</option>
+            <option value="D">D (2♯)</option>
+            <option value="A">A (3♯)</option>
+            <option value="E">E (4♯)</option>
+            <option value="B">B (5♯)</option>
+            <option value="F#">F♯ (6♯)</option>
+            <option value="F">F (1♭)</option>
+            <option value="Bb">B♭ (2♭)</option>
+            <option value="Eb">E♭ (3♭)</option>
+            <option value="Ab">A♭ (4♭)</option>
+            <option value="Db">D♭ (5♭)</option>
+            <option value="Gb">G♭ (6♭)</option>
+          </optgroup>
+          <optgroup label="Minor">
+            <option value="Am">Am (none)</option>
+            <option value="Em">Em (1♯)</option>
+            <option value="Bm">Bm (2♯)</option>
+            <option value="F#m">F♯m (3♯)</option>
+            <option value="C#m">C♯m (4♯)</option>
+            <option value="G#m">G♯m (5♯)</option>
+            <option value="Dm">Dm (1♭)</option>
+            <option value="Gm">Gm (2♭)</option>
+            <option value="Cm">Cm (3♭)</option>
+            <option value="Fm">Fm (4♭)</option>
+            <option value="Bbm">B♭m (5♭)</option>
+            <option value="Ebm">E♭m (6♭)</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="random">Random per note</option>
+          </optgroup>
+        </select>
+        <button id="noteLabelToggle" class="seg-btn" type="button" title="Show note names on staff">Labels</button>
       </div>
 
       <!-- Staff display -->
@@ -203,7 +239,7 @@ import Layout from '../../layouts/Layout.astro';
           <div id="staffReadPrompt" class="target-label" style="min-height:1.4em">Identify the note shown on the staff</div>
         </div>
         <div id="staffReadResult" class="note-result"></div>
-        <div id="staffReadChoices" class="note-choices"></div>
+        <div id="staffReadChoices" class="note-choices-grid"></div>
         <div class="score-row">
           <span id="staffReadScore"  class="score-text">Score: 0 / 0</span>
           <span id="staffReadStreak" class="streak-text"></span>
@@ -432,6 +468,22 @@ import Layout from '../../layouts/Layout.astro';
     .choice-btn:disabled { opacity: 0.5; cursor: default; }
     .write-prompt { font-size: clamp(2.5rem, 7vw, 4rem); }
 
+    /* ── Note choice grid (reading mode) ── */
+    .note-choices-grid { margin: 0.5rem 0; }
+    .choices-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      margin-bottom: 3px;
+    }
+    .choices-row .choice-btn { padding: 0.35rem 0.3rem; font-size: 1rem; }
+    .choices-row .choice-spacer { display: block; }
+    .sharps-row .choice-btn, .flats-row .choice-btn {
+      font-size: 0.8rem; padding: 0.2rem 0.2rem; opacity: 0.9;
+    }
+    /* Label toggle active state */
+    #noteLabelToggle.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
     /* ── Fretboard ── */
     .fretboard-wrap    { position: relative; margin-top: 1.4rem; display: flex; align-items: stretch; }
     .fretboard-labels  { display: flex; flex-direction: column; justify-content: space-between; padding: 14px 6px 14px 0; font-size: 0.75rem; font-weight: 700; color: color-mix(in srgb, var(--muted), transparent 30%); user-select: none; }
@@ -472,6 +524,37 @@ import Layout from '../../layouts/Layout.astro';
     ];
 
     const INLAY_FRETS = [3,5,7,9,12,15,17,19,21,24];
+
+    /* ── Key signature definitions ────────────────────── */
+    /* adj: { letter → semitone delta }, vex: VexFlow key name */
+    const KEY_SIGS = {
+      'C':   { adj: {}, vex: 'C' },
+      'G':   { adj: { F:+1 }, vex: 'G' },
+      'D':   { adj: { F:+1, C:+1 }, vex: 'D' },
+      'A':   { adj: { F:+1, C:+1, G:+1 }, vex: 'A' },
+      'E':   { adj: { F:+1, C:+1, G:+1, D:+1 }, vex: 'E' },
+      'B':   { adj: { F:+1, C:+1, G:+1, D:+1, A:+1 }, vex: 'B' },
+      'F#':  { adj: { F:+1, C:+1, G:+1, D:+1, A:+1, E:+1 }, vex: 'F#' },
+      'F':   { adj: { B:-1 }, vex: 'F' },
+      'Bb':  { adj: { B:-1, E:-1 }, vex: 'Bb' },
+      'Eb':  { adj: { B:-1, E:-1, A:-1 }, vex: 'Eb' },
+      'Ab':  { adj: { B:-1, E:-1, A:-1, D:-1 }, vex: 'Ab' },
+      'Db':  { adj: { B:-1, E:-1, A:-1, D:-1, G:-1 }, vex: 'Db' },
+      'Gb':  { adj: { B:-1, E:-1, A:-1, D:-1, G:-1, C:-1 }, vex: 'Gb' },
+      'Am':  { adj: {}, vex: 'C' },
+      'Em':  { adj: { F:+1 }, vex: 'G' },
+      'Bm':  { adj: { F:+1, C:+1 }, vex: 'D' },
+      'F#m': { adj: { F:+1, C:+1, G:+1 }, vex: 'A' },
+      'C#m': { adj: { F:+1, C:+1, G:+1, D:+1 }, vex: 'E' },
+      'G#m': { adj: { F:+1, C:+1, G:+1, D:+1, A:+1 }, vex: 'B' },
+      'Dm':  { adj: { B:-1 }, vex: 'F' },
+      'Gm':  { adj: { B:-1, E:-1 }, vex: 'Bb' },
+      'Cm':  { adj: { B:-1, E:-1, A:-1 }, vex: 'Eb' },
+      'Fm':  { adj: { B:-1, E:-1, A:-1, D:-1 }, vex: 'Ab' },
+      'Bbm': { adj: { B:-1, E:-1, A:-1, D:-1, G:-1 }, vex: 'Db' },
+      'Ebm': { adj: { B:-1, E:-1, A:-1, D:-1, G:-1, C:-1 }, vex: 'Gb' },
+    };
+    const ALL_KEY_NAMES = Object.keys(KEY_SIGS);
 
     /* Staff position tables: dy = pixels from stave top (staveY=60) */
     /* Each entry is one diatonic step, natural notes only */
@@ -546,14 +629,16 @@ import Layout from '../../layouts/Layout.astro';
       document.head.appendChild(s);
     }
 
-    let staffCurrentMidi = null;
-    let staffCurrentClef = 'bass';
+    let staffCurrentMidi     = null;
+    let staffCurrentClef     = 'bass';
+    let staffCurrentDrawOpts = {};
 
-    function drawStaff(midi, clef) {
+    function drawStaff(midi, clef, drawOpts) {
       clef = clef || staffCurrentClef;
-      staffCurrentMidi = midi;
-      staffCurrentClef = clef;
-      withVF(() => _doDrawStaff(midi, clef));
+      staffCurrentMidi     = midi;
+      staffCurrentClef     = clef;
+      staffCurrentDrawOpts = drawOpts || {};
+      withVF(() => _doDrawStaff(midi, clef, staffCurrentDrawOpts));
     }
 
     function _doDrawStaff(midi, clef, opts) {
@@ -570,22 +655,47 @@ import Layout from '../../layouts/Layout.astro';
       renderer.resize(W, H);
       const ctx = renderer.getContext();
 
-      const stave = new VF.Stave(10, STAVE_Y, W - 20).addClef(clef);
+      const keySig = opts.keySig || KEY_SIGS['C'];
+      const stave  = new VF.Stave(10, STAVE_Y, W - 20).addClef(clef);
+      if (keySig.vex && keySig.vex !== 'C') stave.addKeySignature(keySig.vex);
       stave.setContext(ctx).draw();
+
+      // Note labels on the right side of the SVG
+      if (noteLabelsEnabled) {
+        const svg = container.querySelector('svg');
+        if (svg) {
+          const labelPositions = applyKeySigToPositions(getClefPositions(), keySig);
+          for (const p of labelPositions) {
+            if (p.dy < -20 || p.dy > 65) continue;
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', W - 6);
+            t.setAttribute('y', STAVE_Y + p.dy + 4);
+            t.setAttribute('text-anchor', 'end');
+            t.setAttribute('font-size', '10');
+            t.setAttribute('font-family', 'sans-serif');
+            t.setAttribute('fill', '#999');
+            t.textContent = p.name;
+            svg.appendChild(t);
+          }
+        }
+      }
 
       if (midi === null || midi === undefined) return;
 
-      const cls = ((midi % 12) + 12) % 12;
-      const oct = Math.floor(midi / 12) - 1;
-      const key = VEX_NAMES[cls] + '/' + oct;
-
-      const note = new VF.StaveNote({ clef, keys: [key], duration: 'w' });
-      if (SHARP_CLASSES.has(cls)) note.addAccidental(0, new VF.Accidental('#'));
-
-      // Color override for write mode feedback
-      if (opts.color) {
-        note.setStyle({ fillStyle: opts.color, strokeStyle: opts.color });
+      // Use natural letter/octave when provided (key sig handles the accidental visually)
+      let vfNoteKey, addExplicitAccidental = false;
+      if (opts.letter && opts.octave != null) {
+        vfNoteKey = opts.letter.toLowerCase() + '/' + opts.octave;
+      } else {
+        const cls = ((midi % 12) + 12) % 12;
+        const oct = Math.floor(midi / 12) - 1;
+        vfNoteKey = VEX_NAMES[cls] + '/' + oct;
+        if (SHARP_CLASSES.has(cls)) addExplicitAccidental = true;
       }
+
+      const note = new VF.StaveNote({ clef, keys: [vfNoteKey], duration: 'w' });
+      if (addExplicitAccidental) note.addAccidental(0, new VF.Accidental('#'));
+      if (opts.color) note.setStyle({ fillStyle: opts.color, strokeStyle: opts.color });
 
       const voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT);
       voice.addTickables([note]);
@@ -1102,14 +1212,42 @@ import Layout from '../../layouts/Layout.astro';
     /* ═══════════════════════════════════════════════════════════
        STAFF TAB — SHARED
     ═══════════════════════════════════════════════════════════ */
-    let currentClef  = 'bass';
-    let staffMode    = 'reading';
+    let currentClef       = 'bass';
+    let staffMode         = 'reading';
+    let currentKey        = 'C';
+    let noteLabelsEnabled = false;
 
     function getClefPositions() {
       return currentClef === 'bass' ? BASS_POSITIONS : TREBLE_POSITIONS;
     }
 
-    // Find closest staff position to a y-coordinate (relative to SVG top)
+    // Apply key signature adjustments to a positions array; returns new array with adjusted midi/name
+    function applyKeySigToPositions(positions, keySig) {
+      const adj = (keySig && keySig.adj) || {};
+      return positions.map(p => {
+        const letter = p.name[0];
+        const octave = parseInt(p.name.slice(1), 10);
+        const a = adj[letter] || 0;
+        const accType = a > 0 ? '#' : a < 0 ? '\u266d' : null;
+        const displayName = accType ? (letter + accType + p.name.slice(1)) : p.name;
+        return { dy: p.dy, midi: p.midi + a, name: displayName, letter, octave, accType };
+      });
+    }
+
+    // Returns the active key sig; picks random one if currentKey === 'random'
+    function getActiveKeySig() {
+      if (currentKey === 'random') {
+        return KEY_SIGS[ALL_KEY_NAMES[Math.floor(Math.random() * ALL_KEY_NAMES.length)]];
+      }
+      return KEY_SIGS[currentKey] || KEY_SIGS['C'];
+    }
+
+    // Helper to get the display key sig for a static draw (no random roll)
+    function getStaticKeySig() {
+      return currentKey === 'random' ? KEY_SIGS['C'] : (KEY_SIGS[currentKey] || KEY_SIGS['C']);
+    }
+
+    // Find closest natural staff position to a y-coordinate (for click mapping in write mode)
     function posFromY(y) {
       const positions = getClefPositions();
       const dy = y - STAVE_Y;
@@ -1128,27 +1266,32 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* ── STAFF READING mode ───────────────────────────── */
-    const srState = { active: false, targetMidi: null, answered: false, score: { correct: 0, total: 0 }, streak: 0 };
-
-    function srGetPool() {
-      // All positions for current clef
-      return getClefPositions().map(p => p.midi);
-    }
+    const srState = {
+      active: false, targetPos: null, targetMidi: null,
+      keySig: null, answered: false,
+      score: { correct: 0, total: 0 }, streak: 0
+    };
 
     function srPickTarget() {
-      const pool = srGetPool();
+      const keySig = getActiveKeySig();
+      const pool   = applyKeySigToPositions(getClefPositions(), keySig);
       if (!pool.length) return null;
-      // Avoid repeating same note
-      let midi;
-      do { midi = pool[Math.floor(Math.random() * pool.length)]; } while (pool.length > 1 && midi === srState.targetMidi);
-      return midi;
+      let pos;
+      do {
+        pos = pool[Math.floor(Math.random() * pool.length)];
+      } while (pool.length > 1 && srState.targetPos && pos.dy === srState.targetPos.dy);
+      return { pos, keySig };
     }
 
     function srStart() {
-      srState.targetMidi = srPickTarget();
-      if (!srState.targetMidi) return;
-      srState.answered = false;
-      drawStaff(srState.targetMidi, currentClef);
+      const pick = srPickTarget();
+      if (!pick) return;
+      const { pos, keySig } = pick;
+      srState.targetPos  = pos;
+      srState.targetMidi = pos.midi;
+      srState.keySig     = keySig;
+      srState.answered   = false;
+      drawStaff(pos.midi, currentClef, { keySig, letter: pos.letter, octave: pos.octave });
       srBuildChoices();
       document.getElementById('staffReadResult').textContent = '';
       document.getElementById('staffReadResult').className   = 'note-result';
@@ -1158,54 +1301,94 @@ import Layout from '../../layouts/Layout.astro';
       srState.active = true;
     }
 
+    /* Build the 3-row answer grid: sharps / naturals / flats */
     function srBuildChoices() {
-      // 7 note letter buttons: A B C D E F G
-      const letters = ['A','B','C','D','E','F','G'];
+      // col 1=C 2=D 3=E 4=F 5=G 6=A 7=B
+      const NATURALS = [
+        { name:'C', pc:0, col:1 }, { name:'D', pc:2, col:2 }, { name:'E', pc:4, col:3 },
+        { name:'F', pc:5, col:4 }, { name:'G', pc:7, col:5 }, { name:'A', pc:9, col:6 },
+        { name:'B', pc:11, col:7 },
+      ];
+      // C# D# F# G# A# (no E# / B#)
+      const SHARPS = [
+        { name:'C\u266f', pc:1,  col:1 }, { name:'D\u266f', pc:3,  col:2 },
+        { name:'F\u266f', pc:6,  col:4 }, { name:'G\u266f', pc:8,  col:5 },
+        { name:'A\u266f', pc:10, col:6 },
+      ];
+      // Db Eb Gb Ab Bb (no Cb / Fb)
+      const FLATS = [
+        { name:'D\u266d', pc:1,  col:2 }, { name:'E\u266d', pc:3,  col:3 },
+        { name:'G\u266d', pc:6,  col:5 }, { name:'A\u266d', pc:8,  col:6 },
+        { name:'B\u266d', pc:10, col:7 },
+      ];
+
       const container = document.getElementById('staffReadChoices');
       container.innerHTML = '';
-      const targetLetter = midiToName(srState.targetMidi).replace('#','');
-      letters.forEach(letter => {
-        const btn = document.createElement('button');
-        btn.textContent = letter;
-        btn.className   = 'choice-btn';
-        btn.addEventListener('click', () => srOnChoice(letter, btn));
-        container.appendChild(btn);
-      });
+
+      function makeRow(notes, rowClass) {
+        const row = document.createElement('div');
+        row.className = 'choices-row ' + rowClass;
+        for (let col = 1; col <= 7; col++) {
+          const note = notes.find(n => n.col === col);
+          if (note) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = note.name;
+            btn.className = 'choice-btn';
+            btn.dataset.pc = note.pc;
+            btn.addEventListener('click', () => srOnChoice(note.pc, btn));
+            row.appendChild(btn);
+          } else {
+            const sp = document.createElement('span');
+            sp.className = 'choice-spacer';
+            row.appendChild(sp);
+          }
+        }
+        return row;
+      }
+
+      container.appendChild(makeRow(SHARPS,   'sharps-row'));
+      container.appendChild(makeRow(NATURALS, 'naturals-row'));
+      container.appendChild(makeRow(FLATS,    'flats-row'));
     }
 
-    function srOnChoice(letter, btn) {
+    function srOnChoice(clickedPc, btn) {
       if (srState.answered) return;
       srState.answered = true;
-      const targetLetter = midiToName(srState.targetMidi).replace('#','');
-      const correct = letter === targetLetter;
-      // Disable all buttons, color correct/wrong
+      const targetPc = ((srState.targetMidi % 12) + 12) % 12;
+      const correct  = clickedPc === targetPc;
+      // Highlight all buttons with target pitch class as correct
       document.querySelectorAll('#staffReadChoices .choice-btn').forEach(b => {
         b.disabled = true;
-        if (b.textContent === targetLetter) b.classList.add('correct');
+        const bPc = parseInt(b.dataset.pc, 10);
+        if (bPc === targetPc)      b.classList.add('correct');
         else if (b === btn && !correct) b.classList.add('wrong');
       });
       const resultEl = document.getElementById('staffReadResult');
+      const noteName = srState.targetPos ? srState.targetPos.name : midiToFullName(srState.targetMidi);
       if (correct) {
         srState.score.correct++; srState.score.total++; srState.streak++;
-        resultEl.textContent = 'Correct! \u2713 — ' + srState.targetMidi !== null ? midiToFullName(srState.targetMidi) : '';
-        resultEl.textContent = 'Correct! \u2713 — ' + midiToFullName(srState.targetMidi);
+        resultEl.textContent = 'Correct! \u2713 \u2014 ' + noteName;
         resultEl.className   = 'note-result result-correct';
       } else {
         srState.score.total++; srState.streak = 0;
-        resultEl.textContent = 'Wrong. It was ' + midiToFullName(srState.targetMidi);
+        resultEl.textContent = 'Wrong. It was ' + noteName;
         resultEl.className   = 'note-result result-wrong';
       }
       srUpdateScore();
       document.getElementById('staffReadNextBtn').disabled = false;
-      // Auto-advance
-      setTimeout(() => { if (!srState.answered) return; srNext(); }, 1800);
+      setTimeout(() => { if (srState.answered) srNext(); }, 1800);
     }
 
     function srNext() {
-      srState.targetMidi = srPickTarget();
-      if (!srState.targetMidi) return;
-      srState.answered = false;
-      drawStaff(srState.targetMidi, currentClef);
+      const pick = srPickTarget();
+      if (!pick) return;
+      const { pos, keySig } = pick;
+      srState.targetPos  = pos;
+      srState.targetMidi = pos.midi;
+      srState.keySig     = keySig;
+      srState.answered   = false;
+      drawStaff(pos.midi, currentClef, { keySig, letter: pos.letter, octave: pos.octave });
       srBuildChoices();
       document.getElementById('staffReadResult').textContent = '';
       document.getElementById('staffReadResult').className   = 'note-result';
@@ -1220,39 +1403,46 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* ── STAFF WRITING mode ───────────────────────────── */
-    const swState = { active: false, targetMidi: null, answered: false, score: { correct: 0, total: 0 }, streak: 0 };
+    const swState = {
+      active: false, targetPos: null, targetMidi: null,
+      keySig: null, answered: false,
+      score: { correct: 0, total: 0 }, streak: 0
+    };
     let writeHoverPos = null;
 
-    function swGetPool() {
-      // Use middle range only (avoid extreme ledger lines for writing mode)
-      const positions = getClefPositions();
-      // Filter to dy range [-10, 50] = staff + 1 ledger above/below
-      return positions.filter(p => p.dy >= -10 && p.dy <= 50);
+    function swGetPool(keySig) {
+      return applyKeySigToPositions(getClefPositions(), keySig)
+        .filter(p => p.dy >= -10 && p.dy <= 50);
     }
 
     function swPickTarget() {
-      const pool = swGetPool();
+      const keySig = getActiveKeySig();
+      const pool   = swGetPool(keySig);
       if (!pool.length) return null;
       let pos;
-      do { pos = pool[Math.floor(Math.random() * pool.length)]; } while (pool.length > 1 && pos.midi === swState.targetMidi);
-      return pos;
+      do {
+        pos = pool[Math.floor(Math.random() * pool.length)];
+      } while (pool.length > 1 && swState.targetPos && pos.dy === swState.targetPos.dy);
+      return { pos, keySig };
     }
 
     function swStart() {
-      const pos = swPickTarget();
-      if (!pos) return;
+      const pick = swPickTarget();
+      if (!pick) return;
+      const { pos, keySig } = pick;
+      swState.targetPos  = pos;
       swState.targetMidi = pos.midi;
+      swState.keySig     = keySig;
       swState.answered   = false;
-      document.getElementById('staffWritePrompt').textContent = midiToName(swState.targetMidi);
+      // Show note name without octave number for the prompt
+      document.getElementById('staffWritePrompt').textContent = pos.name.replace(/\d+$/, '');
       document.getElementById('staffWriteResult').textContent = '';
       document.getElementById('staffWriteResult').className   = 'note-result';
       document.getElementById('staffWriteStartBtn').textContent = 'New Note';
       document.getElementById('staffWriteNextBtn').disabled    = true;
       document.getElementById('staffWriteReplayBtn').disabled  = false;
       swState.active = true;
-      // Draw empty staff
-      drawStaff(null, currentClef);
-      // Activate overlay
+      drawStaff(null, currentClef, { keySig });
       swActivateOverlay();
     }
 
@@ -1335,30 +1525,30 @@ import Layout from '../../layouts/Layout.astro';
       canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    function swCommitAnswer(pos, canvas) {
+    function swCommitAnswer(naturalPos, canvas) {
       swState.answered = true;
-      const correct    = pos.midi === swState.targetMidi;
-      const ctx2d      = canvas.getContext('2d');
+      // Compare by dy (staff line/space position) — key sig doesn't change position
+      const correct = naturalPos.dy === swState.targetPos.dy;
+      const ctx2d   = canvas.getContext('2d');
       swClearOverlay(canvas);
 
       if (correct) {
-        swPaintNote(ctx2d, canvas.width, pos, '#27ae60', 1);
+        swPaintNote(ctx2d, canvas.width, swState.targetPos, '#27ae60', 1);
       } else {
-        // Green for correct position, red for where they clicked
-        const correctPos = getClefPositions().find(p => p.midi === swState.targetMidi);
-        if (correctPos) swPaintNote(ctx2d, canvas.width, correctPos, '#27ae60', 0.9);
-        swPaintNote(ctx2d, canvas.width, pos, '#e74c3c', 0.85);
+        swPaintNote(ctx2d, canvas.width, swState.targetPos, '#27ae60', 0.9);
+        swPaintNote(ctx2d, canvas.width, naturalPos,        '#e74c3c', 0.85);
       }
 
+      // Get keyed display name for the clicked position
+      const clickedKeyed = applyKeySigToPositions([naturalPos], swState.keySig)[0];
       const resultEl = document.getElementById('staffWriteResult');
       if (correct) {
         swState.score.correct++; swState.score.total++; swState.streak++;
-        resultEl.textContent = 'Correct! \u2713 \u2014 ' + pos.name;
+        resultEl.textContent = 'Correct! \u2713 \u2014 ' + swState.targetPos.name;
         resultEl.className   = 'note-result result-correct';
       } else {
         swState.score.total++; swState.streak = 0;
-        const correctPos = getClefPositions().find(p => p.midi === swState.targetMidi);
-        resultEl.textContent = 'Wrong \u2014 ' + pos.name + '. It was ' + (correctPos ? correctPos.name : midiToFullName(swState.targetMidi));
+        resultEl.textContent = 'Wrong \u2014 ' + clickedKeyed.name + '. It was ' + swState.targetPos.name;
         resultEl.className   = 'note-result result-wrong';
       }
       swUpdateScore();
@@ -1367,15 +1557,18 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     function swNext() {
-      const pos = swPickTarget();
-      if (!pos) return;
+      const pick = swPickTarget();
+      if (!pick) return;
+      const { pos, keySig } = pick;
+      swState.targetPos  = pos;
       swState.targetMidi = pos.midi;
+      swState.keySig     = keySig;
       swState.answered   = false;
-      document.getElementById('staffWritePrompt').textContent = midiToName(swState.targetMidi);
+      document.getElementById('staffWritePrompt').textContent = pos.name.replace(/\d+$/, '');
       document.getElementById('staffWriteResult').textContent = '';
       document.getElementById('staffWriteResult').className   = 'note-result';
       document.getElementById('staffWriteNextBtn').disabled   = true;
-      drawStaff(null, currentClef);
+      drawStaff(null, currentClef, { keySig });
       swActivateOverlay();
     }
 
@@ -1387,18 +1580,15 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     function enterStaffTab() {
-      // Hide fretboard, draw empty staff
       const fw = document.getElementById('fretboardWrap');
       if (fw) fw.style.display = 'none';
-      drawStaff(null, currentClef);
-      // Show/hide correct sub-panel
+      drawStaff(null, currentClef, { keySig: getStaticKeySig() });
       applyStaffMode();
     }
 
     function leaveStaffTab() {
       const fw = document.getElementById('fretboardWrap');
       if (fw) fw.style.display = '';
-      // Hide overlay
       const overlay = document.getElementById('writeOverlay');
       if (overlay) overlay.classList.add('hidden');
     }
@@ -1409,15 +1599,13 @@ import Layout from '../../layouts/Layout.astro';
       if (staffMode === 'reading') {
         readPanel.classList.remove('hidden');
         writePanel.classList.add('hidden');
-        // Hide overlay
         const overlay = document.getElementById('writeOverlay');
         if (overlay) overlay.classList.add('hidden');
-        // Reset prompt/staff if switching mid-session
-        if (!srState.active) drawStaff(null, currentClef);
+        if (!srState.active) drawStaff(null, currentClef, { keySig: getStaticKeySig() });
       } else {
         readPanel.classList.add('hidden');
         writePanel.classList.remove('hidden');
-        drawStaff(null, currentClef);
+        drawStaff(null, currentClef, { keySig: getStaticKeySig() });
         if (swState.active) swActivateOverlay();
       }
     }
@@ -1613,17 +1801,44 @@ import Layout from '../../layouts/Layout.astro';
           btn.classList.add('active');
           currentClef = btn.dataset.clef;
           staffCurrentClef = currentClef;
-          // Reset both modes when clef changes
-          srState.active = false; srState.targetMidi = null;
-          swState.active = false; swState.targetMidi = null;
-          document.getElementById('staffWritePrompt').textContent = '--';
-          document.getElementById('staffReadStartBtn').textContent = 'Start';
+          srState.active = false; srState.targetPos = null; srState.targetMidi = null;
+          swState.active = false; swState.targetPos = null; swState.targetMidi = null;
+          document.getElementById('staffWritePrompt').textContent  = '--';
+          document.getElementById('staffReadStartBtn').textContent  = 'Start';
           document.getElementById('staffWriteStartBtn').textContent = 'Start';
-          // Hide overlay
           const overlay = document.getElementById('writeOverlay');
           if (overlay) overlay.classList.add('hidden');
-          drawStaff(null, currentClef);
+          drawStaff(null, currentClef, { keySig: getStaticKeySig() });
         });
+      });
+    }
+
+    function initStaffKeySelect() {
+      const sel = document.getElementById('staffKeySelect');
+      if (!sel) return;
+      sel.addEventListener('change', function () {
+        currentKey = this.value;
+        srState.active = false; srState.targetPos = null; srState.targetMidi = null;
+        swState.active = false; swState.targetPos = null; swState.targetMidi = null;
+        document.getElementById('staffWritePrompt').textContent  = '--';
+        document.getElementById('staffReadStartBtn').textContent  = 'Start';
+        document.getElementById('staffWriteStartBtn').textContent = 'Start';
+        document.getElementById('staffReadResult').textContent   = '';
+        document.getElementById('staffWriteResult').textContent  = '';
+        const overlay = document.getElementById('writeOverlay');
+        if (overlay) overlay.classList.add('hidden');
+        drawStaff(null, currentClef, { keySig: getStaticKeySig() });
+      });
+    }
+
+    function initNoteLabelToggle() {
+      const btn = document.getElementById('noteLabelToggle');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        noteLabelsEnabled = !noteLabelsEnabled;
+        this.classList.toggle('active', noteLabelsEnabled);
+        // Redraw with current state to show/hide labels
+        drawStaff(staffCurrentMidi, staffCurrentClef, staffCurrentDrawOpts);
       });
     }
 
@@ -1645,6 +1860,8 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('staffReadResetBtn').addEventListener('click', () => {
         srState.score = { correct: 0, total: 0 }; srState.streak = 0; srUpdateScore();
         document.getElementById('staffReadResult').textContent = '';
+        document.getElementById('staffReadScore').textContent = 'Score: 0 / 0';
+        document.getElementById('staffReadStreak').textContent = '';
       });
       document.getElementById('staffWriteStartBtn').addEventListener('click', swStart);
       document.getElementById('staffWriteNextBtn').addEventListener('click', () => { if (swState.active) swNext(); });
@@ -1695,6 +1912,8 @@ import Layout from '../../layouts/Layout.astro';
       initClefToggle();
       initStaffModeToggle();
       initStaffPanel();
+      initStaffKeySelect();
+      initNoteLabelToggle();
       initNotePanel();
       initScalesPanel();
       initIntervalsPanel();
@@ -1712,8 +1931,7 @@ import Layout from '../../layouts/Layout.astro';
 
       const ro = new ResizeObserver(() => {
         refreshFretboard();
-        if (currentTab === 'staff') drawStaff(staffCurrentMidi, staffCurrentClef);
-        // Resize write overlay if visible
+        if (currentTab === 'staff') drawStaff(staffCurrentMidi, staffCurrentClef, staffCurrentDrawOpts);
         const overlay = document.getElementById('writeOverlay');
         if (overlay && !overlay.classList.contains('hidden')) {
           overlay.width = document.getElementById('staffCard').clientWidth || 400;
