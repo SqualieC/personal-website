@@ -22,6 +22,13 @@ import Layout from '../../layouts/Layout.astro';
       <span class="vol-wrap" aria-hidden="true">
         <span id="volFill" class="vol-fill"></span>
       </span>
+      <label for="instrSelect" class="instr-label">Instrument</label>
+      <select id="instrSelect" class="trainer-select">
+        <option value="synth">Bass (Synth)</option>
+        <option value="bass">Bass Guitar</option>
+        <option value="piano" selected>Piano</option>
+      </select>
+      <span id="instrStatus" class="instr-status"></span>
     </div>
 
     <!-- ── Staff display ──────────────────────────────────── -->
@@ -141,6 +148,8 @@ import Layout from '../../layouts/Layout.astro';
     .mic-status { font-size: 0.84rem; color: var(--muted); }
     .vol-wrap { width: 80px; height: 8px; background: color-mix(in srgb, var(--muted), transparent 78%); border-radius: 4px; overflow: hidden; }
     .vol-fill { display: block; height: 100%; width: 0%; background: var(--accent); border-radius: 4px; transition: width 0.05s; }
+    .instr-label  { font-size: 0.85rem; color: var(--muted); }
+    .instr-status { font-size: 0.78rem; color: var(--muted); min-width: 5rem; }
 
     /* ── Visibility ── */
     .tab-panel { display: block; }
@@ -436,6 +445,95 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* ═══════════════════════════════════════════════════════════
+       INSTRUMENT SAMPLER  (Tone.js lazy-loaded from CDN)
+       - Piano       : Salamander Grand Piano (tonejs.github.io/audio/salamander)
+       - Bass Guitar : multi-sampled electric bass (nbrosowsky/tonejs-instruments)
+       Falls back to oscillator synth if Tone.js or samples fail to load.
+    ═══════════════════════════════════════════════════════════ */
+    const INSTR_CONFIGS = {
+      synth: { label: 'Bass (Synth)', sampled: false },
+      bass: {
+        label: 'Bass Guitar', sampled: true,
+        baseUrl: 'https://nbrosowsky.github.io/tonejs-instruments/samples/bass-electric/',
+        urls: {
+          'A#1': 'As1.mp3', 'A#2': 'As2.mp3', 'A#3': 'As3.mp3',
+          'C#1': 'Cs1.mp3', 'C#2': 'Cs2.mp3', 'C#3': 'Cs3.mp3',
+          'E1':  'E1.mp3',  'E2':  'E2.mp3',  'E3':  'E3.mp3',
+          'G1':  'G1.mp3',  'G2':  'G2.mp3',  'G3':  'G3.mp3',
+        },
+        release: 0.4,
+      },
+      piano: {
+        label: 'Piano', sampled: true,
+        baseUrl: 'https://tonejs.github.io/audio/salamander/',
+        urls: {
+          'A0': 'A0.mp3', 'C1': 'C1.mp3', 'D#1': 'Ds1.mp3', 'F#1': 'Fs1.mp3',
+          'A1': 'A1.mp3', 'C2': 'C2.mp3', 'D#2': 'Ds2.mp3', 'F#2': 'Fs2.mp3',
+          'A2': 'A2.mp3', 'C3': 'C3.mp3', 'D#3': 'Ds3.mp3', 'F#3': 'Fs3.mp3',
+          'A3': 'A3.mp3', 'C4': 'C4.mp3', 'D#4': 'Ds4.mp3', 'F#4': 'Fs4.mp3',
+        },
+        release: 0.8,
+      },
+    };
+
+    let toneJsLoaded    = false;
+    let toneJsQueue     = [];
+    let activeSampler   = null;
+    let samplerInstr    = null;
+
+    function withToneJs(fn) {
+      if (toneJsLoaded) { fn(); return; }
+      toneJsQueue.push(fn);
+      if (document.getElementById('toneJsScript')) return;
+      const s = document.createElement('script');
+      s.id  = 'toneJsScript';
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.9.11/Tone.js';
+      s.onload  = () => { toneJsLoaded = true; toneJsQueue.forEach(f => f()); toneJsQueue = []; };
+      s.onerror = () => setInstrStatus('Tone.js failed', '#e74c3c');
+      document.head.appendChild(s);
+    }
+
+    function setInstrStatus(msg, color) {
+      const el = document.getElementById('instrStatus');
+      if (el) { el.textContent = msg; el.style.color = color || 'var(--muted)'; }
+    }
+
+    function loadSampler(instrKey) {
+      const cfg = INSTR_CONFIGS[instrKey];
+      if (!cfg || !cfg.sampled) { setInstrStatus(''); return; }
+      if (samplerInstr === instrKey && activeSampler) return;
+      withToneJs(() => {
+        if (activeSampler) { try { activeSampler.dispose(); } catch (e) {} activeSampler = null; }
+        setInstrStatus('Loading…');
+        activeSampler = new Tone.Sampler({
+          urls: cfg.urls,
+          baseUrl: cfg.baseUrl,
+          release: cfg.release || 1,
+          onload:  () => { samplerInstr = instrKey; setInstrStatus(''); },
+          onerror: () => { setInstrStatus('Load failed — using synth', '#e67e22'); activeSampler = null; },
+        }).toDestination();
+      });
+    }
+
+    function midiToToneName(midi) {
+      const N = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      return N[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+    }
+
+    // Public playback — uses sampler when available, falls back to oscillator synth
+    function playNote(midi, duration) {
+      duration = duration || 0.8;
+      const instrKey = document.getElementById('instrSelect')?.value || 'synth';
+      const cfg = INSTR_CONFIGS[instrKey];
+      if (!cfg || !cfg.sampled || !activeSampler || samplerInstr !== instrKey) {
+        playRefTone(midi, duration);
+        return;
+      }
+      if (window.Tone) Tone.start();
+      activeSampler.triggerAttackRelease(midiToToneName(midi), duration);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
        RAF PITCH LOOP
     ═══════════════════════════════════════════════════════════ */
     const pitchBuf = new Float32Array(8192);
@@ -512,7 +610,7 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('noteNextBtn').disabled     = true;
       noteShowTarget();
       noteState.active = true;
-      if (document.getElementById('notePlayRef').checked) playRefTone(noteState.targetMidi, 0.9);
+      if (document.getElementById('notePlayRef').checked) playNote(noteState.targetMidi, 0.9);
     }
 
     function noteShowTarget() {
@@ -533,7 +631,7 @@ import Layout from '../../layouts/Layout.astro';
       if (!noteState.targetMidi) return;
       noteShowTarget();
       document.getElementById('noteNextBtn').disabled = true;
-      if (document.getElementById('notePlayRef').checked) playRefTone(noteState.targetMidi, 0.9);
+      if (document.getElementById('notePlayRef').checked) playNote(noteState.targetMidi, 0.9);
     }
 
     function setNoteResult(text, cls) {
@@ -620,7 +718,7 @@ import Layout from '../../layouts/Layout.astro';
       scaleState.waiting = false; scaleState.stableFrames = 0; scaleState.lastMidi = null;
       fbTargetMidi = midi; refreshFretboard();
       drawStaff(midi);
-      if (document.getElementById('scalePlayRef').checked) playRefTone(midi, 0.6);
+      if (document.getElementById('scalePlayRef').checked) playNote(midi, 0.6);
     }
 
     function scaleSkip() { if (scaleState.active) scaleAdvance(); }
@@ -794,6 +892,7 @@ import Layout from '../../layouts/Layout.astro';
     function initMicBtn() {
       const btn = document.getElementById('micBtn');
       btn.addEventListener('click', async () => {
+        if (window.Tone) Tone.start();
         if (micStream) {
           stopMic();
           btn.textContent = 'Enable Microphone';
@@ -838,6 +937,11 @@ import Layout from '../../layouts/Layout.astro';
       populateSelects();
       initTabs();
       initMicBtn();
+      document.getElementById('instrSelect')?.addEventListener('change', function () {
+        if (window.Tone) Tone.start();
+        loadSampler(this.value);
+      });
+      loadSampler(document.getElementById('instrSelect')?.value || 'piano');
       initNotePanel();
       initScalesPanel();
 
