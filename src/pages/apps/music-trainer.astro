@@ -411,7 +411,8 @@ import Layout from '../../layouts/Layout.astro';
     #staffContainer { width: 100%; }
     #staffContainer svg { display: block; width: 100% !important; }
     .write-overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      position: absolute; top: 0; left: 0; width: 100%;
+      /* height set explicitly by JS to match SVG logical height */
       cursor: crosshair; pointer-events: auto;
     }
     .note-choices {
@@ -1257,23 +1258,32 @@ import Layout from '../../layouts/Layout.astro';
 
     function swActivateOverlay() {
       const card    = document.getElementById('staffCard');
-      const overlay = document.getElementById('writeOverlay');
-      overlay.width  = card.clientWidth  || 400;
-      overlay.height = 200;
-      overlay.classList.remove('hidden');
-      // Clear previous listeners by replacing canvas
-      const fresh = overlay.cloneNode(false);
-      overlay.parentNode.replaceChild(fresh, overlay);
+      // SVG logical height is always 200 (set in _doDrawStaff)
+      const W = card.clientWidth || 400;
+      const H = 200;
+
+      // Replace canvas to drop stale listeners
+      const oldOverlay = document.getElementById('writeOverlay');
+      const fresh = oldOverlay.cloneNode(false);
+      oldOverlay.parentNode.replaceChild(fresh, oldOverlay);
+
+      // Set logical size and matching CSS size so canvas coords == CSS pixels
+      fresh.width       = W;
+      fresh.height      = H;
+      fresh.style.width  = W + 'px';
+      fresh.style.height = H + 'px';
       fresh.classList.remove('hidden');
-      fresh.width  = overlay.width;
-      fresh.height = overlay.height;
+
+      function getMouseY(e) {
+        const rect = fresh.getBoundingClientRect();
+        // scaleY maps CSS pixels → canvas logical pixels (should be 1:1 after above, but be safe)
+        const scaleY = fresh.height / rect.height;
+        return (e.clientY - rect.top) * scaleY;
+      }
 
       fresh.addEventListener('mousemove', (e) => {
         if (swState.answered) return;
-        const rect = fresh.getBoundingClientRect();
-        const scaleX = fresh.width / rect.width;
-        const mouseY = (e.clientY - rect.top) * scaleX;
-        writeHoverPos = posFromY(mouseY);
+        writeHoverPos = posFromY(getMouseY(e));
         swDrawGhost(fresh, writeHoverPos, 'rgba(86,163,255,0.7)');
       });
 
@@ -1284,76 +1294,71 @@ import Layout from '../../layouts/Layout.astro';
 
       fresh.addEventListener('click', (e) => {
         if (swState.answered || !swState.active) return;
-        const rect   = fresh.getBoundingClientRect();
-        const scaleX = fresh.width / rect.width;
-        const mouseY = (e.clientY - rect.top) * scaleX;
-        const pos    = posFromY(mouseY);
-        swCommitAnswer(pos, fresh);
+        swCommitAnswer(posFromY(getMouseY(e)), fresh);
       });
     }
 
-    function swDrawGhost(canvas, pos, color) {
-      swClearOverlay(canvas);
-      if (!pos) return;
-      const ctx2d = canvas.getContext('2d');
-      const W = canvas.width;
+    // Draw a single note-head + ledger lines onto ctx2d without clearing first
+    function swPaintNote(ctx2d, W, pos, color, alpha) {
       const x = W * 0.42;
       const y = STAVE_Y + pos.dy;
-
       ctx2d.save();
-      ctx2d.globalAlpha = 0.75;
+      ctx2d.globalAlpha = alpha != null ? alpha : 0.85;
       ctx2d.strokeStyle = color;
+      ctx2d.fillStyle   = color;
       ctx2d.lineWidth   = 1.5;
-
-      // Ledger lines for notes outside staff (staff lines at dy=0,10,20,30,40)
-      if (pos.dy < 0) {
-        for (let ldy = (pos.dy % 10 === 0 ? pos.dy : pos.dy - (((pos.dy % 10) + 10) % 10)); ldy <= -10; ldy += 10) {
-          if (ldy > pos.dy - 5) {
-            const ly = STAVE_Y + ldy;
-            ctx2d.beginPath(); ctx2d.moveTo(x - 18, ly); ctx2d.lineTo(x + 18, ly); ctx2d.stroke();
-          }
-        }
-      } else if (pos.dy > 40) {
-        for (let ldy = 50; ldy <= pos.dy + 5; ldy += 10) {
-          const ly = STAVE_Y + ldy;
-          ctx2d.beginPath(); ctx2d.moveTo(x - 18, ly); ctx2d.lineTo(x + 18, ly); ctx2d.stroke();
-        }
+      // Ledger lines above staff (staff lines at dy=0,10,20,30,40)
+      const topLedger = Math.ceil(Math.min(pos.dy, 0) / 10) * 10;
+      for (let ldy = -10; ldy >= topLedger; ldy -= 10) {
+        const ly = STAVE_Y + ldy;
+        ctx2d.beginPath(); ctx2d.moveTo(x - 18, ly); ctx2d.lineTo(x + 18, ly); ctx2d.stroke();
       }
-
-      ctx2d.fillStyle = color;
+      // Ledger lines below staff
+      const botLedger = Math.floor(Math.max(pos.dy, 40) / 10) * 10;
+      for (let ldy = 50; ldy <= botLedger; ldy += 10) {
+        const ly = STAVE_Y + ldy;
+        ctx2d.beginPath(); ctx2d.moveTo(x - 18, ly); ctx2d.lineTo(x + 18, ly); ctx2d.stroke();
+      }
       ctx2d.beginPath();
       ctx2d.ellipse(x, y, 12, 8, -0.25, 0, Math.PI * 2);
       ctx2d.fill();
       ctx2d.restore();
     }
 
+    function swDrawGhost(canvas, pos, color) {
+      swClearOverlay(canvas);
+      if (!pos) return;
+      swPaintNote(canvas.getContext('2d'), canvas.width, pos, color || 'rgba(86,163,255,0.7)', 0.75);
+    }
+
     function swClearOverlay(canvas) {
-      const ctx2d = canvas.getContext('2d');
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     }
 
     function swCommitAnswer(pos, canvas) {
       swState.answered = true;
-      const correct = pos.midi === swState.targetMidi;
-      const color   = correct ? '#27ae60' : '#e74c3c';
-      swDrawGhost(canvas, pos, color);
-      // Also show correct position if wrong
-      if (!correct) {
+      const correct    = pos.midi === swState.targetMidi;
+      const ctx2d      = canvas.getContext('2d');
+      swClearOverlay(canvas);
+
+      if (correct) {
+        swPaintNote(ctx2d, canvas.width, pos, '#27ae60', 1);
+      } else {
+        // Green for correct position, red for where they clicked
         const correctPos = getClefPositions().find(p => p.midi === swState.targetMidi);
-        if (correctPos) swDrawGhost(canvas, correctPos, '#27ae60');
-        // Redraw wrong on top
-        swDrawGhost(canvas, pos, '#e74c3c80');
+        if (correctPos) swPaintNote(ctx2d, canvas.width, correctPos, '#27ae60', 0.9);
+        swPaintNote(ctx2d, canvas.width, pos, '#e74c3c', 0.85);
       }
 
       const resultEl = document.getElementById('staffWriteResult');
       if (correct) {
         swState.score.correct++; swState.score.total++; swState.streak++;
-        resultEl.textContent = 'Correct! \u2713 — ' + pos.name;
+        resultEl.textContent = 'Correct! \u2713 \u2014 ' + pos.name;
         resultEl.className   = 'note-result result-correct';
       } else {
         swState.score.total++; swState.streak = 0;
         const correctPos = getClefPositions().find(p => p.midi === swState.targetMidi);
-        resultEl.textContent = 'Wrong — ' + pos.name + '. It was ' + (correctPos ? correctPos.name : midiToFullName(swState.targetMidi));
+        resultEl.textContent = 'Wrong \u2014 ' + pos.name + '. It was ' + (correctPos ? correctPos.name : midiToFullName(swState.targetMidi));
         resultEl.className   = 'note-result result-wrong';
       }
       swUpdateScore();
