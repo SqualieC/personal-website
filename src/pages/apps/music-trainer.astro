@@ -832,9 +832,9 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
            frames landing on the same semitone (within ±30 ¢)
          - Silence clears state so the needle snaps back to centre
     ═══════════════════════════════════════════════════════════ */
-    const TUNER_STABLE_FRAMES = 4;   // frames before note name commits
-    const MIDI_EMA_ALPHA      = 0.20; // lower = smoother MIDI trace
-    const CENTS_EMA_ALPHA     = 0.09; // lower = smoother needle
+    const TUNER_STABLE_FRAMES = 6;   // frames before note name commits
+    const MIDI_EMA_ALPHA      = 0.13; // lower = smoother MIDI trace
+    const CENTS_EMA_ALPHA     = 0.06; // lower = smoother needle
 
     let tunerSmoothedMidi  = null;  // EMA of raw MIDI
     let tunerSmoothedCents = 0;     // EMA of cents offset
