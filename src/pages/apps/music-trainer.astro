@@ -225,6 +225,14 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       </div>
     </div>
 
+    <!-- ── FRETBOARD ─────────────────────────────────── -->
+    <div class="fretboard-wrap">
+      <canvas id="fretboard" class="fretboard-canvas"></canvas>
+      <div class="fretboard-labels" aria-hidden="true">
+        <span>G</span><span>D</span><span>A</span><span>E</span>
+      </div>
+    </div>
+
   </section>
 
   <style>
@@ -512,6 +520,30 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
     .btn-row { margin-top: 0.75rem; }
 
+    /* ── Fretboard ── */
+    .fretboard-wrap {
+      position: relative;
+      margin-top: 1.4rem;
+      display: flex;
+      align-items: stretch;
+    }
+    .fretboard-labels {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 14px 6px 14px 0;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: color-mix(in srgb, var(--muted), transparent 30%);
+      user-select: none;
+    }
+    .fretboard-canvas {
+      flex: 1;
+      height: 160px;
+      border-radius: 10px;
+      display: block;
+    }
+
     /* ── Tuner in-tune glow ── */
     @keyframes in-tune-pulse {
       0%   { text-shadow: 0 0 0px var(--accent); }
@@ -777,6 +809,18 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       if (currentTab === 'note')      updateNoteDetect(result);
       if (currentTab === 'scales')    updateScaleDetect(result);
       if (currentTab === 'intervals') updateIntervalDetect(result);
+
+      // Update fretboard detected note
+      if (result) {
+        const nearest = Math.round(freqToMidi(result.freq));
+        if (nearest !== fbDetectedMidi) {
+          fbDetectedMidi = nearest;
+          refreshFretboard();
+        }
+      } else if (fbDetectedMidi !== null) {
+        fbDetectedMidi = null;
+        refreshFretboard();
+      }
     }
 
     /* ═══════════════════════════════════════════════════════════
@@ -888,6 +932,8 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       noteState.stableFrames = 0;
       noteState.lastMidi     = null;
       noteState.waiting      = false;
+      fbTargetMidi = midi;
+      refreshFretboard();
     }
 
     function noteNext() {
@@ -993,6 +1039,8 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       setScaleResult('', '');
       scaleState.stableFrames = 0;
       scaleState.lastMidi     = null;
+      fbTargetMidi = midi;
+      refreshFretboard();
       if (document.getElementById('scalePlayRef').checked) {
         playRefTone(midi, 0.6);
       }
@@ -1124,11 +1172,14 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       const label = document.getElementById('intPhaseLabel');
       if (phase === 'root') {
         label.textContent = 'Step 1: Play the root note (' + midiToFullName(intState.rootMidi) + ')';
+        fbTargetMidi = intState.rootMidi;
         playRefTone(intState.rootMidi, 0.6);
       } else {
         label.textContent = 'Step 2: Play the interval note (' + midiToFullName(intState.targetMidi) + ')';
+        fbTargetMidi = intState.targetMidi;
         playRefTone(intState.targetMidi, 0.6);
       }
+      refreshFretboard();
     }
 
     function setIntResult(text, cls) {
@@ -1314,6 +1365,11 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
           document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
           const panel = document.getElementById(tab + 'Panel');
           if (panel) panel.classList.remove('hidden');
+          // Clear target dots when on tuner or tools (no target note)
+          if (tab === 'tuner' || tab === 'tools') {
+            fbTargetMidi = null;
+            refreshFretboard();
+          }
         });
       });
     }
@@ -1391,6 +1447,139 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
     }
 
     /* ═══════════════════════════════════════════════════════════
+       FRETBOARD CANVAS
+       Mirrors the desktop FretboardWidget paintEvent exactly:
+         - bg #1c1f24, strings #c8cbd1, frets #3a3f47, nut #e2a86f
+         - inlays at 3,5,7,9,12 (#596070), double dots at 12
+         - target positions: green #3ddc84 r=9
+         - detected position:  blue  #56a3ff r=7
+         - G string at top, E string at bottom (index 0=bottom)
+    ═══════════════════════════════════════════════════════════ */
+    const INLAY_FRETS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
+
+    function drawFretboard(targetPositions, detectedMidi) {
+      const canvas = document.getElementById('fretboard');
+      if (!canvas) return;
+
+      // Hi-DPI
+      const dpr  = window.devicePixelRatio || 1;
+      const displayW = canvas.clientWidth;
+      const displayH = canvas.clientHeight;
+      if (canvas.width  !== Math.round(displayW * dpr) ||
+          canvas.height !== Math.round(displayH * dpr)) {
+        canvas.width  = Math.round(displayW * dpr);
+        canvas.height = Math.round(displayH * dpr);
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      const W = displayW, H = displayH;
+
+      const pad    = 14;
+      const lx     = pad, rx = W - pad;
+      const ty     = pad, by = H - pad;
+      const rw     = rx - lx, rh = by - ty;
+      const frets  = 12;
+      const strs   = 4; // G D A E (top→bottom = index 3→0)
+
+      // Background
+      ctx.fillStyle = '#1c1f24';
+      ctx.fillRect(0, 0, W, H);
+
+      // ── Strings (horizontal) ──────────────────────────────
+      ctx.lineWidth = 2;
+      for (let s = 0; s < strs; s++) {
+        const y = ty + (rh * s) / (strs - 1);
+        ctx.strokeStyle = '#c8cbd1';
+        ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(rx, y); ctx.stroke();
+      }
+
+      // ── Fret wires (vertical) ─────────────────────────────
+      for (let f = 0; f <= frets; f++) {
+        const x = lx + (rw * f) / frets;
+        ctx.strokeStyle = f === 0 ? '#e2a86f' : '#3a3f47';
+        ctx.lineWidth   = f === 0 ? 4 : 1;
+        ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x, by); ctx.stroke();
+      }
+
+      // ── Inlay dots ────────────────────────────────────────
+      ctx.fillStyle = '#596070';
+      const cy = ty + rh / 2;
+      for (const fret of INLAY_FRETS) {
+        if (fret > frets) continue;
+        const x = lx + (rw * (fret - 0.5)) / frets;
+        if (fret === 12 || fret === 24) {
+          const off = rh * 0.26;
+          ctx.beginPath(); ctx.arc(x, cy - off, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x, cy + off, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(x, cy, 5, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // ── Draw position dots ────────────────────────────────
+      // stringIndex: 0=E(bottom), 3=G(top) — same convention as desktop
+      function dotY(stringIndex) {
+        return ty + (rh * (strs - 1 - stringIndex)) / (strs - 1);
+      }
+      function dotX(fret) {
+        // desktop draws AT the fret wire position
+        return lx + (rw * fret) / frets;
+      }
+
+      function drawDots(positions, color, radius, labelColor) {
+        for (const pos of positions) {
+          const { stringIndex, fret: f, label } = pos;
+          if (f < 0 || f > frets) continue;
+          const x = dotX(f), y = dotY(stringIndex);
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+          if (label) {
+            ctx.fillStyle = labelColor || '#0b0e12';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, x, y);
+          }
+        }
+      }
+
+      // Target positions (green)
+      drawDots(targetPositions || [], '#3ddc84', 9, '#0b0e12');
+
+      // Detected note positions (blue) — all bass positions for that midi
+      if (detectedMidi !== null && detectedMidi !== undefined) {
+        const detPos = bassPositions(detectedMidi).map(p => ({
+          stringIndex: BASS_STRINGS.findIndex(s => s.name === p.string),
+          fret: p.fret,
+          label: '',
+        }));
+        drawDots(detPos, '#56a3ff', 7, '#0b0e12');
+      }
+
+      ctx.restore();
+    }
+
+    // Build target position list from a MIDI note (for green dots)
+    function midiToFretPositions(midi) {
+      return bassPositions(midi).map(p => ({
+        stringIndex: BASS_STRINGS.findIndex(s => s.name === p.string),
+        fret: p.fret,
+        label: midiToName(midi),
+      }));
+    }
+
+    // State for what the fretboard should show
+    let fbTargetMidi   = null;
+    let fbDetectedMidi = null;
+
+    function refreshFretboard() {
+      const targets = fbTargetMidi !== null ? midiToFretPositions(fbTargetMidi) : [];
+      drawFretboard(targets, fbDetectedMidi);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
        BOOT
     ═══════════════════════════════════════════════════════════ */
     document.addEventListener('DOMContentLoaded', function () {
@@ -1402,6 +1591,12 @@ const NOTE_NAMES_SSR = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       initIntervalsPanel();
       initToolsPanel();
       toneUpdateFreqDisplay();
+
+      // Initial fretboard draw + resize handler
+      refreshFretboard();
+      const ro = new ResizeObserver(() => refreshFretboard());
+      const canvas = document.getElementById('fretboard');
+      if (canvas) ro.observe(canvas);
     });
 
   })();
