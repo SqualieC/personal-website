@@ -1465,7 +1465,10 @@ import Layout from '../../layouts/Layout.astro';
       fresh.classList.remove('hidden');
 
       function getMouseY(e) {
-        return e.offsetY !== undefined ? e.offsetY : (e.clientY - fresh.getBoundingClientRect().top);
+        // Anchor to the SVG element so ghost coords match the drawn staff exactly
+        const svgEl = document.querySelector('#staffContainer svg');
+        const ref = svgEl || fresh;
+        return e.clientY - ref.getBoundingClientRect().top;
       }
 
       fresh.addEventListener('mousemove', (e) => {
