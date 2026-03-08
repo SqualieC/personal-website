@@ -442,10 +442,10 @@ import Layout from '../../layouts/Layout.astro';
       position: relative;
       background: #f5f5f5; border-radius: 12px; padding: 0 0 4px; margin-bottom: 1rem;
       overflow: hidden; border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
-      min-height: 130px;
+      min-height: 240px;
     }
     #staffContainer { width: 100%; }
-    #staffContainer svg { display: block; width: 100% !important; }
+    #staffContainer svg { display: block; width: 100% !important; height: 240px; }
     .write-overlay {
       position: absolute; top: 0; left: 0; width: 100%;
       /* height set explicitly by JS to match SVG logical height */
@@ -469,18 +469,18 @@ import Layout from '../../layouts/Layout.astro';
     .write-prompt { font-size: clamp(2.5rem, 7vw, 4rem); }
 
     /* ── Note choice grid (reading mode) ── */
-    .note-choices-grid { margin: 0.5rem 0; }
-    .choices-row {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 3px;
-      margin-bottom: 3px;
+    .note-choices-grid {
+      margin: 0.5rem 0;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
     }
-    .choices-row .choice-btn { padding: 0.35rem 0.3rem; font-size: 1rem; }
-    .choices-row .choice-spacer { display: block; }
-    .sharps-row .choice-btn, .flats-row .choice-btn {
-      font-size: 0.8rem; padding: 0.2rem 0.2rem; opacity: 0.9;
+    .choices-row { display: flex; gap: 4px; }
+    .choices-row .choice-btn,
+    .choices-row .choice-spacer {
+      flex: 0 0 2.8rem; width: 2.8rem;
+      padding: 0.45rem 0; text-align: center; font-size: 1rem;
     }
+    .choices-row .choice-spacer { visibility: hidden; }
+    .sharps-row .choice-btn, .flats-row .choice-btn { font-size: 0.82rem; padding: 0.3rem 0; }
     /* Label toggle active state */
     #noteLabelToggle.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
@@ -558,7 +558,7 @@ import Layout from '../../layouts/Layout.astro';
 
     /* Staff position tables: dy = pixels from stave top (staveY=60) */
     /* Each entry is one diatonic step, natural notes only */
-    const STAVE_Y = 60;
+    const STAVE_Y = 80;
 
     const BASS_POSITIONS = [
       { dy:-20, midi:64, name:'E4' }, { dy:-15, midi:62, name:'D4' },
@@ -649,7 +649,7 @@ import Layout from '../../layouts/Layout.astro';
 
       const VF = Vex.Flow;
       const W  = Math.max(container.clientWidth || 400, 200);
-      const H  = 200;
+      const H  = 240;
 
       const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
       renderer.resize(W, H);
@@ -1450,7 +1450,7 @@ import Layout from '../../layouts/Layout.astro';
       const card    = document.getElementById('staffCard');
       // SVG logical height is always 200 (set in _doDrawStaff)
       const W = card.clientWidth || 400;
-      const H = 200;
+      const H = 240;
 
       // Replace canvas to drop stale listeners
       const oldOverlay = document.getElementById('writeOverlay');
