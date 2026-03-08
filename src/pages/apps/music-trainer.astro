@@ -660,20 +660,22 @@ import Layout from '../../layouts/Layout.astro';
       if (keySig.vex && keySig.vex !== 'C') stave.addKeySignature(keySig.vex);
       stave.setContext(ctx).draw();
 
-      // Note labels on the right side of the SVG
+      // Note labels on the right side of the SVG — spaces/gaps only
       if (noteLabelsEnabled) {
         const svg = container.querySelector('svg');
         if (svg) {
           const labelPositions = applyKeySigToPositions(getClefPositions(), keySig);
           for (const p of labelPositions) {
+            // Only label gap (space) positions, not line positions
+            if (p.dy % 10 === 0) continue;
             if (p.dy < -20 || p.dy > 65) continue;
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            t.setAttribute('x', W - 6);
+            t.setAttribute('x', W - 8);
             t.setAttribute('y', STAVE_Y + p.dy + 4);
             t.setAttribute('text-anchor', 'end');
-            t.setAttribute('font-size', '10');
+            t.setAttribute('font-size', '11');
             t.setAttribute('font-family', 'sans-serif');
-            t.setAttribute('fill', '#999');
+            t.setAttribute('fill', '#888');
             t.textContent = p.name;
             svg.appendChild(t);
           }
@@ -1411,8 +1413,7 @@ import Layout from '../../layouts/Layout.astro';
     let writeHoverPos = null;
 
     function swGetPool(keySig) {
-      return applyKeySigToPositions(getClefPositions(), keySig)
-        .filter(p => p.dy >= -10 && p.dy <= 50);
+      return applyKeySigToPositions(getClefPositions(), keySig);
     }
 
     function swPickTarget() {
@@ -1434,8 +1435,7 @@ import Layout from '../../layouts/Layout.astro';
       swState.targetMidi = pos.midi;
       swState.keySig     = keySig;
       swState.answered   = false;
-      // Show note name without octave number for the prompt
-      document.getElementById('staffWritePrompt').textContent = pos.name.replace(/\d+$/, '');
+      document.getElementById('staffWritePrompt').textContent = pos.name;
       document.getElementById('staffWriteResult').textContent = '';
       document.getElementById('staffWriteResult').className   = 'note-result';
       document.getElementById('staffWriteStartBtn').textContent = 'New Note';
@@ -1465,10 +1465,7 @@ import Layout from '../../layouts/Layout.astro';
       fresh.classList.remove('hidden');
 
       function getMouseY(e) {
-        const rect = fresh.getBoundingClientRect();
-        // scaleY maps CSS pixels → canvas logical pixels (should be 1:1 after above, but be safe)
-        const scaleY = fresh.height / rect.height;
-        return (e.clientY - rect.top) * scaleY;
+        return e.offsetY !== undefined ? e.offsetY : (e.clientY - fresh.getBoundingClientRect().top);
       }
 
       fresh.addEventListener('mousemove', (e) => {
@@ -1564,7 +1561,7 @@ import Layout from '../../layouts/Layout.astro';
       swState.targetMidi = pos.midi;
       swState.keySig     = keySig;
       swState.answered   = false;
-      document.getElementById('staffWritePrompt').textContent = pos.name.replace(/\d+$/, '');
+      document.getElementById('staffWritePrompt').textContent = pos.name;
       document.getElementById('staffWriteResult').textContent = '';
       document.getElementById('staffWriteResult').className   = 'note-result';
       document.getElementById('staffWriteNextBtn').disabled   = true;
