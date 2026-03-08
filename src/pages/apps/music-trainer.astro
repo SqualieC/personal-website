@@ -465,19 +465,17 @@ import Layout from '../../layouts/Layout.astro';
 
     /* ── Note choice grid (reading mode) ── */
     .note-choices-grid {
-      margin: 0.5rem 0;
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-    }
-    .choices-row {
       display: grid;
       grid-template-columns: repeat(13, 1fr);
-      gap: 3px;
-      width: 100%; max-width: 29rem;
+      grid-template-rows: auto auto auto;
+      gap: 4px;
+      max-width: 29rem;
+      margin: 0.5rem auto;
     }
-    .choices-row .choice-btn {
+    .note-choices-grid .choice-btn {
       min-width: 0; padding: 0.35rem 0; text-align: center; font-size: 0.95rem;
     }
-    .sharps-row .choice-btn, .flats-row .choice-btn { font-size: 0.78rem; padding: 0.25rem 0; }
+    .note-choices-grid .choice-btn.accidental { font-size: 0.78rem; padding: 0.25rem 0; }
     /* Label toggle active state */
     #noteLabelToggle.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
@@ -1309,47 +1307,37 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* Build the 3-row answer grid: sharps / naturals / flats
-       13-column grid: naturals at odd cols (1,3,5,7,9,11,13),
-       sharps/flats at even cols between them (2,4,8,10,12 — col 6 is the E→F gap) */
+       Single 13-col grid; naturals at odd cols, sharps/flats at even cols between them.
+       col 6 is the E→F gap (no black key). All buttons are direct children of the container
+       so they share one grid and column widths align perfectly across all three rows. */
     function srBuildChoices() {
-      const NATURALS = [
-        { name:'C', pc:0, gc:1  }, { name:'D', pc:2,  gc:3  }, { name:'E', pc:4,  gc:5  },
-        { name:'F', pc:5, gc:7  }, { name:'G', pc:7,  gc:9  }, { name:'A', pc:9,  gc:11 },
-        { name:'B', pc:11, gc:13 },
-      ];
-      const SHARPS = [
-        { name:'C\u266f', pc:1,  gc:2  }, { name:'D\u266f', pc:3,  gc:4  },
-        { name:'F\u266f', pc:6,  gc:8  }, { name:'G\u266f', pc:8,  gc:10 },
-        { name:'A\u266f', pc:10, gc:12 },
-      ];
-      const FLATS = [
-        { name:'D\u266d', pc:1,  gc:2  }, { name:'E\u266d', pc:3,  gc:4  },
-        { name:'G\u266d', pc:6,  gc:8  }, { name:'A\u266d', pc:8,  gc:10 },
-        { name:'B\u266d', pc:10, gc:12 },
+      // gc = grid-column (1–13), gr = grid-row (1=sharps, 2=naturals, 3=flats)
+      const NOTES = [
+        { name:'C\u266f', pc:1,  gc:2,  gr:1 }, { name:'D\u266f', pc:3,  gc:4,  gr:1 },
+        { name:'F\u266f', pc:6,  gc:8,  gr:1 }, { name:'G\u266f', pc:8,  gc:10, gr:1 },
+        { name:'A\u266f', pc:10, gc:12, gr:1 },
+        { name:'C', pc:0,  gc:1,  gr:2 }, { name:'D', pc:2,  gc:3,  gr:2 },
+        { name:'E', pc:4,  gc:5,  gr:2 }, { name:'F', pc:5,  gc:7,  gr:2 },
+        { name:'G', pc:7,  gc:9,  gr:2 }, { name:'A', pc:9,  gc:11, gr:2 },
+        { name:'B', pc:11, gc:13, gr:2 },
+        { name:'D\u266d', pc:1,  gc:2,  gr:3 }, { name:'E\u266d', pc:3,  gc:4,  gr:3 },
+        { name:'G\u266d', pc:6,  gc:8,  gr:3 }, { name:'A\u266d', pc:8,  gc:10, gr:3 },
+        { name:'B\u266d', pc:10, gc:12, gr:3 },
       ];
 
       const container = document.getElementById('staffReadChoices');
       container.innerHTML = '';
-
-      function makeRow(notes, rowClass) {
-        const row = document.createElement('div');
-        row.className = 'choices-row ' + rowClass;
-        for (const note of notes) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = note.name;
-          btn.className = 'btn btn-secondary choice-btn';
-          btn.dataset.pc = note.pc;
-          btn.style.gridColumn = String(note.gc);
-          btn.addEventListener('click', () => srOnChoice(note.pc, btn));
-          row.appendChild(btn);
-        }
-        return row;
+      for (const note of NOTES) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = note.name;
+        btn.className = 'btn btn-secondary choice-btn' + (note.gr !== 2 ? ' accidental' : '');
+        btn.dataset.pc = note.pc;
+        btn.style.gridColumn = String(note.gc);
+        btn.style.gridRow    = String(note.gr);
+        btn.addEventListener('click', () => srOnChoice(note.pc, btn));
+        container.appendChild(btn);
       }
-
-      container.appendChild(makeRow(SHARPS,   'sharps-row'));
-      container.appendChild(makeRow(NATURALS, 'naturals-row'));
-      container.appendChild(makeRow(FLATS,    'flats-row'));
     }
 
     function srOnChoice(clickedPc, btn) {
