@@ -4,7 +4,7 @@ import mdx from '@astrojs/mdx';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  site: 'https://squaliec.github.io',
+  site: 'https://squalie.cc',
   integrations: [mdx()],
   vite: {
     plugins: [tailwindcss()]

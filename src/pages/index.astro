@@ -2,11 +2,9 @@
 import { getCollection, getEntry } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
 
-const projects = (await getCollection('projects')).sort(
+const latestProject = (await getCollection('projects')).sort(
   (a, b) => b.data.updatedAt.valueOf() - a.data.updatedAt.valueOf()
-);
-const featured = projects.filter((project) => project.data.featured).slice(0, 4);
-const latestProject = projects[0];
+)[0];
 
 const recentPosts = (await getCollection('blog')).sort(
   (a, b) => b.data.updatedAt.valueOf() - a.data.updatedAt.valueOf()
@@ -39,25 +37,34 @@ const { heroHeading, heroSubtext, siteTagline } = siteSettings!.data;
   </section>
 
   <section>
-    <h2 class="section-title">Featured Work</h2>
-    <div class="grid">
-      {featured.map((project) => (
-        <article class="card">
-          <h3>{project.data.title}</h3>
-          <p>{project.data.pitch}</p>
-          <div class="meta-row">
-            <span class="badge">{project.data.status}</span>
+    <div style="display:flex; align-items:baseline; gap:0.75rem; margin: 3rem 0 1.2rem;">
+      <h2 style="font-size:clamp(1.3rem,2.4vw,1.8rem); margin:0; line-height:1.12;">Listening</h2>
+      <a href="https://www.last.fm/user/SqualieC" target="_blank" rel="noopener noreferrer"
+        style="font-size:0.78rem; color:var(--muted); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent), transparent 55%);">
+        last.fm/SqualieC
+      </a>
+    </div>
+
+    <!-- Now Playing -->
+    <div id="lfm-now-playing" style="display:none; margin-bottom:0.85rem;" class="card">
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <img id="lfm-np-art" src="" alt="Album art" width="64" height="64"
+          style="width:64px; height:64px; border-radius:8px; object-fit:cover; flex-shrink:0; background:var(--bg-soft);">
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:0.45rem; margin-bottom:0.25rem;">
+            <span id="lfm-pulse" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent-2);"></span>
+            <span style="font-size:0.7rem; color:var(--accent-2); font-weight:700; letter-spacing:0.1em; text-transform:uppercase;">Now Playing</span>
           </div>
-          <div class="btn-row">
-            {project.data.downloadUrl ? (
-              <a class="btn btn-primary" href={project.data.downloadUrl}>{project.data.downloadLabel ?? 'Download'}</a>
-            ) : (
-              <a class="btn btn-online" href={`/projects/${project.slug}`}>Open Project</a>
-            )}
-            <a class="btn btn-secondary" href={`/projects/${project.slug}`}>Details</a>
-          </div>
-        </article>
-      ))}
+          <div id="lfm-np-track" style="font-weight:700; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div id="lfm-np-artist" style="color:var(--muted); font-size:0.875rem; margin-top:0.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          <div id="lfm-np-album" style="color:var(--muted); font-size:0.775rem; opacity:0.65; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Tracks -->
+    <div id="lfm-recent" style="display:flex; flex-direction:column; gap:0.45rem;">
+      <p style="color:var(--muted); font-size:0.9rem; margin:0;">Loading recent tracks…</p>
     </div>
   </section>
 
@@ -76,3 +83,124 @@ const { heroHeading, heroSubtext, siteTagline } = siteSettings!.data;
     </section>
   )}
 </Layout>
+
+<style>
+  @keyframes lfm-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+  #lfm-pulse {
+    animation: lfm-pulse 1.5s ease-in-out infinite;
+  }
+</style>
+
+<script>
+  const API_KEY = 'be78de703d3308f682022a181da8fad3';
+  const USERNAME = 'SqualieC';
+  const BASE = 'https://ws.audioscrobbler.com/2.0/';
+  const CACHE_TTL = 60_000; // 1 minute
+
+  const PLACEHOLDER_ART = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="8" fill="%231a2f54"/%3E%3Ccircle cx="32" cy="32" r="10" fill="%23b8ceee" opacity=".25"/%3E%3Ccircle cx="32" cy="32" r="4" fill="%23b8ceee" opacity=".45"/%3E%3C/svg%3E';
+
+  function getCache(key: string): { data: any; ts: number } | null {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function setCache(key: string, data: any) {
+    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch {}
+  }
+
+  async function fetchRecentTracks(): Promise<any[]> {
+    const cacheKey = 'lfm_recent';
+    const cached = getCache(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+    const url = `${BASE}?method=user.getrecenttracks&user=${USERNAME}&limit=8&api_key=${API_KEY}&format=json`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Last.fm error ${res.status}`);
+    const json = await res.json();
+    const tracks: any[] = json?.recenttracks?.track ?? [];
+    setCache(cacheKey, tracks);
+    return tracks;
+  }
+
+  function getArt(track: any, size = 2): string {
+    const img = track?.image?.[size]?.['#text'];
+    return img && !img.includes('2a96cbd8b46e442fc41c2b86b821562f') ? img : PLACEHOLDER_ART;
+  }
+
+  function relativeTime(uts: string): string {
+    const diff = Math.floor((Date.now() / 1000) - parseInt(uts));
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function renderNowPlaying(track: any) {
+    const el = document.getElementById('lfm-now-playing')!;
+    const isPlaying = track?.['@attr']?.nowplaying === 'true';
+
+    if (!isPlaying) { el.style.display = 'none'; return; }
+
+    (document.getElementById('lfm-np-art') as HTMLImageElement).src = getArt(track, 2);
+    document.getElementById('lfm-np-track')!.textContent = track.name ?? '';
+    document.getElementById('lfm-np-artist')!.textContent = track.artist?.['#text'] ?? '';
+    document.getElementById('lfm-np-album')!.textContent = track.album?.['#text'] ?? '';
+    el.style.display = 'block';
+  }
+
+  function renderRecentTracks(tracks: any[]) {
+    const container = document.getElementById('lfm-recent')!;
+    // skip the first if it's nowplaying
+    const list = tracks.filter(t => t?.['@attr']?.nowplaying !== 'true').slice(0, 7);
+
+    if (!list.length) {
+      container.innerHTML = '<p style="color:var(--muted);font-size:0.9rem;margin:0;">No recent tracks found.</p>';
+      return;
+    }
+
+    container.innerHTML = list.map(track => {
+      const art = getArt(track, 1);
+      const name = track.name ?? '';
+      const artist = track.artist?.['#text'] ?? '';
+      const time = track.date?.uts ? relativeTime(track.date.uts) : '';
+      return `
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.55rem 0.75rem;border-radius:10px;background:color-mix(in srgb,var(--card),transparent 40%);border:1px solid color-mix(in srgb,var(--muted),transparent 82%);">
+          <img src="${art}" alt="" width="40" height="40"
+            style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-soft);"
+            onerror="this.src='${PLACEHOLDER_ART}'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+            <div style="color:var(--muted);font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${artist}</div>
+          </div>
+          <div style="color:var(--muted);font-size:0.75rem;white-space:nowrap;flex-shrink:0;">${time}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function refresh() {
+    try {
+      const tracks = await fetchRecentTracks();
+      renderNowPlaying(tracks[0]);
+      renderRecentTracks(tracks);
+    } catch (err) {
+      console.warn('Last.fm fetch failed:', err);
+      const container = document.getElementById('lfm-recent')!;
+      if (container.querySelector('p')?.textContent?.includes('Loading')) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:0.9rem;margin:0;">Could not load recent tracks.</p>';
+      }
+    }
+  }
+
+  refresh();
+  // Poll every 30s to catch now-playing changes
+  setInterval(() => {
+    // Clear cache so we get fresh data
+    try { localStorage.removeItem('lfm_recent'); } catch {}
+    refresh();
+  }, 30_000);
+</script>
