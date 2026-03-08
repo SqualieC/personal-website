@@ -468,13 +468,15 @@ import Layout from '../../layouts/Layout.astro';
       margin: 0.5rem 0;
       display: flex; flex-direction: column; align-items: center; gap: 4px;
     }
-    .choices-row { display: flex; gap: 4px; }
-    .choices-row .choice-btn,
-    .choices-row .choice-spacer {
-      flex: 0 0 3.4rem; width: 3.4rem; min-width: 0;
-      padding: 0.35rem 0; text-align: center; font-size: 0.95rem;
+    .choices-row {
+      display: grid;
+      grid-template-columns: repeat(13, 1fr);
+      gap: 3px;
+      width: 100%; max-width: 29rem;
     }
-    .choices-row .choice-spacer { visibility: hidden; border: none; background: none; }
+    .choices-row .choice-btn {
+      min-width: 0; padding: 0.35rem 0; text-align: center; font-size: 0.95rem;
+    }
     .sharps-row .choice-btn, .flats-row .choice-btn { font-size: 0.78rem; padding: 0.25rem 0; }
     /* Label toggle active state */
     #noteLabelToggle.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
@@ -1306,25 +1308,24 @@ import Layout from '../../layouts/Layout.astro';
       srState.active = true;
     }
 
-    /* Build the 3-row answer grid: sharps / naturals / flats */
+    /* Build the 3-row answer grid: sharps / naturals / flats
+       13-column grid: naturals at odd cols (1,3,5,7,9,11,13),
+       sharps/flats at even cols between them (2,4,8,10,12 — col 6 is the E→F gap) */
     function srBuildChoices() {
-      // col 1=C 2=D 3=E 4=F 5=G 6=A 7=B
       const NATURALS = [
-        { name:'C', pc:0, col:1 }, { name:'D', pc:2, col:2 }, { name:'E', pc:4, col:3 },
-        { name:'F', pc:5, col:4 }, { name:'G', pc:7, col:5 }, { name:'A', pc:9, col:6 },
-        { name:'B', pc:11, col:7 },
+        { name:'C', pc:0, gc:1  }, { name:'D', pc:2,  gc:3  }, { name:'E', pc:4,  gc:5  },
+        { name:'F', pc:5, gc:7  }, { name:'G', pc:7,  gc:9  }, { name:'A', pc:9,  gc:11 },
+        { name:'B', pc:11, gc:13 },
       ];
-      // C# D# F# G# A# (no E# / B#)
       const SHARPS = [
-        { name:'C\u266f', pc:1,  col:1 }, { name:'D\u266f', pc:3,  col:2 },
-        { name:'F\u266f', pc:6,  col:4 }, { name:'G\u266f', pc:8,  col:5 },
-        { name:'A\u266f', pc:10, col:6 },
+        { name:'C\u266f', pc:1,  gc:2  }, { name:'D\u266f', pc:3,  gc:4  },
+        { name:'F\u266f', pc:6,  gc:8  }, { name:'G\u266f', pc:8,  gc:10 },
+        { name:'A\u266f', pc:10, gc:12 },
       ];
-      // Db Eb Gb Ab Bb (no Cb / Fb)
       const FLATS = [
-        { name:'D\u266d', pc:1,  col:2 }, { name:'E\u266d', pc:3,  col:3 },
-        { name:'G\u266d', pc:6,  col:5 }, { name:'A\u266d', pc:8,  col:6 },
-        { name:'B\u266d', pc:10, col:7 },
+        { name:'D\u266d', pc:1,  gc:2  }, { name:'E\u266d', pc:3,  gc:4  },
+        { name:'G\u266d', pc:6,  gc:8  }, { name:'A\u266d', pc:8,  gc:10 },
+        { name:'B\u266d', pc:10, gc:12 },
       ];
 
       const container = document.getElementById('staffReadChoices');
@@ -1333,21 +1334,15 @@ import Layout from '../../layouts/Layout.astro';
       function makeRow(notes, rowClass) {
         const row = document.createElement('div');
         row.className = 'choices-row ' + rowClass;
-        for (let col = 1; col <= 7; col++) {
-          const note = notes.find(n => n.col === col);
-          if (note) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = note.name;
-            btn.className = 'btn btn-secondary choice-btn';
-            btn.dataset.pc = note.pc;
-            btn.addEventListener('click', () => srOnChoice(note.pc, btn));
-            row.appendChild(btn);
-          } else {
-            const sp = document.createElement('span');
-            sp.className = 'choice-spacer';
-            row.appendChild(sp);
-          }
+        for (const note of notes) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = note.name;
+          btn.className = 'btn btn-secondary choice-btn';
+          btn.dataset.pc = note.pc;
+          btn.style.gridColumn = String(note.gc);
+          btn.addEventListener('click', () => srOnChoice(note.pc, btn));
+          row.appendChild(btn);
         }
         return row;
       }
