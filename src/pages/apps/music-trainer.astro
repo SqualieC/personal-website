@@ -457,19 +457,10 @@ import Layout from '../../layouts/Layout.astro';
       display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
       margin: 0.6rem 0;
     }
-    .choice-btn {
-      padding: 0.45rem 1.1rem;
-      border: 2px solid color-mix(in srgb, var(--muted), transparent 20%);
-      border-radius: 8px;
-      background: color-mix(in srgb, var(--muted), transparent 88%);
-      color: var(--text);
-      font-size: 1.15rem; font-weight: 700; cursor: pointer; font-family: inherit;
-      transition: all 0.12s;
-    }
-    .choice-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent), transparent 80%); border-color: var(--accent); color: var(--accent); }
-    .choice-btn.correct { background: rgba(39,174,96,0.18); border-color: #27ae60; color: #27ae60; }
-    .choice-btn.wrong   { background: rgba(231,76,60,0.18);  border-color: #e74c3c; color: #e74c3c; }
-    .choice-btn:disabled { opacity: 0.55; cursor: default; }
+    .choice-btn { font-size: 1rem; font-weight: 700; transition: all 0.12s; }
+    .choice-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .choice-btn.correct { background: rgba(39,174,96,0.18); border-color: #27ae60 !important; color: #27ae60 !important; }
+    .choice-btn.wrong   { background: rgba(231,76,60,0.18);  border-color: #e74c3c !important; color: #e74c3c !important; }
     .write-prompt { font-size: clamp(2.5rem, 7vw, 4rem); }
 
     /* ── Note choice grid (reading mode) ── */
@@ -480,11 +471,11 @@ import Layout from '../../layouts/Layout.astro';
     .choices-row { display: flex; gap: 4px; }
     .choices-row .choice-btn,
     .choices-row .choice-spacer {
-      flex: 0 0 3.2rem; width: 3.2rem;
-      padding: 0.4rem 0; text-align: center; font-size: 0.95rem;
+      flex: 0 0 3.4rem; width: 3.4rem; min-width: 0;
+      padding: 0.35rem 0; text-align: center; font-size: 0.95rem;
     }
-    .choices-row .choice-spacer { visibility: hidden; }
-    .sharps-row .choice-btn, .flats-row .choice-btn { font-size: 0.82rem; padding: 0.3rem 0; }
+    .choices-row .choice-spacer { visibility: hidden; border: none; background: none; }
+    .sharps-row .choice-btn, .flats-row .choice-btn { font-size: 0.78rem; padding: 0.25rem 0; }
     /* Label toggle active state */
     #noteLabelToggle.active { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
@@ -1348,7 +1339,7 @@ import Layout from '../../layouts/Layout.astro';
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.textContent = note.name;
-            btn.className = 'choice-btn';
+            btn.className = 'btn btn-secondary choice-btn';
             btn.dataset.pc = note.pc;
             btn.addEventListener('click', () => srOnChoice(note.pc, btn));
             row.appendChild(btn);
