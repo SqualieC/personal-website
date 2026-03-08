@@ -1305,6 +1305,7 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('staffReadNextBtn').disabled    = true;
       document.getElementById('staffReadReplayBtn').disabled  = false;
       srState.active = true;
+      staffReplayNote(pos.midi);
     }
 
     /* Build the 3-row answer grid: sharps / naturals / flats
@@ -1382,6 +1383,7 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('staffReadResult').textContent = '';
       document.getElementById('staffReadResult').className   = 'note-result';
       document.getElementById('staffReadNextBtn').disabled   = true;
+      staffReplayNote(pos.midi);
     }
 
     function srUpdateScore() {
@@ -1431,6 +1433,7 @@ import Layout from '../../layouts/Layout.astro';
       swState.active = true;
       drawStaff(null, currentClef, { keySig });
       swActivateOverlay();
+      staffReplayNote(pos.midi);
     }
 
     function swActivateOverlay() {
@@ -1554,6 +1557,7 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('staffWriteNextBtn').disabled   = true;
       drawStaff(null, currentClef, { keySig });
       swActivateOverlay();
+      staffReplayNote(pos.midi);
     }
 
     function swUpdateScore() {
