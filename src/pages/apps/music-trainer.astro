@@ -466,7 +466,8 @@ import Layout from '../../layouts/Layout.astro';
     /* ── Note choice grid (reading mode) ── */
     .note-choices-grid {
       display: grid;
-      grid-template-columns: repeat(13, 1fr);
+      grid-template-columns: repeat(14, 1fr);
+      column-gap: 0;
       grid-template-rows: auto auto auto;
       gap: 4px;
       max-width: 29rem;
@@ -1307,11 +1308,11 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* Build the 3-row answer grid: sharps / naturals / flats
-       Single 13-col grid; naturals at odd cols, sharps/flats at even cols between them.
-       col 6 is the E→F gap (no black key). All buttons are direct children of the container
-       so they share one grid and column widths align perfectly across all three rows. */
+       14-col grid, each button spans 2 cols. Naturals: C(1-2) D(3-4) E(5-6) F(7-8) G(9-10) A(11-12) B(13-14).
+       Sharps/flats straddle natural borders: C#(2-3) D#(4-5) ··gap(6-7)·· F#(8-9) G#(10-11) A#(12-13).
+       column-gap:0 so naturals touch; only gap is E-F (cols 6-7 = one natural width). */
     function srBuildChoices() {
-      // gc = grid-column (1–13), gr = grid-row (1=sharps, 2=naturals, 3=flats)
+      // gc = start column (1-based), each button spans gc / gc+2; gr = grid-row (1=sharps, 2=naturals, 3=flats)
       const NOTES = [
         { name:'C\u266f', pc:1,  gc:2,  gr:1 }, { name:'D\u266f', pc:3,  gc:4,  gr:1 },
         { name:'F\u266f', pc:6,  gc:8,  gr:1 }, { name:'G\u266f', pc:8,  gc:10, gr:1 },
@@ -1333,7 +1334,7 @@ import Layout from '../../layouts/Layout.astro';
         btn.textContent = note.name;
         btn.className = 'btn btn-secondary choice-btn' + (note.gr !== 2 ? ' accidental' : '');
         btn.dataset.pc = note.pc;
-        btn.style.gridColumn = String(note.gc);
+        btn.style.gridColumn = `${note.gc} / ${note.gc + 2}`;
         btn.style.gridRow    = String(note.gr);
         btn.addEventListener('click', () => srOnChoice(note.pc, btn));
         container.appendChild(btn);
