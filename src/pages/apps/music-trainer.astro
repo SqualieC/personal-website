@@ -558,9 +558,14 @@ import Layout from '../../layouts/Layout.astro';
 
     /* Staff position tables: dy = pixels from stave top (staveY=60) */
     /* Each entry is one diatonic step, natural notes only */
-    const STAVE_Y = 80;
+    // STAVE_Y = visual Y of the top staff line in both canvas and SVG coordinates.
+    // VexFlow Stave y-param = STAVE_Y - 40 (because VexFlow adds headroom*spacing=4*10=40
+    // before drawing the first line, so: stave.y + headroom*spacing = top staff line Y).
+    const STAVE_Y = 120;
 
     const BASS_POSITIONS = [
+      { dy:-40, midi:71, name:'B4' }, { dy:-35, midi:69, name:'A4' },
+      { dy:-30, midi:67, name:'G4' }, { dy:-25, midi:65, name:'F4' },
       { dy:-20, midi:64, name:'E4' }, { dy:-15, midi:62, name:'D4' },
       { dy:-10, midi:60, name:'C4' }, { dy: -5, midi:59, name:'B3' },
       { dy:  0, midi:57, name:'A3' }, { dy:  5, midi:55, name:'G3' },
@@ -573,6 +578,9 @@ import Layout from '../../layouts/Layout.astro';
     ];
 
     const TREBLE_POSITIONS = [
+      { dy:-40, midi:91, name:'G6' }, { dy:-35, midi:89, name:'F6' },
+      { dy:-30, midi:88, name:'E6' }, { dy:-25, midi:86, name:'D6' },
+      { dy:-20, midi:84, name:'C6' }, { dy:-15, midi:83, name:'B5' },
       { dy:-10, midi:81, name:'A5' }, { dy: -5, midi:79, name:'G5' },
       { dy:  0, midi:77, name:'F5' }, { dy:  5, midi:76, name:'E5' },
       { dy: 10, midi:74, name:'D5' }, { dy: 15, midi:72, name:'C5' },
@@ -656,7 +664,7 @@ import Layout from '../../layouts/Layout.astro';
       const ctx = renderer.getContext();
 
       const keySig = opts.keySig || KEY_SIGS['C'];
-      const stave  = new VF.Stave(10, STAVE_Y, W - 20).addClef(clef);
+      const stave  = new VF.Stave(10, STAVE_Y - 40, W - 20).addClef(clef);
       if (keySig.vex && keySig.vex !== 'C') stave.addKeySignature(keySig.vex);
       stave.setContext(ctx).draw();
 
@@ -668,7 +676,7 @@ import Layout from '../../layouts/Layout.astro';
           for (const p of labelPositions) {
             // Only label gap (space) positions, not line positions
             if (p.dy % 10 === 0) continue;
-            if (p.dy < -20 || p.dy > 65) continue;
+            if (p.dy < -40 || p.dy > 65) continue;
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             t.setAttribute('x', W - 8);
             t.setAttribute('y', STAVE_Y + p.dy + 4);
@@ -1465,10 +1473,7 @@ import Layout from '../../layouts/Layout.astro';
       fresh.classList.remove('hidden');
 
       function getMouseY(e) {
-        // Anchor to the SVG element so ghost coords match the drawn staff exactly
-        const svgEl = document.querySelector('#staffContainer svg');
-        const ref = svgEl || fresh;
-        return e.clientY - ref.getBoundingClientRect().top;
+        return e.clientY - fresh.getBoundingClientRect().top;
       }
 
       fresh.addEventListener('mousemove', (e) => {
