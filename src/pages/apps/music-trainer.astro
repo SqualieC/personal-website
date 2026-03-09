@@ -241,6 +241,18 @@ import Layout from '../../layouts/Layout.astro';
           <div id="staffReadPrompt" class="target-label" style="min-height:1.4em">Identify the note shown on the staff</div>
         </div>
         <div id="staffReadResult" class="note-result"></div>
+        <div style="display:flex; align-items:center; gap:0.5rem; margin:0.35rem 0 0.2rem;">
+          <div class="seg-group" id="srAnswerToggle">
+            <button class="seg-btn active" data-srmode="buttons" type="button">Buttons</button>
+            <button class="seg-btn"        data-srmode="type"    type="button">Type</button>
+          </div>
+        </div>
+        <div id="staffReadTypeRow" class="ctrl-row" style="display:none; margin:0.2rem 0 0.5rem;">
+          <input id="staffReadTypeInput" type="text" class="fret-input"
+            style="width:9rem; text-align:left; font-size:1rem;"
+            placeholder="e.g. Bb, F#, A" autocomplete="off" spellcheck="false">
+          <button id="staffReadTypeSubmit" class="btn btn-primary" type="button">Check</button>
+        </div>
         <div id="staffReadChoices" class="note-choices-grid"></div>
         <div class="score-row">
           <span id="staffReadScore"  class="score-text">Score: 0 / 0</span>
@@ -1062,7 +1074,7 @@ import Layout from '../../layouts/Layout.astro';
        SCALE PRACTICE
     ═══════════════════════════════════════════════════════════ */
     const scaleState = { active: false, waiting: false, notes: [], idx: 0, stableFrames: 0, lastMidi: null };
-    const SCALE_STABLE_REQUIRED = 8;
+    const SCALE_STABLE_REQUIRED = 6; // ~0.1s at 60fps
 
     function scaleBuild() {
       const root    = parseInt(document.getElementById('scaleRoot').value,   10);
@@ -1277,6 +1289,7 @@ import Layout from '../../layouts/Layout.astro';
       keySig: null, answered: false,
       score: { correct: 0, total: 0 }, streak: 0
     };
+    let srAnswerMode = 'buttons'; // 'buttons' | 'type'
 
     function srPickTarget() {
       const keySig = getActiveKeySig();
@@ -1308,11 +1321,45 @@ import Layout from '../../layouts/Layout.astro';
       staffReplayNote(pos.midi);
     }
 
+    // Parses typed note input → pitch class (0-11), or null if unrecognised.
+    // Accepts: A B C D E F G + suffixes b/bb/flat/♭ (flat) or #/sharp/♯ (sharp).
+    // Case-insensitive; handles "a flat", "Bb", "F#", "b sharp", "A♭", etc.
+    function parseNoteInput(raw) {
+      const s = raw.trim().toLowerCase()
+        .replace(/♯/g, '#').replace(/♭/g, 'b')
+        .replace(/\bsharp\b/g, '#').replace(/\bflat\b/g, 'b')
+        .replace(/\s+/g, '');
+      const NOTE_PC = { c:0, d:2, e:4, f:5, g:7, a:9, b:11 };
+      if (!s) return null;
+      const pc = NOTE_PC[s[0]];
+      if (pc === undefined) return null;
+      const suffix = s.slice(1);
+      if (suffix === '')  return pc;
+      if (suffix === '#') return (pc + 1) % 12;
+      if (suffix === 'b') return (pc - 1 + 12) % 12;
+      return null;
+    }
+
     /* Build the 3-row answer grid: sharps / naturals / flats
        14-col grid, each button spans 2 cols. Naturals: C(1-2) D(3-4) E(5-6) F(7-8) G(9-10) A(11-12) B(13-14).
        Sharps/flats straddle natural borders: C#(2-3) D#(4-5) ··gap(6-7)·· F#(8-9) G#(10-11) A#(12-13).
        column-gap:0 so naturals touch; only gap is E-F (cols 6-7 = one natural width). */
     function srBuildChoices() {
+      const choicesEl  = document.getElementById('staffReadChoices');
+      const typeRow    = document.getElementById('staffReadTypeRow');
+      const typeInput  = document.getElementById('staffReadTypeInput');
+      const typeSubmit = document.getElementById('staffReadTypeSubmit');
+      if (srAnswerMode === 'type') {
+        choicesEl.innerHTML = '';
+        choicesEl.style.display = 'none';
+        typeRow.style.display   = 'flex';
+        if (typeInput)  { typeInput.value = ''; typeInput.disabled = false; typeInput.focus(); }
+        if (typeSubmit) typeSubmit.disabled = false;
+        return;
+      }
+      // buttons mode
+      typeRow.style.display    = 'none';
+      choicesEl.style.display  = '';
       // gc = start column (1-based), each button spans gc / gc+2; gr = grid-row (1=sharps, 2=naturals, 3=flats)
       const NOTES = [
         { name:'C\u266f', pc:1,  gc:2,  gr:1 }, { name:'D\u266f', pc:3,  gc:4,  gr:1 },
@@ -1368,6 +1415,21 @@ import Layout from '../../layouts/Layout.astro';
       srUpdateScore();
       document.getElementById('staffReadNextBtn').disabled = false;
       setTimeout(() => { if (srState.answered) srNext(); }, 1800);
+    }
+
+    function srOnTypeSubmit() {
+      if (srState.answered || !srState.active) return;
+      const input    = document.getElementById('staffReadTypeInput');
+      const resultEl = document.getElementById('staffReadResult');
+      const pc = parseNoteInput(input ? input.value : '');
+      if (pc === null) {
+        resultEl.textContent = 'Unrecognised — try e.g. "Bb", "F#", "A"';
+        resultEl.className   = 'note-result result-detected';
+        return;
+      }
+      if (input) input.disabled = true;
+      document.getElementById('staffReadTypeSubmit').disabled = true;
+      srOnChoice(pc, null);
     }
 
     function srNext() {
@@ -1854,6 +1916,20 @@ import Layout from '../../layouts/Layout.astro';
       document.getElementById('staffWriteStartBtn').addEventListener('click', swStart);
       document.getElementById('staffWriteNextBtn').addEventListener('click', () => { if (swState.active) swNext(); });
       document.getElementById('staffWriteReplayBtn').addEventListener('click', () => { if (window.Tone) Tone.start(); staffReplayNote(swState.targetMidi); });
+
+      // Answer mode toggle (Buttons / Type)
+      document.querySelectorAll('#srAnswerToggle .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#srAnswerToggle .seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          srAnswerMode = btn.dataset.srmode;
+          srBuildChoices();
+        });
+      });
+      document.getElementById('staffReadTypeSubmit')?.addEventListener('click', srOnTypeSubmit);
+      document.getElementById('staffReadTypeInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); srOnTypeSubmit(); }
+      });
     }
 
     function initNotePanel() {
