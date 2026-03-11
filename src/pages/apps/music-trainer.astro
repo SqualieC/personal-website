@@ -24,7 +24,11 @@ import Layout from '../../layouts/Layout.astro';
       <button class="mode-tab"        data-tab="scales"     type="button">Scales</button>
       <button class="mode-tab"        data-tab="arpeggios" type="button">Arpeggios</button>
       <button class="mode-tab"        data-tab="shape"     type="button">Shape</button>
-      <button class="mode-tab"        data-tab="intervals" type="button">Intervals</button>
+      <button class="mode-tab"        data-tab="intervals"  type="button">Intervals</button>
+      <button class="mode-tab"        data-tab="fretquiz"  type="button">Fret Quiz</button>
+      <button class="mode-tab"        data-tab="progr"     type="button">Progressions</button>
+      <button class="mode-tab"        data-tab="ear"       type="button">Ear Train</button>
+      <button class="mode-tab"        data-tab="theory"    type="button">Theory</button>
       <button class="mode-tab"        data-tab="staff"     type="button">Staff</button>
       <button class="mode-tab"        data-tab="tools"     type="button">Tools</button>
     </div>
@@ -398,6 +402,80 @@ import Layout from '../../layouts/Layout.astro';
 
     </div>
 
+    <!-- ── FRET QUIZ ─────────────────────────────────── -->
+    <div id="fretquizPanel" class="tab-panel hidden">
+      <div class="panel-body">
+        <div class="ctrl-row" style="flex-wrap:wrap;gap:0.7rem;align-items:center;">
+          <button id="fqStartBtn" class="btn btn-primary" type="button">Start</button>
+          <span id="fqScore" class="score-badge">Score: 0 / 0</span>
+          <span id="fqResult" class="result-label"></span>
+        </div>
+        <div id="fqPrompt" class="drill-prompt" style="display:none;">
+          Find all <strong id="fqTargetName"></strong> notes on the fretboard
+        </div>
+        <p class="panel-hint" id="fqHint">Click Start, then tap every position of the target note on the fretboard below.</p>
+      </div>
+    </div>
+
+    <!-- ── PROGRESSIONS ───────────────────────────────── -->
+    <div id="progrPanel" class="tab-panel hidden">
+      <div class="panel-body">
+        <div class="ctrl-row" style="flex-wrap:wrap;gap:0.7rem;align-items:center;">
+          <label for="progrType">Progression</label>
+          <select id="progrType" class="trainer-select">
+            <option value="I-IV-V">I – IV – V (major)</option>
+            <option value="ii-V-I">ii – V – I (jazz)</option>
+            <option value="I-V-vi-IV">I – V – vi – IV (pop)</option>
+            <option value="blues12">12-Bar Blues</option>
+            <option value="I-IV-I-V">I – IV – I – V (shuffle)</option>
+          </select>
+          <label for="progrKey">Key</label>
+          <select id="progrKey" class="trainer-select"></select>
+        </div>
+        <div class="ctrl-row" style="flex-wrap:wrap;gap:0.7rem;align-items:center;">
+          <button id="progrStartBtn" class="btn btn-primary" type="button">Start</button>
+          <span id="progrScore" class="score-badge">Score: 0 / 0</span>
+        </div>
+        <div id="progrChordRow" class="chord-chip-row" style="display:none;"></div>
+        <div id="progrResult" class="result-label" style="margin-top:0.5rem;"></div>
+        <p class="panel-hint">Play the root note of each highlighted chord on your bass. Hold it steady for ~0.1s to advance.</p>
+      </div>
+    </div>
+
+    <!-- ── EAR TRAINING ───────────────────────────────── -->
+    <div id="earPanel" class="tab-panel hidden">
+      <div class="panel-body">
+        <div class="ctrl-row" style="flex-wrap:wrap;gap:0.7rem;align-items:center;">
+          <label>Direction</label>
+          <div class="seg-group" id="earDirToggle">
+            <button class="seg-btn active" data-dir="asc"  type="button">Asc</button>
+            <button class="seg-btn"        data-dir="desc" type="button">Desc</button>
+            <button class="seg-btn"        data-dir="harm" type="button">Harmonic</button>
+          </div>
+          <button id="earStartBtn" class="btn btn-primary" type="button">Start</button>
+          <span id="earScore" class="score-badge">Score: 0 / 0</span>
+        </div>
+        <div id="earPromptRow" style="display:none;margin-top:0.6rem;">
+          <button id="earReplayBtn" class="btn btn-secondary" type="button">&#x1F50A; Replay</button>
+          <span style="font-size:0.85rem;color:var(--muted);margin-left:0.6rem;">What interval did you hear?</span>
+        </div>
+        <div id="earChoices" class="note-choices-grid" style="margin-top:0.7rem;"></div>
+        <div id="earResult" class="result-label" style="margin-top:0.5rem;"></div>
+      </div>
+    </div>
+
+    <!-- ── THEORY ─────────────────────────────────────── -->
+    <div id="theoryPanel" class="tab-panel hidden">
+      <div class="panel-body">
+        <div class="ctrl-row" style="flex-wrap:wrap;gap:0.7rem;align-items:center;">
+          <label>Key</label>
+          <span id="cofKeyLabel" class="score-badge" style="min-width:3rem;text-align:center;">C</span>
+        </div>
+        <div id="cofSvgWrap" style="width:100%;max-width:340px;margin:0.8rem auto 0;"></div>
+        <div id="cofDetails" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
     <!-- ── TOOLS ──────────────────────────────────────── -->
     <div id="toolsPanel" class="tab-panel hidden">
       <div class="tools-section">
@@ -607,6 +685,48 @@ import Layout from '../../layouts/Layout.astro';
     .fretboard-wrap    { position: relative; margin-top: 1.4rem; display: flex; align-items: stretch; }
     .fretboard-labels  { display: flex; flex-direction: column; justify-content: space-between; padding: 14px 6px 14px 0; font-size: 0.75rem; font-weight: 700; color: color-mix(in srgb, var(--muted), transparent 30%); user-select: none; }
     .fretboard-canvas  { flex: 1; height: 160px; border-radius: 10px; display: block; }
+
+    /* ── Shared panel helpers ── */
+    .panel-body { display: flex; flex-direction: column; gap: 0.65rem; }
+    .panel-hint { font-size: 0.82rem; color: var(--muted); margin: 0.35rem 0 0; }
+    .drill-prompt { font-size: 1.1rem; margin: 0.5rem 0 0; color: var(--text); }
+    .score-badge {
+      display: inline-block; border-radius: 999px; padding: 0.22rem 0.65rem;
+      font-size: 0.78rem; font-weight: 700;
+      background: color-mix(in srgb, var(--accent), transparent 83%);
+      color: color-mix(in srgb, var(--accent), white 20%);
+    }
+    .result-label { font-size: 0.92rem; font-weight: 600; min-height: 1.3em; }
+    .result-label.correct { color: var(--accent); }
+    .result-label.wrong   { color: var(--accent-2); }
+
+    /* ── Chord chip row (Progressions) ── */
+    .chord-chip-row { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem; }
+    .chord-chip {
+      border-radius: 10px; padding: 0.4rem 0.85rem; font-size: 0.9rem; font-weight: 700;
+      background: color-mix(in srgb, var(--card), transparent 10%);
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 70%);
+      color: var(--muted); transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .chord-chip.active {
+      background: color-mix(in srgb, var(--accent), transparent 75%);
+      border-color: var(--accent); color: var(--text);
+    }
+    .chord-chip.done {
+      background: color-mix(in srgb, var(--accent), transparent 90%);
+      border-color: color-mix(in srgb, var(--accent), transparent 70%);
+      color: color-mix(in srgb, var(--accent), transparent 40%);
+      text-decoration: line-through;
+    }
+
+    /* ── COF SVG ── */
+    #cofSvgWrap svg { width: 100%; height: auto; cursor: pointer; }
+    .cof-wedge { transition: opacity 0.12s; }
+    .cof-wedge:hover { opacity: 0.85; }
+    .cof-wedge.selected { stroke: var(--accent); stroke-width: 2.5; }
+    #cofDetails table { border-collapse: collapse; font-size: 0.85rem; width: 100%; }
+    #cofDetails th { color: var(--muted); font-weight: 600; text-align: left; padding: 0.2rem 0.6rem; }
+    #cofDetails td { padding: 0.2rem 0.6rem; border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 82%); }
 
     @keyframes in-tune-pulse {
       0%   { text-shadow: 0 0 0px var(--accent); }
@@ -1067,6 +1187,7 @@ import Layout from '../../layouts/Layout.astro';
       if (currentTab === 'scales')     updateScaleDetect(result);
       if (currentTab === 'arpeggios')  updateArpDetect(result);
       if (currentTab === 'intervals')  updateIntervalDetect(result);
+      if (currentTab === 'progr')      updateProgrDetect(result);
       if (result) {
         const nearest = Math.round(freqToMidi(result.freq));
         if (nearest !== fbDetectedMidi) { fbDetectedMidi = nearest; refreshFretboard(); }
@@ -2056,10 +2177,422 @@ import Layout from '../../layouts/Layout.astro';
     }
 
     /* ═══════════════════════════════════════════════════════════
+       FEATURE 4 – FRETBOARD NOTE QUIZ
+    ═══════════════════════════════════════════════════════════ */
+    const fqState = {
+      active: false,
+      targetPc: null,
+      correct: 0,
+      total: 0,
+      found: [],      // set of 'string-fret' keys already found this round
+      allPos: [],     // all valid positions for targetPc
+    };
+
+    function fqAllPositions(pc) {
+      const out = [];
+      BASS_STRINGS.forEach((s, si) => {
+        for (let fret = 0; fret <= 24; fret++) {
+          if (((s.midi + fret) % 12 + 12) % 12 === pc) out.push({ si, fret, key: `${si}-${fret}` });
+        }
+      });
+      return out;
+    }
+
+    function fqPickTarget() {
+      fqState.targetPc = Math.floor(Math.random() * 12);
+      fqState.found = [];
+      fqState.allPos = fqAllPositions(fqState.targetPc);
+      document.getElementById('fqTargetName').textContent = NOTE_NAMES[fqState.targetPc];
+      document.getElementById('fqPrompt').style.display = '';
+      document.getElementById('fqResult').textContent = '';
+      document.getElementById('fqResult').className = 'result-label';
+      document.getElementById('fqHint').textContent =
+        `Found: 0 / ${fqState.allPos.length} — tap each ${NOTE_NAMES[fqState.targetPc]} on the fretboard.`;
+      // Show target overlays on fretboard
+      fbShapeData = {
+        rootPc: fqState.targetPc,
+        positions: fqState.allPos.map(p => ({ si: p.si, fret: p.fret })),
+      };
+      refreshFretboard();
+    }
+
+    function fqOnCanvasClick(evt) {
+      if (!fqState.active || fqState.targetPc === null) return;
+      const canvas = document.getElementById('fretboard');
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const FRETS = 12;
+      const STRINGS = 4;
+      const padL = 28, padR = 12, padT = 14, padB = 14;
+      const drawW = w - padL - padR;
+      const drawH = h - padT - padB;
+      const fretSpacing = drawW / FRETS;
+      const stringSpacing = drawH / (STRINGS - 1);
+
+      let closestSi = -1, closestFret = -1, minDist = Infinity;
+      for (let si = 0; si < STRINGS; si++) {
+        const sy = padT + si * stringSpacing;
+        for (let fret = 1; fret <= FRETS; fret++) {
+          const fx = padL + (fret - 0.5) * fretSpacing;
+          const dist = Math.sqrt((x - fx) ** 2 + (y - sy) ** 2);
+          if (dist < minDist) { minDist = dist; closestSi = si; closestFret = fret; }
+        }
+      }
+      if (minDist > fretSpacing * 0.65) return;
+      const stringObj = BASS_STRINGS[closestSi];
+      const midi = stringObj.midi + closestFret;
+      const pc = ((midi % 12) + 12) % 12;
+      const key = `${closestSi}-${closestFret}`;
+
+      if (pc !== fqState.targetPc) {
+        fqState.total++;
+        fqState.correct = Math.max(0, fqState.correct - 0); // no subtract, just mark wrong
+        document.getElementById('fqResult').textContent = `✗ That's ${NOTE_NAMES[pc]}, not ${NOTE_NAMES[fqState.targetPc]}`;
+        document.getElementById('fqResult').className = 'result-label wrong';
+        fqUpdateScore();
+        return;
+      }
+      if (fqState.found.includes(key)) return;
+      fqState.found.push(key);
+      fqState.total++;
+      fqState.correct++;
+      document.getElementById('fqResult').textContent = `✓ ${NOTE_NAMES[fqState.targetPc]} on ${stringObj.name} str fret ${closestFret}`;
+      document.getElementById('fqResult').className = 'result-label correct';
+      fqUpdateScore();
+      document.getElementById('fqHint').textContent =
+        `Found: ${fqState.found.length} / ${fqState.allPos.length} — keep tapping!`;
+
+      if (fqState.found.length >= fqState.allPos.length) {
+        setTimeout(() => {
+          document.getElementById('fqResult').textContent = `All ${NOTE_NAMES[fqState.targetPc]}s found! Next…`;
+          setTimeout(fqPickTarget, 900);
+        }, 300);
+      }
+    }
+
+    function fqUpdateScore() {
+      document.getElementById('fqScore').textContent = `Score: ${fqState.correct} / ${fqState.total}`;
+    }
+
+    function fqStart() {
+      fqState.active = true;
+      fqState.correct = 0;
+      fqState.total = 0;
+      document.getElementById('fqStartBtn').textContent = 'Reset';
+      fqPickTarget();
+    }
+
+    function initFretQuizPanel() {
+      document.getElementById('fqStartBtn').addEventListener('click', fqStart);
+      const canvas = document.getElementById('fretboard');
+      canvas.addEventListener('click', fqOnCanvasClick);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEATURE 5 – CHORD PROGRESSION DRILL
+    ═══════════════════════════════════════════════════════════ */
+    const PROGRESSIONS = {
+      'I-IV-V':    [0, 5, 7],
+      'ii-V-I':    [2, 7, 0],
+      'I-V-vi-IV': [0, 7, 9, 5],
+      'blues12':   [0,0,0,0, 5,5,0,0, 7,5,0,7],
+      'I-IV-I-V':  [0, 5, 0, 7],
+    };
+    const PROGR_STABLE = 6;
+
+    const progrState = {
+      active: false,
+      offsets: [],
+      keyPc: 0,
+      idx: 0,
+      correct: 0,
+      total: 0,
+      stableCount: 0,
+      lastPc: null,
+    };
+
+    function progrBuild() {
+      const type = document.getElementById('progrType').value;
+      const keyPc = parseInt(document.getElementById('progrKey').value);
+      progrState.offsets = PROGRESSIONS[type] || [0, 5, 7];
+      progrState.keyPc = keyPc;
+      progrState.idx = 0;
+      progrState.stableCount = 0;
+      progrState.lastPc = null;
+
+      const row = document.getElementById('progrChordRow');
+      row.innerHTML = progrState.offsets.map((off, i) => {
+        const pc = (keyPc + off) % 12;
+        return `<span class="chord-chip${i === 0 ? ' active' : ''}" data-idx="${i}">${NOTE_NAMES[pc]}</span>`;
+      }).join('');
+      row.style.display = 'flex';
+      document.getElementById('progrResult').textContent = '';
+      document.getElementById('progrResult').className = 'result-label';
+    }
+
+    function progrUpdateChips() {
+      document.querySelectorAll('#progrChordRow .chord-chip').forEach((chip, i) => {
+        chip.className = 'chord-chip' + (i < progrState.idx ? ' done' : i === progrState.idx ? ' active' : '');
+      });
+    }
+
+    function progrAdvance() {
+      progrState.idx++;
+      progrState.stableCount = 0;
+      progrState.lastPc = null;
+      if (progrState.idx >= progrState.offsets.length) {
+        document.getElementById('progrResult').textContent = '✓ Progression complete!';
+        document.getElementById('progrResult').className = 'result-label correct';
+        progrState.correct++;
+        progrState.total++;
+        fqUpdateProgrScore();
+        progrUpdateChips();
+        setTimeout(() => { progrState.idx = 0; progrState.stableCount = 0; progrUpdateChips(); document.getElementById('progrResult').textContent = ''; }, 1200);
+      } else {
+        progrUpdateChips();
+      }
+    }
+
+    function fqUpdateProgrScore() {
+      document.getElementById('progrScore').textContent = `Score: ${progrState.correct} / ${progrState.total}`;
+    }
+
+    function updateProgrDetect(result) {
+      if (!progrState.active || progrState.idx >= progrState.offsets.length) return;
+      const targetPc = (progrState.keyPc + progrState.offsets[progrState.idx]) % 12;
+      if (!result) { progrState.stableCount = 0; progrState.lastPc = null; return; }
+      const pc = ((Math.round(freqToMidi(result.freq)) % 12) + 12) % 12;
+      if (pc === progrState.lastPc) {
+        progrState.stableCount++;
+        if (progrState.stableCount >= PROGR_STABLE) {
+          if (pc === targetPc) {
+            document.getElementById('progrResult').textContent = `✓ ${NOTE_NAMES[pc]}`;
+            document.getElementById('progrResult').className = 'result-label correct';
+            progrAdvance();
+          }
+          progrState.stableCount = 0;
+        }
+      } else {
+        progrState.lastPc = pc;
+        progrState.stableCount = 1;
+      }
+    }
+
+    function progrStart() {
+      progrState.active = true;
+      progrState.correct = 0;
+      progrState.total = 0;
+      document.getElementById('progrStartBtn').textContent = 'Reset';
+      progrBuild();
+    }
+
+    function initProgrPanel() {
+      document.getElementById('progrStartBtn').addEventListener('click', progrStart);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEATURE 6 – EAR TRAINING: INTERVAL ID
+    ═══════════════════════════════════════════════════════════ */
+    const earState = {
+      active: false,
+      direction: 'asc',
+      rootMidi: null,
+      targetSemi: null,
+      correct: 0,
+      total: 0,
+    };
+
+    function earPlayPairNotes(root, semi, dir) {
+      if (dir === 'harm') {
+        playNote(root, 1.2); playNote(root + semi, 1.2);
+      } else if (dir === 'asc') {
+        playNote(root, 0.7);
+        setTimeout(() => playNote(root + semi, 0.7), 600);
+      } else {
+        playNote(root + semi, 0.7);
+        setTimeout(() => playNote(root, 0.7), 600);
+      }
+    }
+
+    function earPlayPair() {
+      const root = 36 + Math.floor(Math.random() * 13); // C2–C3
+      const idx = Math.floor(Math.random() * INTERVALS.length);
+      const [, semi] = INTERVALS[idx];
+      earState.rootMidi = root;
+      earState.targetSemi = semi;
+      earPlayPairNotes(root, semi, earState.direction);
+      document.getElementById('earPromptRow').style.display = '';
+      document.getElementById('earResult').textContent = '';
+      document.getElementById('earResult').className = 'result-label';
+      earBuildChoices();
+    }
+
+    function earBuildChoices() {
+      const container = document.getElementById('earChoices');
+      container.innerHTML = INTERVALS.map(([name, semi]) =>
+        `<button class="choice-btn" data-semi="${semi}" type="button">${name}</button>`
+      ).join('');
+      container.querySelectorAll('.choice-btn').forEach(btn => {
+        btn.addEventListener('click', () => earOnChoice(parseInt(btn.dataset.semi)));
+      });
+    }
+
+    function earOnChoice(semi) {
+      earState.total++;
+      const correct = semi === earState.targetSemi;
+      if (correct) earState.correct++;
+      const res = document.getElementById('earResult');
+      const correctName = INTERVALS.find(([,s]) => s === earState.targetSemi)?.[0] ?? '?';
+      res.textContent = correct
+        ? `✓ Correct! ${correctName}`
+        : `✗ It was ${correctName}`;
+      res.className = 'result-label ' + (correct ? 'correct' : 'wrong');
+      document.getElementById('earScore').textContent = `Score: ${earState.correct} / ${earState.total}`;
+      // Highlight correct answer
+      document.querySelectorAll('#earChoices .choice-btn').forEach(btn => {
+        const s = parseInt(btn.dataset.semi);
+        if (s === earState.targetSemi) btn.style.background = 'color-mix(in srgb,var(--accent),transparent 55%)';
+        if (s === semi && !correct) btn.style.background = 'color-mix(in srgb,var(--accent-2),transparent 55%)';
+      });
+      setTimeout(() => earPlayPair(), 1500);
+    }
+
+    function initEarPanel() {
+      document.getElementById('earStartBtn').addEventListener('click', () => {
+        if (window.Tone) Tone.start();
+        earState.active = true;
+        earState.correct = 0;
+        earState.total = 0;
+        document.getElementById('earStartBtn').textContent = 'Next';
+        earPlayPair();
+      });
+      document.getElementById('earReplayBtn').addEventListener('click', () => {
+        if (window.Tone) Tone.start();
+        if (earState.rootMidi !== null && earState.targetSemi !== null) {
+          earPlayPairNotes(earState.rootMidi, earState.targetSemi, earState.direction);
+        }
+      });
+      document.querySelectorAll('#earDirToggle .seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#earDirToggle .seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          earState.direction = btn.dataset.dir;
+        });
+      });
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FEATURE 7 – CIRCLE OF FIFTHS + DIATONIC CHORDS
+    ═══════════════════════════════════════════════════════════ */
+    const COF_MAJOR = ['C','G','D','A','E','B','F#/Gb','Db','Ab','Eb','Bb','F'];
+    const COF_MINOR = ['Am','Em','Bm','F#m','C#m','G#m','D#m/Ebm','Bbm','Fm','Cm','Gm','Dm'];
+    const COF_PCS   = [0,7,2,9,4,11,6,1,8,3,10,5];
+    const COF_COLORS_OUTER = '#1e4278';
+    const COF_COLORS_INNER = '#2a1250';
+    const DIATONIC_QUALITIES = ['maj','min','min','maj','maj','min','dim'];
+    const DIATONIC_ROMAN     = ['I','ii','iii','IV','V','vi','vii°'];
+
+    let cofSelectedIdx = 0;
+
+    function cofWedgePath(cx, cy, r1, r2, startAngle, endAngle) {
+      const toRad = a => a * Math.PI / 180;
+      const cos1s = Math.cos(toRad(startAngle)), sin1s = Math.sin(toRad(startAngle));
+      const cos1e = Math.cos(toRad(endAngle)),   sin1e = Math.sin(toRad(endAngle));
+      return [
+        `M ${cx + r1*cos1s} ${cy + r1*sin1s}`,
+        `A ${r1} ${r1} 0 0 1 ${cx + r1*cos1e} ${cy + r1*sin1e}`,
+        `L ${cx + r2*cos1e} ${cy + r2*sin1e}`,
+        `A ${r2} ${r2} 0 0 0 ${cx + r2*cos1s} ${cy + r2*sin1s}`,
+        'Z'
+      ].join(' ');
+    }
+
+    function cofBuildSvg() {
+      const SIZE = 320, cx = SIZE/2, cy = SIZE/2;
+      const R1 = 130, R2 = 100, R3 = 70, Rc = 42;
+      const sliceAngle = 360 / 12;
+      let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" xmlns="http://www.w3.org/2000/svg">`;
+      for (let i = 0; i < 12; i++) {
+        const start = i * sliceAngle - 90 - sliceAngle/2;
+        const end   = start + sliceAngle;
+        const mid   = (start + end) / 2 * Math.PI / 180;
+        const outerR = (R1 + R2) / 2;
+        const innerR = (R2 + R3) / 2;
+        const isSelected = i === cofSelectedIdx;
+        // Outer ring (major)
+        svg += `<path d="${cofWedgePath(cx,cy,R1,R2,start,end)}"
+          fill="${COF_COLORS_OUTER}" stroke="color-mix(in srgb,#b8ceee,transparent 65%)"
+          stroke-width="1" class="cof-wedge${isSelected?' selected':''}"
+          data-idx="${i}" data-ring="major"/>`;
+        svg += `<text x="${cx + outerR*Math.cos(mid)}" y="${cy + outerR*Math.sin(mid)}"
+          text-anchor="middle" dominant-baseline="central" fill="#eef5ff"
+          font-size="13" font-weight="700" font-family="Inter,sans-serif"
+          style="pointer-events:none">${COF_MAJOR[i]}</text>`;
+        // Inner ring (relative minor)
+        svg += `<path d="${cofWedgePath(cx,cy,R2,R3,start,end)}"
+          fill="${COF_COLORS_INNER}" stroke="color-mix(in srgb,#b8ceee,transparent 65%)"
+          stroke-width="1" class="cof-wedge${isSelected?' selected':''}"
+          data-idx="${i}" data-ring="minor"/>`;
+        svg += `<text x="${cx + innerR*Math.cos(mid)}" y="${cy + innerR*Math.sin(mid)}"
+          text-anchor="middle" dominant-baseline="central"
+          fill="color-mix(in srgb,#b8ceee,transparent 20%)"
+          font-size="10" font-family="Inter,sans-serif"
+          style="pointer-events:none">${COF_MINOR[i]}</text>`;
+      }
+      // Center circle
+      svg += `<circle cx="${cx}" cy="${cy}" r="${Rc}" fill="#0c1729" stroke="color-mix(in srgb,#b8ceee,transparent 65%)" stroke-width="1"/>`;
+      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"
+        fill="var(--accent)" font-size="15" font-weight="700" font-family="Inter,sans-serif"
+        style="pointer-events:none">${COF_MAJOR[cofSelectedIdx]}</text>`;
+      svg += '</svg>';
+      return svg;
+    }
+
+    function cofScaleNotes(rootPc) {
+      return SCALE_PATTERNS.major.slice(0, 7).map(s => NOTE_NAMES[(rootPc + s) % 12]);
+    }
+
+    function cofSelectKey(idx) {
+      cofSelectedIdx = idx;
+      const rootPc = COF_PCS[idx];
+      document.getElementById('cofKeyLabel').textContent = COF_MAJOR[idx];
+      document.getElementById('cofSvgWrap').innerHTML = cofBuildSvg();
+      // Re-bind clicks after re-render
+      document.querySelectorAll('#cofSvgWrap .cof-wedge').forEach(el => {
+        el.addEventListener('click', () => cofSelectKey(parseInt(el.dataset.idx)));
+      });
+      // Details
+      const scaleNotes = cofScaleNotes(rootPc);
+      const rows = DIATONIC_ROMAN.map((roman, i) => {
+        const notePc = (rootPc + SCALE_PATTERNS.major[i]) % 12;
+        return `<tr><td>${roman}</td><td>${NOTE_NAMES[notePc]}${DIATONIC_QUALITIES[i] === 'min' ? 'm' : DIATONIC_QUALITIES[i] === 'dim' ? '°' : ''}</td><td>${DIATONIC_QUALITIES[i]}</td></tr>`;
+      }).join('');
+      document.getElementById('cofDetails').innerHTML = `
+        <p style="color:var(--muted);font-size:0.82rem;margin:0 0 0.5rem;">
+          <strong style="color:var(--text)">${COF_MAJOR[idx]} major</strong>
+          — ${scaleNotes.join(' · ')}
+        </p>
+        <table><thead><tr>
+          <th>Degree</th><th>Chord</th><th>Quality</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function initTheoryPanel() {
+      document.getElementById('cofSvgWrap').innerHTML = cofBuildSvg();
+      document.querySelectorAll('#cofSvgWrap .cof-wedge').forEach(el => {
+        el.addEventListener('click', () => cofSelectKey(parseInt(el.dataset.idx)));
+      });
+      cofSelectKey(0);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
        UI INIT
     ═══════════════════════════════════════════════════════════ */
     function populateNoteSelects() {
-      ['scaleRoot','arpRoot','shapeRoot','intRoot','toneNote'].forEach(id => {
+      ['scaleRoot','arpRoot','shapeRoot','intRoot','progrKey','toneNote'].forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
         NOTE_NAMES.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; sel.appendChild(o); });
@@ -2080,9 +2613,11 @@ import Layout from '../../layouts/Layout.astro';
           document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
           const panel = document.getElementById(tab + 'Panel');
           if (panel) panel.classList.remove('hidden');
-          if (tab === 'staff') { enterStaffTab(); fbShapeData = null; }
-          else if (tab === 'shape') { leaveStaffTab(); fbTargetMidi = null; shapeRefresh(); }
-          else { leaveStaffTab(); fbTargetMidi = null; fbShapeData = null; refreshFretboard(); }
+          if (tab === 'staff') { enterStaffTab(); fbShapeData = null; fqState.active = false; }
+          else if (tab === 'shape') { leaveStaffTab(); fbTargetMidi = null; fqState.active = false; shapeRefresh(); }
+          else if (tab === 'fretquiz') { leaveStaffTab(); fbTargetMidi = null; fbShapeData = null; fqState.active = false; refreshFretboard(); }
+          else if (tab === 'theory') { leaveStaffTab(); fbTargetMidi = null; fbShapeData = null; refreshFretboard(); initTheoryPanel(); }
+          else { leaveStaffTab(); fbTargetMidi = null; fbShapeData = null; fqState.active = false; refreshFretboard(); }
         });
       });
     }
@@ -2252,6 +2787,10 @@ import Layout from '../../layouts/Layout.astro';
       initArpeggiosPanel();
       initShapePanel();
       initIntervalsPanel();
+      initFretQuizPanel();
+      initProgrPanel();
+      initEarPanel();
+      initTheoryPanel();
       initToolsPanel();
 
       document.getElementById('instrSelect')?.addEventListener('change', function () {
