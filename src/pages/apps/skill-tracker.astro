@@ -100,7 +100,8 @@ import Layout from '../../layouts/Layout.astro';
     aspect-ratio: 1;
     background: var(--bg-soft);
     border-radius: 1.5rem;
-    overflow: hidden;
+    /* No overflow:hidden — border-radius on the canvas clips the 3D content
+       while letting the HTML label overlay render outside without being cut off. */
     border: 1px solid color-mix(in srgb, var(--muted), transparent 78%);
   }
 
@@ -108,6 +109,7 @@ import Layout from '../../layouts/Layout.astro';
     display: block;
     width: 100%;
     height: 100%;
+    border-radius: 1.5rem; /* clips WebGL rendering to match panel corners */
   }
 
   /* ── Vertex labels overlay ───────────────────────────────────── */
@@ -526,6 +528,9 @@ let controls: OrbitControls;
 let polyGroup: THREE.Group | null = null;
 let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; name: string; proportion: number }[] = [];
 let labelEls: HTMLElement[] = [];
+// Cached canvas dimensions — updated by ResizeObserver, used in animate().
+// Avoids querying clientWidth (which can be 0 during early layout) every frame.
+let canvasW = 400, canvasH = 400;
 
 // ── API ───────────────────────────────────────────────────────────
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -570,9 +575,11 @@ function initThree(canvas: HTMLCanvasElement) {
   controls.enablePan       = false;
 
   new ResizeObserver(() => {
-    camera.aspect = canvas.clientWidth / canvas.clientHeight;
+    canvasW = canvas.clientWidth;
+    canvasH = canvas.clientHeight;
+    camera.aspect = canvasW / canvasH;
     camera.updateProjectionMatrix();
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+    renderer.setSize(canvasW, canvasH, false);
   }).observe(canvas);
 
   animate();
@@ -686,18 +693,13 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  // Project vertex positions → HTML label coordinates
-  const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
-  const cw = canvas.clientWidth;
-  const ch = canvas.clientHeight;
-
   vertexData.forEach((v, i) => {
     const label = labelEls[i];
     if (!label) return;
 
     const proj = v.tipPos.clone().project(camera);
-    const x = (proj.x + 1) / 2 * cw;
-    const y = (-proj.y + 1) / 2 * ch;
+    const x = (proj.x + 1) / 2 * canvasW;
+    const y = (-proj.y + 1) / 2 * canvasH;
 
     // Dim labels on the far side of the shape
     const toV = v.tipPos.clone().sub(camera.position);
