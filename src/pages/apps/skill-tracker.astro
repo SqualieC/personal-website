@@ -1,0 +1,1007 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout
+  title="Skill Tracker | SqualieC"
+  description="Track time across skills and watch your 3D shape evolve. Weekly, yearly, and lifetime views."
+>
+  <section class="hero hero-surface">
+    <p class="eyebrow">Personal Tool</p>
+    <h1>Skill Tracker</h1>
+    <p class="lead">Log time across skills and watch your shape grow. Requires the local backend to be running.</p>
+  </section>
+
+  <section class="tracker-shell">
+
+    <!-- ── Blob viewer ──────────────────────────────────────────── -->
+    <div class="blob-panel">
+      <canvas id="blobCanvas"></canvas>
+
+      <div class="period-tabs">
+        <button class="period-tab active" data-period="week">This Week</button>
+        <button class="period-tab" data-period="year">This Year</button>
+        <button class="period-tab" data-period="lifetime">Lifetime</button>
+      </div>
+
+      <div id="blobLegend" class="blob-legend"></div>
+
+      <div id="noDataMsg" class="no-data-msg" hidden>
+        No time logged yet — start a session to shape your blob.
+      </div>
+    </div>
+
+    <!-- ── Control panel ────────────────────────────────────────── -->
+    <aside class="control-panel">
+
+      <!-- Connection row -->
+      <div class="conn-header">
+        <div class="conn-status">
+          <span id="connDot" class="conn-dot"></span>
+          <span id="connLabel">Connecting…</span>
+        </div>
+        <button id="settingsToggle" class="icon-btn" title="Backend settings">⚙</button>
+      </div>
+
+      <!-- Settings panel -->
+      <div id="settingsPanel" class="settings-panel" hidden>
+        <span class="settings-label">Backend URL</span>
+        <div class="settings-row">
+          <input id="apiUrlInput" class="settings-input" type="url" placeholder="http://localhost:8000" />
+          <button id="saveApiUrl" class="btn-sm">Save</button>
+        </div>
+        <p class="settings-hint">Run <code>start.bat</code> inside <code>SkillTracker/backend/</code> to start the server.</p>
+      </div>
+
+      <!-- Active session banner -->
+      <div id="activeBanner" class="active-banner" hidden>
+        <span class="conn-dot active pulse"></span>
+        <span id="activeCatName">—</span>
+        <span id="activeClock" class="active-clock">00:00:00</span>
+      </div>
+
+      <!-- Timer card -->
+      <div class="cp-card">
+        <h3 class="cp-card-title">Log Time</h3>
+        <select id="categorySelect" class="cp-select">
+          <option value="">Select a skill…</option>
+        </select>
+        <button id="timerBtn" class="timer-btn" disabled>
+          <span id="timerBtnLabel">▶ Start</span>
+        </button>
+      </div>
+
+      <!-- Skills card -->
+      <div class="cp-card">
+        <h3 class="cp-card-title">Skills</h3>
+        <ul id="categoryList" class="cat-list"></ul>
+        <div class="add-cat-row">
+          <input id="newCatName" class="cp-input" placeholder="New skill…" maxlength="32" />
+          <input id="newCatColor" type="color" class="cp-color" value="#28edc4" />
+          <button id="addCatBtn" class="btn-sm">Add</button>
+        </div>
+      </div>
+
+    </aside>
+  </section>
+
+  <!-- ── Recent sessions ──────────────────────────────────────── -->
+  <section class="history-section">
+    <h2 class="section-title" style="margin-bottom:0.75rem">Recent Sessions</h2>
+    <div id="historyList" class="history-list"></div>
+  </section>
+</Layout>
+
+<style>
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .tracker-shell {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+    align-items: start;
+  }
+
+  /* ── Blob panel ──────────────────────────────────────────────── */
+  .blob-panel {
+    position: relative;
+    aspect-ratio: 1;
+    background: var(--bg-soft);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 78%);
+  }
+
+  #blobCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .period-tabs {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.3rem;
+    background: color-mix(in srgb, var(--bg), transparent 25%);
+    backdrop-filter: blur(10px);
+    border-radius: 999px;
+    padding: 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+  }
+
+  .period-tab {
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .period-tab.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
+  .blob-legend {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    pointer-events: none;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg), transparent 20%);
+    backdrop-filter: blur(6px);
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+  }
+
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .no-data-msg {
+    position: absolute;
+    bottom: 3.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--bg), transparent 20%);
+    backdrop-filter: blur(6px);
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+  }
+
+  /* ── Control panel ───────────────────────────────────────────── */
+  .control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .conn-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+  }
+
+  .conn-status {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #555;
+    flex-shrink: 0;
+  }
+  .conn-dot.connected    { background: #4ade80; }
+  .conn-dot.disconnected { background: #f87171; }
+  .conn-dot.active       { background: var(--accent); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.35; }
+  }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.2rem 0.3rem;
+    border-radius: 0.3rem;
+    transition: color 0.15s;
+  }
+  .icon-btn:hover { color: var(--text); }
+
+  .settings-panel {
+    background: var(--card);
+    border-radius: 0.75rem;
+    padding: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .settings-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .settings-row {
+    display: flex;
+    gap: 0.45rem;
+  }
+
+  .settings-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg);
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+    border-radius: 0.4rem;
+    color: var(--text);
+    padding: 0.38rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .settings-hint {
+    font-size: 0.73rem;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .settings-hint code {
+    background: var(--bg);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    font-size: 0.71rem;
+  }
+
+  .active-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    background: color-mix(in srgb, var(--accent), transparent 88%);
+    border: 1px solid color-mix(in srgb, var(--accent), transparent 55%);
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .active-clock {
+    margin-left: auto;
+    font-family: monospace;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  /* ── Cards ───────────────────────────────────────────────────── */
+  .cp-card {
+    background: var(--card);
+    border-radius: 1rem;
+    padding: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .cp-card-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ── Timer ───────────────────────────────────────────────────── */
+  .cp-select {
+    background: var(--bg);
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+    border-radius: 0.5rem;
+    color: var(--text);
+    padding: 0.48rem 0.7rem;
+    font-size: 0.88rem;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .timer-btn {
+    width: 100%;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--accent);
+    color: var(--bg);
+    transition: background 0.2s, opacity 0.2s;
+  }
+  .timer-btn:disabled            { opacity: 0.35; cursor: not-allowed; }
+  .timer-btn.running             { background: #f87171; color: #fff; }
+
+  /* ── Category list ───────────────────────────────────────────── */
+  .cat-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .cat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.45rem;
+    background: var(--bg);
+    font-size: 0.83rem;
+  }
+
+  .cat-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .cat-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cat-time {
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cat-del {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 0.15rem;
+    opacity: 0;
+    transition: opacity 0.12s;
+    line-height: 1;
+  }
+  .cat-item:hover .cat-del { opacity: 1; }
+
+  .add-cat-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .cp-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg);
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+    border-radius: 0.4rem;
+    color: var(--text);
+    padding: 0.38rem 0.55rem;
+    font-size: 0.82rem;
+  }
+
+  .cp-color {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 0.3rem;
+    padding: 2px;
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+  }
+
+  .btn-sm {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 0.4rem;
+    padding: 0.38rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── History ─────────────────────────────────────────────────── */
+  .history-section {
+    margin: 1rem 0 3rem;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--card);
+    border-radius: 0.5rem;
+    padding: 0.48rem 0.8rem;
+    font-size: 0.83rem;
+  }
+
+  .history-cat {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 110px;
+    font-weight: 500;
+  }
+
+  .history-dur {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 70px;
+  }
+
+  .history-date {
+    color: var(--muted);
+    margin-left: auto;
+    font-size: 0.76rem;
+  }
+
+  .empty-msg {
+    color: var(--muted);
+    font-size: 0.83rem;
+    padding: 0.5rem 0;
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────── */
+  @media (max-width: 700px) {
+    .tracker-shell {
+      grid-template-columns: 1fr;
+    }
+    .blob-panel {
+      aspect-ratio: 1;
+    }
+  }
+</style>
+
+<script>
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── Types ─────────────────────────────────────────────────────────
+interface Category {
+  id: number;
+  name: string;
+  color: string;
+  axis_x: number;
+  axis_y: number;
+  axis_z: number;
+}
+
+interface StatsCat {
+  id: number;
+  name: string;
+  color: string;
+  axis: [number, number, number];
+  total_seconds: number;
+  proportion: number;
+}
+
+interface StatsResponse {
+  categories: StatsCat[];
+  total_seconds: number;
+}
+
+interface ActiveSession {
+  id: number;
+  category_id: number;
+  started_at: string;
+  category_name: string;
+  color: string;
+}
+
+// ── State ─────────────────────────────────────────────────────────
+let apiBase = (localStorage.getItem('st-api') ?? 'http://localhost:8000').replace(/\/$/, '');
+let categories: Category[] = [];
+let currentStats: StatsResponse | null = null;
+let activeSession: ActiveSession | null = null;
+let currentPeriod: 'week' | 'year' | 'lifetime' = 'week';
+let clockInterval: ReturnType<typeof setInterval> | null = null;
+let wasConnected = false;
+
+// ── API ───────────────────────────────────────────────────────────
+async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${apiBase}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+// ── Three.js ──────────────────────────────────────────────────────
+const K_RBF      = 3.0;
+const BASE_R     = 0.55;
+const BLOB_SCALE = 0.65;
+const LERP       = 0.05;
+
+let scene: THREE.Scene;
+let camera: THREE.PerspectiveCamera;
+let renderer: THREE.WebGLRenderer;
+let blobMesh: THREE.Mesh;
+let controls: OrbitControls;
+let geo: THREE.SphereGeometry;
+let origPos: Float32Array;
+let targetPos: Float32Array;
+let colAttr: THREE.Float32BufferAttribute;
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16 & 0xff) / 255, (n >> 8 & 0xff) / 255, (n & 0xff) / 255];
+}
+
+function initThree(canvas: HTMLCanvasElement) {
+  scene = new THREE.Scene();
+  const w = canvas.clientWidth || 400;
+  const h = canvas.clientHeight || 400;
+
+  camera = new THREE.PerspectiveCamera(48, w / h, 0.1, 100);
+  camera.position.set(0, 0, 3.2);
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h, false);
+  renderer.setClearColor(0x000000, 0);
+
+  // Geometry — high-res sphere
+  geo = new THREE.SphereGeometry(1, 96, 48);
+  origPos   = Float32Array.from(geo.attributes.position.array as Float32Array);
+  targetPos = Float32Array.from(origPos);
+
+  const count = (geo.attributes.position as THREE.BufferAttribute).count;
+  colAttr = new THREE.Float32BufferAttribute(new Float32Array(count * 3).fill(0.18), 3);
+  geo.setAttribute('color', colAttr);
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.38,
+    metalness: 0.08,
+  });
+
+  blobMesh = new THREE.Mesh(geo, mat);
+  scene.add(blobMesh);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x304060, 2.2));
+  const dir = new THREE.DirectionalLight(0xffffff, 2.8);
+  dir.position.set(3, 5, 3);
+  scene.add(dir);
+  const l1 = new THREE.PointLight(0x28edc4, 8, 14);
+  l1.position.set(-3, 1.5, -2);
+  scene.add(l1);
+  const l2 = new THREE.PointLight(0xff6b38, 5, 14);
+  l2.position.set(3, -2, 2);
+  scene.add(l2);
+
+  // Controls
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping   = true;
+  controls.dampingFactor   = 0.06;
+  controls.autoRotate      = true;
+  controls.autoRotateSpeed = 0.5;
+  controls.enableZoom      = false;
+  controls.enablePan       = false;
+
+  // Resize observer
+  new ResizeObserver(() => {
+    const nw = canvas.clientWidth;
+    const nh = canvas.clientHeight;
+    camera.aspect = nw / nh;
+    camera.updateProjectionMatrix();
+    renderer.setSize(nw, nh, false);
+  }).observe(canvas);
+
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const pos = geo.attributes.position.array as Float32Array;
+  let dirty = false;
+  for (let i = 0; i < pos.length; i++) {
+    const d = targetPos[i] - pos[i];
+    if (Math.abs(d) > 0.0005) { pos[i] += d * LERP; dirty = true; }
+  }
+  if (dirty) {
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate    = true;
+    geo.computeVertexNormals();
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function computeBlob(cats: StatsCat[]) {
+  const col = colAttr.array as Float32Array;
+  const defaultRgb: [number, number, number] = [0.18, 0.3, 0.48];
+
+  for (let i = 0, n = origPos.length / 3; i < n; i++) {
+    const ox = origPos[i * 3], oy = origPos[i * 3 + 1], oz = origPos[i * 3 + 2];
+    const len = Math.sqrt(ox * ox + oy * oy + oz * oz);
+    const vx = ox / len, vy = oy / len, vz = oz / len;
+
+    let tw = 0, disp = 0, cr = 0, cg = 0, cb = 0;
+
+    for (const c of cats) {
+      const cos = Math.max(-1, Math.min(1, vx * c.axis[0] + vy * c.axis[1] + vz * c.axis[2]));
+      const w = Math.exp(-K_RBF * Math.acos(cos) ** 2);
+      tw += w;
+      disp += w * c.proportion;
+      const [r, g, b] = hexToRgb(c.color);
+      cr += w * r; cg += w * g; cb += w * b;
+    }
+
+    let radius: number;
+    if (tw > 0 && cats.length > 0) {
+      radius = BASE_R + (disp / tw) * BLOB_SCALE;
+      col[i * 3]     = cr / tw;
+      col[i * 3 + 1] = cg / tw;
+      col[i * 3 + 2] = cb / tw;
+    } else {
+      radius = BASE_R;
+      col[i * 3]     = defaultRgb[0];
+      col[i * 3 + 1] = defaultRgb[1];
+      col[i * 3 + 2] = defaultRgb[2];
+    }
+
+    targetPos[i * 3]     = vx * radius;
+    targetPos[i * 3 + 1] = vy * radius;
+    targetPos[i * 3 + 2] = vz * radius;
+  }
+
+  colAttr.needsUpdate = true;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────
+function setConnected(ok: boolean) {
+  const dot   = document.getElementById('connDot')!;
+  const label = document.getElementById('connLabel')!;
+  dot.className   = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
+  label.textContent = ok ? 'Connected' : 'Not connected';
+}
+
+function fmtDuration(s: number): string {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0)  return `${h}h ${m}m`;
+  if (m > 0)  return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function fmtElapsed(startedAt: string): string {
+  const elapsed = Math.floor((Date.now() - new Date(startedAt + 'Z').getTime()) / 1000);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function renderCategoryList(stats: StatsResponse | null) {
+  const list   = document.getElementById('categoryList')!;
+  const select = document.getElementById('categorySelect') as HTMLSelectElement;
+  const saved  = select.value;
+
+  list.innerHTML   = '';
+  select.innerHTML = '<option value="">Select a skill…</option>';
+
+  for (const cat of categories) {
+    const sec = stats?.categories.find(c => c.id === cat.id)?.total_seconds ?? 0;
+
+    const li = document.createElement('li');
+    li.className = 'cat-item';
+    li.innerHTML = `
+      <span class="cat-swatch" style="background:${cat.color}"></span>
+      <span class="cat-name">${cat.name}</span>
+      <span class="cat-time">${sec > 0 ? fmtDuration(sec) : '—'}</span>
+      <button class="cat-del" data-id="${cat.id}" title="Remove">✕</button>`;
+    list.appendChild(li);
+
+    const opt = document.createElement('option');
+    opt.value       = String(cat.id);
+    opt.textContent = cat.name;
+    select.appendChild(opt);
+  }
+
+  if (saved) select.value = saved;
+  updateTimerBtn();
+  renderLegend(stats);
+}
+
+function renderLegend(stats: StatsResponse | null) {
+  const legend  = document.getElementById('blobLegend')!;
+  const noData  = document.getElementById('noDataMsg')!;
+  legend.innerHTML = '';
+
+  if (!stats || stats.total_seconds === 0) {
+    noData.hidden = false;
+    return;
+  }
+  noData.hidden = true;
+
+  [...stats.categories]
+    .sort((a, b) => b.proportion - a.proportion)
+    .filter(c => c.proportion >= 0.01)
+    .slice(0, 6)
+    .forEach(c => {
+      const el = document.createElement('div');
+      el.className = 'legend-item';
+      el.innerHTML = `<span class="legend-dot" style="background:${c.color}"></span>
+                      ${c.name} <span style="color:var(--muted);margin-left:0.2em">${Math.round(c.proportion * 100)}%</span>`;
+      legend.appendChild(el);
+    });
+}
+
+function renderHistory(sessions: any[]) {
+  const list = document.getElementById('historyList')!;
+  list.innerHTML = '';
+
+  if (!sessions.length) {
+    list.innerHTML = '<p class="empty-msg">No sessions logged yet.</p>';
+    return;
+  }
+
+  sessions.slice(0, 15).forEach(s => {
+    const d       = new Date(s.started_at + 'Z');
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = `
+      <span class="history-cat">
+        <span class="cat-swatch" style="background:${s.color}"></span>${s.category_name}
+      </span>
+      <span class="history-dur">${fmtDuration(s.duration_seconds)}</span>
+      <span class="history-date">${dateStr} · ${timeStr}</span>`;
+    list.appendChild(el);
+  });
+}
+
+function startClock(startedAt: string) {
+  stopClock();
+  const banner = document.getElementById('activeBanner')!;
+  const clock  = document.getElementById('activeClock')!;
+  const name   = document.getElementById('activeCatName')!;
+  if (activeSession) {
+    name.textContent = activeSession.category_name;
+    banner.hidden    = false;
+  }
+  clock.textContent = fmtElapsed(startedAt);
+  clockInterval = setInterval(() => { clock.textContent = fmtElapsed(startedAt); }, 1000);
+}
+
+function stopClock() {
+  if (clockInterval) { clearInterval(clockInterval); clockInterval = null; }
+  document.getElementById('activeBanner')!.hidden = true;
+}
+
+function updateTimerBtn() {
+  const btn    = document.getElementById('timerBtn') as HTMLButtonElement;
+  const label  = document.getElementById('timerBtnLabel')!;
+  const select = document.getElementById('categorySelect') as HTMLSelectElement;
+
+  if (activeSession) {
+    btn.disabled = false;
+    btn.classList.add('running');
+    label.textContent = '■ Stop';
+  } else {
+    btn.classList.remove('running');
+    label.textContent = '▶ Start';
+    btn.disabled = !select.value || !wasConnected;
+  }
+}
+
+// ── Data loading ──────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [cats, stats, sessions, active] = await Promise.all([
+      api<Category[]>('/categories'),
+      api<StatsResponse>(`/stats/${currentPeriod}`),
+      api<any[]>('/sessions'),
+      api<ActiveSession | null>('/sessions/active'),
+    ]);
+    categories   = cats;
+    currentStats = stats;
+    computeBlob(stats.categories);
+    renderCategoryList(stats);
+    renderHistory(sessions);
+    activeSession = active;
+    if (active) startClock(active.started_at);
+    else stopClock();
+    updateTimerBtn();
+  } catch (e) {
+    console.error('loadAll failed:', e);
+  }
+}
+
+async function refreshStats() {
+  try {
+    const stats  = await api<StatsResponse>(`/stats/${currentPeriod}`);
+    currentStats = stats;
+    computeBlob(stats.categories);
+    renderCategoryList(stats);
+  } catch {}
+}
+
+// ── Event handlers ────────────────────────────────────────────────
+document.getElementById('settingsToggle')!.addEventListener('click', () => {
+  const panel = document.getElementById('settingsPanel')!;
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden)
+    (document.getElementById('apiUrlInput') as HTMLInputElement).value = apiBase;
+});
+
+document.getElementById('saveApiUrl')!.addEventListener('click', async () => {
+  const v = (document.getElementById('apiUrlInput') as HTMLInputElement).value.trim().replace(/\/$/, '');
+  if (!v) return;
+  apiBase = v;
+  localStorage.setItem('st-api', apiBase);
+  document.getElementById('settingsPanel')!.hidden = true;
+  wasConnected = false;
+  await poll();
+});
+
+document.getElementById('timerBtn')!.addEventListener('click', async () => {
+  const select = document.getElementById('categorySelect') as HTMLSelectElement;
+
+  if (activeSession) {
+    try {
+      await api(`/sessions/stop/${activeSession.id}`, { method: 'POST' });
+      activeSession = null;
+      stopClock();
+      updateTimerBtn();
+      const [stats, sessions] = await Promise.all([
+        api<StatsResponse>(`/stats/${currentPeriod}`),
+        api<any[]>('/sessions'),
+      ]);
+      currentStats = stats;
+      computeBlob(stats.categories);
+      renderCategoryList(stats);
+      renderHistory(sessions);
+    } catch (e) { console.error('Stop failed:', e); }
+  } else {
+    const catId = parseInt(select.value);
+    if (!catId) return;
+    try {
+      const sess = await api<{ id: number; category_id: number; started_at: string }>('/sessions/start', {
+        method: 'POST',
+        body: JSON.stringify({ category_id: catId }),
+      });
+      const cat = categories.find(c => c.id === catId);
+      activeSession = { ...sess, category_name: cat?.name ?? '', color: cat?.color ?? '' };
+      startClock(sess.started_at);
+      updateTimerBtn();
+    } catch (e) { console.error('Start failed:', e); }
+  }
+});
+
+document.getElementById('categorySelect')!.addEventListener('change', updateTimerBtn);
+
+document.getElementById('addCatBtn')!.addEventListener('click', async () => {
+  const nameEl  = document.getElementById('newCatName') as HTMLInputElement;
+  const colorEl = document.getElementById('newCatColor') as HTMLInputElement;
+  const name    = nameEl.value.trim();
+  if (!name || !wasConnected) return;
+  try {
+    const cat = await api<Category>('/categories', {
+      method: 'POST',
+      body: JSON.stringify({ name, color: colorEl.value }),
+    });
+    categories.push(cat);
+    nameEl.value = '';
+    await refreshStats();
+  } catch (e) { console.error('Add category failed:', e); }
+});
+
+document.getElementById('newCatName')!.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') (document.getElementById('addCatBtn') as HTMLButtonElement).click();
+});
+
+document.getElementById('categoryList')!.addEventListener('click', async (e) => {
+  const btn = (e.target as HTMLElement).closest('[data-id]') as HTMLElement | null;
+  if (!btn) return;
+  const id = parseInt(btn.dataset.id!);
+  if (!confirm('Remove this skill? Past sessions are preserved.')) return;
+  try {
+    await api(`/categories/${id}`, { method: 'DELETE' });
+    categories = categories.filter(c => c.id !== id);
+    await refreshStats();
+  } catch (e) { console.error('Delete failed:', e); }
+});
+
+document.querySelectorAll<HTMLButtonElement>('.period-tab').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPeriod = btn.dataset.period as typeof currentPeriod;
+    await refreshStats();
+  });
+});
+
+// ── Poll / init ───────────────────────────────────────────────────
+async function poll() {
+  try {
+    await api('/health');
+    setConnected(true);
+    if (!wasConnected) {
+      wasConnected = true;
+      await loadAll();
+    }
+  } catch {
+    setConnected(false);
+    if (wasConnected) {
+      wasConnected = false;
+      computeBlob([]);
+      updateTimerBtn();
+    }
+  }
+}
+
+// Init Three.js then start polling
+const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
+initThree(canvas);
+poll();
+setInterval(poll, 15_000);
+
+// Refresh stats while a session is running (keeps blob shape current)
+setInterval(async () => { if (activeSession && wasConnected) await refreshStats(); }, 60_000);
+</script>

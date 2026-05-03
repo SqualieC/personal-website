@@ -17,8 +17,10 @@
   "dependencies": {
     "@astrojs/mdx": "^4.3.13",
     "@tailwindcss/vite": "^4.2.1",
+    "@types/three": "^0.184.0",
     "astro": "^5.17.1",
     "pagefind": "^1.4.0",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "three": "^0.184.0"
   }
 }
