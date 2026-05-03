@@ -4,7 +4,7 @@ import Layout from '../../layouts/Layout.astro';
 
 <Layout
   title="Skill Tracker | SqualieC"
-  description="Track time across skills and watch your 3D shape evolve. Weekly, yearly, and lifetime views."
+  description="Track time across skills and watch a 3D shape evolve. Weekly, yearly, and lifetime views."
 >
   <section class="hero hero-surface">
     <p class="eyebrow">Personal Tool</p>
@@ -17,6 +17,7 @@ import Layout from '../../layouts/Layout.astro';
     <!-- ── Blob viewer ──────────────────────────────────────────── -->
     <div class="blob-panel">
       <canvas id="blobCanvas"></canvas>
+      <div id="labelsOverlay" class="labels-overlay"></div>
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="week">This Week</button>
@@ -24,43 +25,37 @@ import Layout from '../../layouts/Layout.astro';
         <button class="period-tab" data-period="lifetime">Lifetime</button>
       </div>
 
-      <div id="blobLegend" class="blob-legend"></div>
-
       <div id="noDataMsg" class="no-data-msg" hidden>
-        No time logged yet — start a session to shape your blob.
+        No time logged yet — start a session to build your shape.
       </div>
     </div>
 
     <!-- ── Control panel ────────────────────────────────────────── -->
     <aside class="control-panel">
 
-      <!-- Connection row -->
       <div class="conn-header">
         <div class="conn-status">
           <span id="connDot" class="conn-dot"></span>
-          <span id="connLabel">Connecting…</span>
+          <span id="connLabel">Not connected</span>
         </div>
         <button id="settingsToggle" class="icon-btn" title="Backend settings">⚙</button>
       </div>
 
-      <!-- Settings panel -->
-      <div id="settingsPanel" class="settings-panel" hidden>
+      <div id="settingsPanel" class="settings-panel">
         <span class="settings-label">Backend URL</span>
         <div class="settings-row">
           <input id="apiUrlInput" class="settings-input" type="url" placeholder="http://localhost:8000" />
-          <button id="saveApiUrl" class="btn-sm">Save</button>
+          <button id="connectBtn" class="btn-sm">Connect</button>
         </div>
-        <p class="settings-hint">Run <code>start.bat</code> inside <code>SkillTracker/backend/</code> to start the server.</p>
+        <p class="settings-hint">Run <code>start.bat</code> inside <code>SkillTracker/backend/</code>, then click Connect.</p>
       </div>
 
-      <!-- Active session banner -->
       <div id="activeBanner" class="active-banner" hidden>
         <span class="conn-dot active pulse"></span>
         <span id="activeCatName">—</span>
         <span id="activeClock" class="active-clock">00:00:00</span>
       </div>
 
-      <!-- Timer card -->
       <div class="cp-card">
         <h3 class="cp-card-title">Log Time</h3>
         <select id="categorySelect" class="cp-select">
@@ -71,13 +66,11 @@ import Layout from '../../layouts/Layout.astro';
         </button>
       </div>
 
-      <!-- Skills card -->
       <div class="cp-card">
         <h3 class="cp-card-title">Skills</h3>
         <ul id="categoryList" class="cat-list"></ul>
         <div class="add-cat-row">
           <input id="newCatName" class="cp-input" placeholder="New skill…" maxlength="32" />
-          <input id="newCatColor" type="color" class="cp-color" value="#28edc4" />
           <button id="addCatBtn" class="btn-sm">Add</button>
         </div>
       </div>
@@ -85,7 +78,6 @@ import Layout from '../../layouts/Layout.astro';
     </aside>
   </section>
 
-  <!-- ── Recent sessions ──────────────────────────────────────── -->
   <section class="history-section">
     <h2 class="section-title" style="margin-bottom:0.75rem">Recent Sessions</h2>
     <div id="historyList" class="history-list"></div>
@@ -118,6 +110,29 @@ import Layout from '../../layouts/Layout.astro';
     height: 100%;
   }
 
+  /* ── Vertex labels overlay ───────────────────────────────────── */
+  .labels-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .vertex-label {
+    position: absolute;
+    transform: translate(-50%, -150%);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg), transparent 15%);
+    backdrop-filter: blur(6px);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    border: 1px solid color-mix(in srgb, #4ade80, transparent 45%);
+    transition: opacity 0.15s;
+  }
+
+  /* ── Period tabs ─────────────────────────────────────────────── */
   .period-tabs {
     position: absolute;
     bottom: 1rem;
@@ -145,38 +160,9 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   .period-tab.active {
-    background: var(--accent);
-    color: var(--bg);
+    background: #4ade80;
+    color: #0c1f10;
     font-weight: 600;
-  }
-
-  .blob-legend {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    pointer-events: none;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.74rem;
-    color: var(--text);
-    background: color-mix(in srgb, var(--bg), transparent 20%);
-    backdrop-filter: blur(6px);
-    padding: 0.18rem 0.55rem;
-    border-radius: 999px;
-  }
-
-  .legend-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
   }
 
   .no-data-msg {
@@ -224,7 +210,7 @@ import Layout from '../../layouts/Layout.astro';
   }
   .conn-dot.connected    { background: #4ade80; }
   .conn-dot.disconnected { background: #f87171; }
-  .conn-dot.active       { background: var(--accent); }
+  .conn-dot.active       { background: #4ade80; }
 
   @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -294,8 +280,8 @@ import Layout from '../../layouts/Layout.astro';
     display: flex;
     align-items: center;
     gap: 0.55rem;
-    background: color-mix(in srgb, var(--accent), transparent 88%);
-    border: 1px solid color-mix(in srgb, var(--accent), transparent 55%);
+    background: color-mix(in srgb, #4ade80, transparent 88%);
+    border: 1px solid color-mix(in srgb, #4ade80, transparent 55%);
     border-radius: 0.75rem;
     padding: 0.55rem 0.85rem;
     font-size: 0.85rem;
@@ -304,7 +290,7 @@ import Layout from '../../layouts/Layout.astro';
   .active-clock {
     margin-left: auto;
     font-family: monospace;
-    color: var(--accent);
+    color: #4ade80;
     font-weight: 600;
     font-size: 0.9rem;
   }
@@ -328,7 +314,6 @@ import Layout from '../../layouts/Layout.astro';
     margin: 0;
   }
 
-  /* ── Timer ───────────────────────────────────────────────────── */
   .cp-select {
     background: var(--bg);
     border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
@@ -348,12 +333,12 @@ import Layout from '../../layouts/Layout.astro';
     font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
-    background: var(--accent);
-    color: var(--bg);
+    background: #4ade80;
+    color: #0c1f10;
     transition: background 0.2s, opacity 0.2s;
   }
-  .timer-btn:disabled            { opacity: 0.35; cursor: not-allowed; }
-  .timer-btn.running             { background: #f87171; color: #fff; }
+  .timer-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .timer-btn.running  { background: #f87171; color: #fff; }
 
   /* ── Category list ───────────────────────────────────────────── */
   .cat-list {
@@ -377,19 +362,15 @@ import Layout from '../../layouts/Layout.astro';
     font-size: 0.83rem;
   }
 
-  .cat-swatch {
-    width: 9px;
-    height: 9px;
+  .cat-dot {
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
+    background: #4ade80;
     flex-shrink: 0;
   }
 
-  .cat-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .cat-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .cat-time {
     color: var(--muted);
@@ -427,20 +408,9 @@ import Layout from '../../layouts/Layout.astro';
     font-size: 0.82rem;
   }
 
-  .cp-color {
-    width: 30px;
-    height: 30px;
-    border: none;
-    border-radius: 0.3rem;
-    padding: 2px;
-    cursor: pointer;
-    background: none;
-    flex-shrink: 0;
-  }
-
   .btn-sm {
-    background: var(--accent);
-    color: var(--bg);
+    background: #4ade80;
+    color: #0c1f10;
     border: none;
     border-radius: 0.4rem;
     padding: 0.38rem 0.7rem;
@@ -452,9 +422,7 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   /* ── History ─────────────────────────────────────────────────── */
-  .history-section {
-    margin: 1rem 0 3rem;
-  }
+  .history-section { margin: 1rem 0 3rem; }
 
   .history-list {
     display: flex;
@@ -481,47 +449,32 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   .history-dur {
-    color: var(--accent);
+    color: #4ade80;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     min-width: 70px;
   }
 
-  .history-date {
-    color: var(--muted);
-    margin-left: auto;
-    font-size: 0.76rem;
-  }
+  .history-date { color: var(--muted); margin-left: auto; font-size: 0.76rem; }
 
-  .empty-msg {
-    color: var(--muted);
-    font-size: 0.83rem;
-    padding: 0.5rem 0;
-  }
+  .empty-msg { color: var(--muted); font-size: 0.83rem; padding: 0.5rem 0; }
 
   /* ── Responsive ──────────────────────────────────────────────── */
   @media (max-width: 700px) {
-    .tracker-shell {
-      grid-template-columns: 1fr;
-    }
-    .blob-panel {
-      aspect-ratio: 1;
-    }
+    .tracker-shell { grid-template-columns: 1fr; }
   }
 </style>
 
 <script>
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Category {
   id: number;
   name: string;
   color: string;
-  axis_x: number;
-  axis_y: number;
-  axis_z: number;
 }
 
 interface StatsCat {
@@ -547,13 +500,32 @@ interface ActiveSession {
 }
 
 // ── State ─────────────────────────────────────────────────────────
+const SHAPE_COLOR = 0x4ade80;
+const MAX_R       = 1.8;
+// Four tiny epsilon points near origin ensure ConvexGeometry always gets
+// enough non-coplanar input regardless of how many categories exist.
+const EPS_POINTS  = [
+  new THREE.Vector3( 0.001,  0,      0    ),
+  new THREE.Vector3( 0,      0.001,  0    ),
+  new THREE.Vector3( 0,      0,      0.001),
+  new THREE.Vector3(-0.001,  0,      0    ),
+];
+
 let apiBase = (localStorage.getItem('st-api') ?? 'http://localhost:8000').replace(/\/$/, '');
-let categories: Category[] = [];
-let currentStats: StatsResponse | null = null;
+let categories: Category[]       = [];
 let activeSession: ActiveSession | null = null;
 let currentPeriod: 'week' | 'year' | 'lifetime' = 'week';
 let clockInterval: ReturnType<typeof setInterval> | null = null;
 let wasConnected = false;
+
+// ── Three.js globals ──────────────────────────────────────────────
+let scene: THREE.Scene;
+let camera: THREE.PerspectiveCamera;
+let renderer: THREE.WebGLRenderer;
+let controls: OrbitControls;
+let polyGroup: THREE.Group | null = null;
+let vertexData: { pos: THREE.Vector3; name: string; proportion: number }[] = [];
+let labelEls: HTMLElement[] = [];
 
 // ── API ───────────────────────────────────────────────────────────
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -566,71 +538,29 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── Three.js ──────────────────────────────────────────────────────
-const K_RBF      = 3.0;
-const BASE_R     = 0.55;
-const BLOB_SCALE = 0.65;
-const LERP       = 0.05;
-
-let scene: THREE.Scene;
-let camera: THREE.PerspectiveCamera;
-let renderer: THREE.WebGLRenderer;
-let blobMesh: THREE.Mesh;
-let controls: OrbitControls;
-let geo: THREE.SphereGeometry;
-let origPos: Float32Array;
-let targetPos: Float32Array;
-let colAttr: THREE.Float32BufferAttribute;
-
-function hexToRgb(hex: string): [number, number, number] {
-  const n = parseInt(hex.replace('#', ''), 16);
-  return [(n >> 16 & 0xff) / 255, (n >> 8 & 0xff) / 255, (n & 0xff) / 255];
-}
-
+// ── Three.js setup ────────────────────────────────────────────────
 function initThree(canvas: HTMLCanvasElement) {
   scene = new THREE.Scene();
   const w = canvas.clientWidth || 400;
   const h = canvas.clientHeight || 400;
 
   camera = new THREE.PerspectiveCamera(48, w / h, 0.1, 100);
-  camera.position.set(0, 0, 3.2);
+  camera.position.set(0, 0, 4.2);
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(w, h, false);
   renderer.setClearColor(0x000000, 0);
 
-  // Geometry — high-res sphere
-  geo = new THREE.SphereGeometry(1, 96, 48);
-  origPos   = Float32Array.from(geo.attributes.position.array as Float32Array);
-  targetPos = Float32Array.from(origPos);
-
-  const count = (geo.attributes.position as THREE.BufferAttribute).count;
-  colAttr = new THREE.Float32BufferAttribute(new Float32Array(count * 3).fill(0.18), 3);
-  geo.setAttribute('color', colAttr);
-
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.38,
-    metalness: 0.08,
-  });
-
-  blobMesh = new THREE.Mesh(geo, mat);
-  scene.add(blobMesh);
-
-  // Lights
-  scene.add(new THREE.AmbientLight(0x304060, 2.2));
-  const dir = new THREE.DirectionalLight(0xffffff, 2.8);
-  dir.position.set(3, 5, 3);
+  // Lights affect MeshPhongMaterial fill
+  scene.add(new THREE.AmbientLight(0x405040, 2.0));
+  const dir = new THREE.DirectionalLight(0xffffff, 2.2);
+  dir.position.set(3, 4, 3);
   scene.add(dir);
-  const l1 = new THREE.PointLight(0x28edc4, 8, 14);
-  l1.position.set(-3, 1.5, -2);
-  scene.add(l1);
-  const l2 = new THREE.PointLight(0xff6b38, 5, 14);
-  l2.position.set(3, -2, 2);
-  scene.add(l2);
+  const fill = new THREE.DirectionalLight(0x80ffb0, 0.6);
+  fill.position.set(-2, -2, -2);
+  scene.add(fill);
 
-  // Controls
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping   = true;
   controls.dampingFactor   = 0.06;
@@ -639,101 +569,157 @@ function initThree(canvas: HTMLCanvasElement) {
   controls.enableZoom      = false;
   controls.enablePan       = false;
 
-  // Resize observer
   new ResizeObserver(() => {
-    const nw = canvas.clientWidth;
-    const nh = canvas.clientHeight;
-    camera.aspect = nw / nh;
+    camera.aspect = canvas.clientWidth / canvas.clientHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(nw, nh, false);
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   }).observe(canvas);
 
   animate();
 }
 
-function animate() {
-  requestAnimationFrame(animate);
-
-  const pos = geo.attributes.position.array as Float32Array;
-  let dirty = false;
-  for (let i = 0; i < pos.length; i++) {
-    const d = targetPos[i] - pos[i];
-    if (Math.abs(d) > 0.0005) { pos[i] += d * LERP; dirty = true; }
-  }
-  if (dirty) {
-    geo.attributes.position.needsUpdate = true;
-    geo.attributes.color.needsUpdate    = true;
-    geo.computeVertexNormals();
-  }
-
-  controls.update();
-  renderer.render(scene, camera);
+// ── Polyhedron builder ────────────────────────────────────────────
+function disposePolyGroup() {
+  if (!polyGroup) return;
+  scene.remove(polyGroup);
+  polyGroup.children.forEach(child => {
+    const c = child as any;
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) {
+      if (Array.isArray(c.material)) c.material.forEach((m: any) => m.dispose());
+      else c.material.dispose();
+    }
+  });
+  polyGroup = null;
 }
 
-function computeBlob(cats: StatsCat[]) {
-  const col = colAttr.array as Float32Array;
-  const defaultRgb: [number, number, number] = [0.18, 0.3, 0.48];
+function buildPolyhedron(cats: StatsCat[]) {
+  disposePolyGroup();
+  labelEls.forEach(el => el.remove());
+  labelEls = [];
+  vertexData = [];
 
-  for (let i = 0, n = origPos.length / 3; i < n; i++) {
-    const ox = origPos[i * 3], oy = origPos[i * 3 + 1], oz = origPos[i * 3 + 2];
-    const len = Math.sqrt(ox * ox + oy * oy + oz * oz);
-    const vx = ox / len, vy = oy / len, vz = oz / len;
+  const noData = document.getElementById('noDataMsg')!;
 
-    let tw = 0, disp = 0, cr = 0, cg = 0, cb = 0;
+  if (cats.length === 0) {
+    noData.hidden = false;
+    return;
+  }
+  noData.hidden = true;
 
-    for (const c of cats) {
-      const cos = Math.max(-1, Math.min(1, vx * c.axis[0] + vy * c.axis[1] + vz * c.axis[2]));
-      const w = Math.exp(-K_RBF * Math.acos(cos) ** 2);
-      tw += w;
-      disp += w * c.proportion;
-      const [r, g, b] = hexToRgb(c.color);
-      cr += w * r; cg += w * g; cb += w * b;
-    }
+  // Position each vertex: 0-proportion → sits near origin (0.06),
+  // full proportion → MAX_R out along its axis.
+  vertexData = cats.map(c => ({
+    pos: new THREE.Vector3(...c.axis).multiplyScalar(
+      (c.proportion > 0 ? c.proportion : 0.06) * MAX_R
+    ),
+    name: c.name,
+    proportion: c.proportion,
+  }));
 
-    let radius: number;
-    if (tw > 0 && cats.length > 0) {
-      radius = BASE_R + (disp / tw) * BLOB_SCALE;
-      col[i * 3]     = cr / tw;
-      col[i * 3 + 1] = cg / tw;
-      col[i * 3 + 2] = cb / tw;
-    } else {
-      radius = BASE_R;
-      col[i * 3]     = defaultRgb[0];
-      col[i * 3 + 1] = defaultRgb[1];
-      col[i * 3 + 2] = defaultRgb[2];
-    }
+  polyGroup = new THREE.Group();
+  scene.add(polyGroup);
 
-    targetPos[i * 3]     = vx * radius;
-    targetPos[i * 3 + 1] = vy * radius;
-    targetPos[i * 3 + 2] = vz * radius;
+  // ── Convex hull fill + edges ──────────────────────────────────
+  try {
+    const hullPts = [...vertexData.map(v => v.pos), ...EPS_POINTS];
+    const fillGeo = new ConvexGeometry(hullPts);
+
+    // Semi-transparent green fill
+    polyGroup.add(new THREE.Mesh(fillGeo, new THREE.MeshPhongMaterial({
+      color:       SHAPE_COLOR,
+      transparent: true,
+      opacity:     0.18,
+      side:        THREE.DoubleSide,
+      depthWrite:  false,
+      shininess:   15,
+    })));
+
+    // Opaque edge outline
+    const edgeGeo = new THREE.EdgesGeometry(fillGeo);
+    polyGroup.add(new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({
+      color: SHAPE_COLOR,
+    })));
+  } catch (e) {
+    console.warn('ConvexGeometry failed:', e);
   }
 
-  colAttr.needsUpdate = true;
+  // ── Spokes from origin to each vertex ────────────────────────
+  const spokePts = vertexData.flatMap(v => [new THREE.Vector3(), v.pos.clone()]);
+  const spokeGeo = new THREE.BufferGeometry().setFromPoints(spokePts);
+  polyGroup.add(new THREE.LineSegments(spokeGeo, new THREE.LineBasicMaterial({
+    color:       SHAPE_COLOR,
+    transparent: true,
+    opacity:     0.28,
+  })));
+
+  // ── Vertex marker spheres ─────────────────────────────────────
+  const markerGeo = new THREE.SphereGeometry(0.055, 10, 8);
+  const markerMat = new THREE.MeshBasicMaterial({ color: SHAPE_COLOR });
+  vertexData.forEach(v => {
+    const m = new THREE.Mesh(markerGeo, markerMat);
+    m.position.copy(v.pos);
+    polyGroup!.add(m);
+  });
+
+  // ── HTML labels ───────────────────────────────────────────────
+  const overlay = document.getElementById('labelsOverlay')!;
+  vertexData.forEach(v => {
+    const pct = Math.round(v.proportion * 100);
+    const el = document.createElement('div');
+    el.className = 'vertex-label';
+    el.textContent = pct > 0 ? `${v.name} ${pct}%` : v.name;
+    overlay.appendChild(el);
+    labelEls.push(el);
+  });
+}
+
+// ── Animation loop ────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // Project vertex positions → HTML label coordinates
+  const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+
+  vertexData.forEach((v, i) => {
+    const label = labelEls[i];
+    if (!label) return;
+
+    const proj = v.pos.clone().project(camera);
+    const x = (proj.x + 1) / 2 * cw;
+    const y = (-proj.y + 1) / 2 * ch;
+
+    // Dim labels on the far side of the shape
+    const toV = v.pos.clone().sub(camera.position);
+    const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
+    label.style.left = `${x}px`;
+    label.style.top  = `${y}px`;
+  });
+
+  renderer.render(scene, camera);
 }
 
 // ── UI helpers ────────────────────────────────────────────────────
 function setConnected(ok: boolean) {
-  const dot   = document.getElementById('connDot')!;
-  const label = document.getElementById('connLabel')!;
-  dot.className   = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
-  label.textContent = ok ? 'Connected' : 'Not connected';
+  document.getElementById('connDot')!.className   = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
+  document.getElementById('connLabel')!.textContent = ok ? 'Connected' : 'Not connected';
 }
 
 function fmtDuration(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0)  return `${h}h ${m}m`;
-  if (m > 0)  return `${m}m ${sec}s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
 
 function fmtElapsed(startedAt: string): string {
   const elapsed = Math.floor((Date.now() - new Date(startedAt + 'Z').getTime()) / 1000);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
 function renderCategoryList(stats: StatsResponse | null) {
@@ -750,66 +736,36 @@ function renderCategoryList(stats: StatsResponse | null) {
     const li = document.createElement('li');
     li.className = 'cat-item';
     li.innerHTML = `
-      <span class="cat-swatch" style="background:${cat.color}"></span>
+      <span class="cat-dot"></span>
       <span class="cat-name">${cat.name}</span>
       <span class="cat-time">${sec > 0 ? fmtDuration(sec) : '—'}</span>
       <button class="cat-del" data-id="${cat.id}" title="Remove">✕</button>`;
     list.appendChild(li);
 
     const opt = document.createElement('option');
-    opt.value       = String(cat.id);
-    opt.textContent = cat.name;
+    opt.value = String(cat.id); opt.textContent = cat.name;
     select.appendChild(opt);
   }
 
   if (saved) select.value = saved;
   updateTimerBtn();
-  renderLegend(stats);
-}
-
-function renderLegend(stats: StatsResponse | null) {
-  const legend  = document.getElementById('blobLegend')!;
-  const noData  = document.getElementById('noDataMsg')!;
-  legend.innerHTML = '';
-
-  if (!stats || stats.total_seconds === 0) {
-    noData.hidden = false;
-    return;
-  }
-  noData.hidden = true;
-
-  [...stats.categories]
-    .sort((a, b) => b.proportion - a.proportion)
-    .filter(c => c.proportion >= 0.01)
-    .slice(0, 6)
-    .forEach(c => {
-      const el = document.createElement('div');
-      el.className = 'legend-item';
-      el.innerHTML = `<span class="legend-dot" style="background:${c.color}"></span>
-                      ${c.name} <span style="color:var(--muted);margin-left:0.2em">${Math.round(c.proportion * 100)}%</span>`;
-      legend.appendChild(el);
-    });
 }
 
 function renderHistory(sessions: any[]) {
   const list = document.getElementById('historyList')!;
   list.innerHTML = '';
-
   if (!sessions.length) {
     list.innerHTML = '<p class="empty-msg">No sessions logged yet.</p>';
     return;
   }
-
   sessions.slice(0, 15).forEach(s => {
-    const d       = new Date(s.started_at + 'Z');
+    const d = new Date(s.started_at + 'Z');
     const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const el = document.createElement('div');
     el.className = 'history-item';
     el.innerHTML = `
-      <span class="history-cat">
-        <span class="cat-swatch" style="background:${s.color}"></span>${s.category_name}
-      </span>
+      <span class="history-cat"><span class="cat-dot"></span>${s.category_name}</span>
       <span class="history-dur">${fmtDuration(s.duration_seconds)}</span>
       <span class="history-date">${dateStr} · ${timeStr}</span>`;
     list.appendChild(el);
@@ -820,11 +776,8 @@ function startClock(startedAt: string) {
   stopClock();
   const banner = document.getElementById('activeBanner')!;
   const clock  = document.getElementById('activeClock')!;
-  const name   = document.getElementById('activeCatName')!;
-  if (activeSession) {
-    name.textContent = activeSession.category_name;
-    banner.hidden    = false;
-  }
+  document.getElementById('activeCatName')!.textContent = activeSession?.category_name ?? '';
+  banner.hidden = false;
   clock.textContent = fmtElapsed(startedAt);
   clockInterval = setInterval(() => { clock.textContent = fmtElapsed(startedAt); }, 1000);
 }
@@ -838,48 +791,52 @@ function updateTimerBtn() {
   const btn    = document.getElementById('timerBtn') as HTMLButtonElement;
   const label  = document.getElementById('timerBtnLabel')!;
   const select = document.getElementById('categorySelect') as HTMLSelectElement;
-
   if (activeSession) {
-    btn.disabled = false;
-    btn.classList.add('running');
-    label.textContent = '■ Stop';
+    btn.disabled = false; btn.classList.add('running'); label.textContent = '■ Stop';
   } else {
-    btn.classList.remove('running');
-    label.textContent = '▶ Start';
+    btn.classList.remove('running'); label.textContent = '▶ Start';
     btn.disabled = !select.value || !wasConnected;
   }
 }
 
 // ── Data loading ──────────────────────────────────────────────────
 async function loadAll() {
-  try {
-    const [cats, stats, sessions, active] = await Promise.all([
-      api<Category[]>('/categories'),
-      api<StatsResponse>(`/stats/${currentPeriod}`),
-      api<any[]>('/sessions'),
-      api<ActiveSession | null>('/sessions/active'),
-    ]);
-    categories   = cats;
-    currentStats = stats;
-    computeBlob(stats.categories);
-    renderCategoryList(stats);
-    renderHistory(sessions);
-    activeSession = active;
-    if (active) startClock(active.started_at);
-    else stopClock();
-    updateTimerBtn();
-  } catch (e) {
-    console.error('loadAll failed:', e);
-  }
+  const [cats, stats, sessions, active] = await Promise.all([
+    api<Category[]>('/categories'),
+    api<StatsResponse>(`/stats/${currentPeriod}`),
+    api<any[]>('/sessions'),
+    api<ActiveSession | null>('/sessions/active'),
+  ]);
+  categories = cats;
+  buildPolyhedron(stats.categories);
+  renderCategoryList(stats);
+  renderHistory(sessions);
+  activeSession = active;
+  if (active) startClock(active.started_at); else stopClock();
+  updateTimerBtn();
 }
 
 async function refreshStats() {
   try {
-    const stats  = await api<StatsResponse>(`/stats/${currentPeriod}`);
-    currentStats = stats;
-    computeBlob(stats.categories);
+    const stats = await api<StatsResponse>(`/stats/${currentPeriod}`);
+    buildPolyhedron(stats.categories);
     renderCategoryList(stats);
   } catch {}
+}
+
+// ── Connection ────────────────────────────────────────────────────
+async function connect() {
+  try {
+    await api('/health');
+    setConnected(true);
+    wasConnected = true;
+    await loadAll();
+  } catch {
+    setConnected(false);
+    wasConnected = false;
+    buildPolyhedron([]);
+    updateTimerBtn();
+  }
 }
 
 // ── Event handlers ────────────────────────────────────────────────
@@ -890,46 +847,39 @@ document.getElementById('settingsToggle')!.addEventListener('click', () => {
     (document.getElementById('apiUrlInput') as HTMLInputElement).value = apiBase;
 });
 
-document.getElementById('saveApiUrl')!.addEventListener('click', async () => {
+document.getElementById('connectBtn')!.addEventListener('click', async () => {
   const v = (document.getElementById('apiUrlInput') as HTMLInputElement).value.trim().replace(/\/$/, '');
-  if (!v) return;
-  apiBase = v;
-  localStorage.setItem('st-api', apiBase);
+  if (v) { apiBase = v; localStorage.setItem('st-api', apiBase); }
   document.getElementById('settingsPanel')!.hidden = true;
-  wasConnected = false;
-  await poll();
+  await connect();
+});
+
+document.getElementById('apiUrlInput')!.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') (document.getElementById('connectBtn') as HTMLButtonElement).click();
 });
 
 document.getElementById('timerBtn')!.addEventListener('click', async () => {
   const select = document.getElementById('categorySelect') as HTMLSelectElement;
-
   if (activeSession) {
     try {
       await api(`/sessions/stop/${activeSession.id}`, { method: 'POST' });
-      activeSession = null;
-      stopClock();
-      updateTimerBtn();
+      activeSession = null; stopClock(); updateTimerBtn();
       const [stats, sessions] = await Promise.all([
         api<StatsResponse>(`/stats/${currentPeriod}`),
         api<any[]>('/sessions'),
       ]);
-      currentStats = stats;
-      computeBlob(stats.categories);
-      renderCategoryList(stats);
-      renderHistory(sessions);
+      buildPolyhedron(stats.categories); renderCategoryList(stats); renderHistory(sessions);
     } catch (e) { console.error('Stop failed:', e); }
   } else {
     const catId = parseInt(select.value);
     if (!catId) return;
     try {
       const sess = await api<{ id: number; category_id: number; started_at: string }>('/sessions/start', {
-        method: 'POST',
-        body: JSON.stringify({ category_id: catId }),
+        method: 'POST', body: JSON.stringify({ category_id: catId }),
       });
       const cat = categories.find(c => c.id === catId);
-      activeSession = { ...sess, category_name: cat?.name ?? '', color: cat?.color ?? '' };
-      startClock(sess.started_at);
-      updateTimerBtn();
+      activeSession = { ...sess, category_name: cat?.name ?? '', color: '' };
+      startClock(sess.started_at); updateTimerBtn();
     } catch (e) { console.error('Start failed:', e); }
   }
 });
@@ -937,14 +887,13 @@ document.getElementById('timerBtn')!.addEventListener('click', async () => {
 document.getElementById('categorySelect')!.addEventListener('change', updateTimerBtn);
 
 document.getElementById('addCatBtn')!.addEventListener('click', async () => {
-  const nameEl  = document.getElementById('newCatName') as HTMLInputElement;
-  const colorEl = document.getElementById('newCatColor') as HTMLInputElement;
-  const name    = nameEl.value.trim();
+  const nameEl = document.getElementById('newCatName') as HTMLInputElement;
+  const name   = nameEl.value.trim();
   if (!name || !wasConnected) return;
   try {
     const cat = await api<Category>('/categories', {
       method: 'POST',
-      body: JSON.stringify({ name, color: colorEl.value }),
+      body: JSON.stringify({ name, color: '#4ade80' }),
     });
     categories.push(cat);
     nameEl.value = '';
@@ -973,35 +922,20 @@ document.querySelectorAll<HTMLButtonElement>('.period-tab').forEach(btn => {
     document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentPeriod = btn.dataset.period as typeof currentPeriod;
-    await refreshStats();
+    if (wasConnected) await refreshStats();
   });
 });
 
-// ── Poll / init ───────────────────────────────────────────────────
-async function poll() {
-  try {
-    await api('/health');
-    setConnected(true);
-    if (!wasConnected) {
-      wasConnected = true;
-      await loadAll();
-    }
-  } catch {
-    setConnected(false);
-    if (wasConnected) {
-      wasConnected = false;
-      computeBlob([]);
-      updateTimerBtn();
-    }
-  }
-}
-
-// Init Three.js then start polling
+// ── Init ──────────────────────────────────────────────────────────
 const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
 initThree(canvas);
-poll();
-setInterval(poll, 15_000);
 
-// Refresh stats while a session is running (keeps blob shape current)
-setInterval(async () => { if (activeSession && wasConnected) await refreshStats(); }, 60_000);
+// Pre-fill saved URL; show settings panel open so user can Connect.
+(document.getElementById('apiUrlInput') as HTMLInputElement).value = apiBase;
+// Auto-connect only if the user has previously saved a URL.
+if (localStorage.getItem('st-api')) {
+  document.getElementById('settingsPanel')!.hidden = true;
+  connect();
+  setInterval(() => { if (wasConnected) refreshStats(); }, 15_000);
+}
 </script>
