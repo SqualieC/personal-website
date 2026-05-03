@@ -550,15 +550,17 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
 // ── Three.js setup ────────────────────────────────────────────────
 function initThree(canvas: HTMLCanvasElement) {
   scene = new THREE.Scene();
-  const w = canvas.clientWidth || 400;
-  const h = canvas.clientHeight || 400;
+  // Initialize module-level dims immediately so label projection is correct
+  // before the async ResizeObserver fires.
+  canvasW = canvas.clientWidth || 400;
+  canvasH = canvas.clientHeight || 400;
 
-  camera = new THREE.PerspectiveCamera(48, w / h, 0.1, 100);
+  camera = new THREE.PerspectiveCamera(48, canvasW / canvasH, 0.1, 100);
   camera.position.set(0, 0, 4.2);
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(w, h, false);
+  renderer.setSize(canvasW, canvasH, false);
   renderer.setClearColor(0x000000, 0);
 
   // Lights affect MeshPhongMaterial fill
@@ -575,7 +577,9 @@ function initThree(canvas: HTMLCanvasElement) {
   controls.dampingFactor   = 0.06;
   controls.autoRotate      = true;
   controls.autoRotateSpeed = 0.5;
-  controls.enableZoom      = false;
+  controls.enableZoom      = true;
+  controls.minDistance     = 2.0;
+  controls.maxDistance     = 9.0;
   controls.enablePan       = false;
 
   new ResizeObserver(() => {
