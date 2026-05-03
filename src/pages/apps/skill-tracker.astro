@@ -119,7 +119,7 @@ import Layout from '../../layouts/Layout.astro';
 
   .vertex-label {
     position: absolute;
-    transform: translate(-50%, -150%);
+    transform: translate(-50%, -50%);
     font-size: 0.72rem;
     font-weight: 500;
     color: var(--text);
@@ -524,7 +524,7 @@ let camera: THREE.PerspectiveCamera;
 let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 let polyGroup: THREE.Group | null = null;
-let vertexData: { pos: THREE.Vector3; name: string; proportion: number }[] = [];
+let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; name: string; proportion: number }[] = [];
 let labelEls: HTMLElement[] = [];
 
 // ── API ───────────────────────────────────────────────────────────
@@ -609,13 +609,13 @@ function buildPolyhedron(cats: StatsCat[]) {
 
   // Position each vertex: 0-proportion → sits near origin (0.06),
   // full proportion → MAX_R out along its axis.
-  vertexData = cats.map(c => ({
-    pos: new THREE.Vector3(...c.axis).multiplyScalar(
+  vertexData = cats.map(c => {
+    const pos = new THREE.Vector3(...c.axis).multiplyScalar(
       (c.proportion > 0 ? c.proportion : 0.06) * MAX_R
-    ),
-    name: c.name,
-    proportion: c.proportion,
-  }));
+    );
+    const tipPos = pos.clone().addScaledVector(pos.clone().normalize(), 0.35);
+    return { pos, tipPos, name: c.name, proportion: c.proportion };
+  });
 
   polyGroup = new THREE.Group();
   scene.add(polyGroup);
@@ -653,8 +653,15 @@ function buildPolyhedron(cats: StatsCat[]) {
     opacity:     0.28,
   })));
 
+  // ── Leader lines: short extension from vertex outward to label tip ──
+  const leaderPts = vertexData.flatMap(v => [v.pos.clone(), v.tipPos.clone()]);
+  const leaderGeo = new THREE.BufferGeometry().setFromPoints(leaderPts);
+  polyGroup.add(new THREE.LineSegments(leaderGeo, new THREE.LineBasicMaterial({
+    color: SHAPE_COLOR,
+  })));
+
   // ── Vertex marker spheres ─────────────────────────────────────
-  const markerGeo = new THREE.SphereGeometry(0.055, 10, 8);
+  const markerGeo = new THREE.SphereGeometry(0.028, 10, 8);
   const markerMat = new THREE.MeshBasicMaterial({ color: SHAPE_COLOR });
   vertexData.forEach(v => {
     const m = new THREE.Mesh(markerGeo, markerMat);
@@ -688,12 +695,12 @@ function animate() {
     const label = labelEls[i];
     if (!label) return;
 
-    const proj = v.pos.clone().project(camera);
+    const proj = v.tipPos.clone().project(camera);
     const x = (proj.x + 1) / 2 * cw;
     const y = (-proj.y + 1) / 2 * ch;
 
     // Dim labels on the far side of the shape
-    const toV = v.pos.clone().sub(camera.position);
+    const toV = v.tipPos.clone().sub(camera.position);
     const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
     label.style.left = `${x}px`;
