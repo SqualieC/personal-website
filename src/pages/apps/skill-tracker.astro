@@ -523,7 +523,7 @@ let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 let polyGroup: THREE.Group | null = null;
 let labelRenderer: CSS2DRenderer;
-let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; name: string; proportion: number }[] = [];
+let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; labelPos: THREE.Vector3; name: string; proportion: number }[] = [];
 let labelObjs: CSS2DObject[] = [];
 let labelEls:  HTMLElement[] = [];
 let canvasW = 400, canvasH = 400;
@@ -636,8 +636,10 @@ function buildPolyhedron(cats: StatsCat[]) {
     const pos = new THREE.Vector3(...c.axis).multiplyScalar(
       (c.proportion > 0 ? c.proportion : 0.06) * MAX_R
     );
-    const tipPos = pos.clone().addScaledVector(pos.clone().normalize(), 0.35);
-    return { pos, tipPos, name: c.name, proportion: c.proportion };
+    const dir = pos.clone().normalize();
+    const tipPos   = pos.clone().addScaledVector(dir, 0.35); // leader line ends here
+    const labelPos = pos.clone().addScaledVector(dir, 0.58); // label sits further out (gap)
+    return { pos, tipPos, labelPos, name: c.name, proportion: c.proportion };
   });
 
   polyGroup = new THREE.Group();
@@ -699,7 +701,7 @@ function buildPolyhedron(cats: StatsCat[]) {
     el.className = 'vertex-label';
     el.textContent = pct > 0 ? `${v.name} ${pct}%` : v.name;
     const obj = new CSS2DObject(el);
-    obj.position.copy(v.tipPos);
+    obj.position.copy(v.labelPos);
     scene.add(obj);
     labelObjs.push(obj);
     labelEls.push(el);
@@ -711,13 +713,12 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  // Dim labels whose vertex is on the far side of the shape from the camera
-  const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  // Dim labels whose axis faces away from the camera (back side of the shape)
   vertexData.forEach((v, i) => {
     const label = labelEls[i];
     if (!label) return;
-    const toV = v.tipPos.clone().sub(camera.position);
-    label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
+    // Positive dot = vertex axis points toward camera = front face
+    label.style.opacity = v.pos.dot(camera.position) > 0 ? '1' : '0.28';
   });
 
   renderer.render(scene, camera);
