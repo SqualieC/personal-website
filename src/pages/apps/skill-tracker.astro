@@ -577,6 +577,11 @@ const EPS_POINTS  = [
   new THREE.Vector3( 0,      0,      0.001),
   new THREE.Vector3(-0.001,  0,      0    ),
 ];
+const PALETTE = [
+  '#4ade80', '#60a5fa', '#f472b6', '#fb923c',
+  '#a78bfa', '#34d399', '#fbbf24', '#f87171',
+  '#38bdf8', '#c084fc',
+];
 
 const API = 'https://korean-srs.squaliekid55.workers.dev';
 let categories: Category[]       = [];
@@ -592,7 +597,7 @@ let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 let polyGroup: THREE.Group | null = null;
 let labelRenderer: CSS2DRenderer;
-let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; labelPos: THREE.Vector3; name: string; proportion: number }[] = [];
+let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; labelPos: THREE.Vector3; name: string; proportion: number; color: string }[] = [];
 let labelObjs: CSS2DObject[] = [];
 let labelEls:  HTMLElement[] = [];
 let canvasW = 400, canvasH = 400;
@@ -645,7 +650,7 @@ function initThree(canvas: HTMLCanvasElement) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping   = true;
   controls.dampingFactor   = 0.06;
-  controls.rotateSpeed     = -1;
+  controls.rotateSpeed     = 1;
   controls.autoRotate      = true;
   controls.autoRotateSpeed = 0.5;
   controls.enableZoom      = true;
@@ -711,14 +716,15 @@ function buildPolyhedron(cats: StatsCat[]) {
 
   // Position each vertex: 0-proportion → sits near origin (0.06),
   // full proportion → MAX_R out along its axis.
-  vertexData = cats.map(c => {
+  vertexData = cats.map((c, i) => {
+    const color = PALETTE[i % PALETTE.length];
     const pos = new THREE.Vector3(...c.axis).multiplyScalar(
       (c.proportion > 0 ? c.proportion : 0.06) * MAX_R
     );
     const dir = pos.clone().normalize();
-    const tipPos   = pos.clone().addScaledVector(dir, 0.35); // leader line ends here
-    const labelPos = pos.clone().addScaledVector(dir, 0.58); // label sits further out (gap)
-    return { pos, tipPos, labelPos, name: c.name, proportion: c.proportion };
+    const tipPos   = pos.clone().addScaledVector(dir, 0.35);
+    const labelPos = pos.clone().addScaledVector(dir, 0.58);
+    return { pos, tipPos, labelPos, name: c.name, proportion: c.proportion, color };
   });
 
   polyGroup = new THREE.Group();
@@ -765,10 +771,9 @@ function buildPolyhedron(cats: StatsCat[]) {
   })));
 
   // ── Vertex marker spheres ─────────────────────────────────────
-  const markerGeo = new THREE.SphereGeometry(0.028, 10, 8);
-  const markerMat = new THREE.MeshBasicMaterial({ color: SHAPE_COLOR });
+  const markerGeo = new THREE.SphereGeometry(0.032, 10, 8);
   vertexData.forEach(v => {
-    const m = new THREE.Mesh(markerGeo, markerMat);
+    const m = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: v.color }));
     m.position.copy(v.pos);
     polyGroup!.add(m);
   });
@@ -779,6 +784,7 @@ function buildPolyhedron(cats: StatsCat[]) {
     const el = document.createElement('div');
     el.className = 'vertex-label';
     el.textContent = pct > 0 ? `${v.name} ${pct}%` : v.name;
+    el.style.borderColor = v.color + '99';
     const obj = new CSS2DObject(el);
     obj.position.copy(v.labelPos);
     scene.add(obj);
@@ -884,13 +890,14 @@ function renderBarChart(cats: StatsCat[]) {
     return;
   }
   const max = Math.max(...cats.map(c => c.total_seconds), 1);
-  cats.forEach(c => {
+  cats.forEach((c, i) => {
+    const color = PALETTE[i % PALETTE.length];
     const pct = Math.round((c.total_seconds / max) * 100);
     const row = document.createElement('div');
     row.className = 'chart-row';
     row.innerHTML = `
       <span class="chart-name">${c.name}</span>
-      <div class="chart-bar-bg"><div class="chart-bar-fg" style="width:${pct}%"></div></div>
+      <div class="chart-bar-bg"><div class="chart-bar-fg" style="width:${pct}%;background:${color}"></div></div>
       <span class="chart-dur">${c.total_seconds > 0 ? fmtDuration(c.total_seconds) : '—'}</span>`;
     container.appendChild(row);
   });
