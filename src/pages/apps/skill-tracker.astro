@@ -17,7 +17,7 @@ import Layout from '../../layouts/Layout.astro';
     <!-- ── Blob viewer ──────────────────────────────────────────── -->
     <div class="blob-panel">
       <canvas id="blobCanvas"></canvas>
-      <div id="labelsOverlay" class="labels-overlay"></div>
+      <!-- CSS2DRenderer injects its own overlay div here at runtime -->
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="week">This Week</button>
@@ -112,20 +112,9 @@ import Layout from '../../layouts/Layout.astro';
     border-radius: 1.5rem; /* clips WebGL rendering to match panel corners */
   }
 
-  /* ── Vertex labels overlay ───────────────────────────────────── */
-  .labels-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
+  /* ── Vertex labels (CSS2DRenderer overlay) ───────────────────── */
+  /* CSS2DRenderer injects position:absolute on its container and each label */
   .vertex-label {
-    position: fixed;
-    left: 0;
-    top: 0;
-    /* Positioned in viewport coords via JS transform. Off-screen until first
-       valid projection so they don't flash at (0,0) on load. */
-    transform: translate(-9999px, -9999px);
     font-size: 0.72rem;
     font-weight: 500;
     color: var(--text);
@@ -136,6 +125,8 @@ import Layout from '../../layouts/Layout.astro';
     white-space: nowrap;
     border: 1px solid color-mix(in srgb, #4ade80, transparent 45%);
     transition: opacity 0.15s;
+    pointer-events: none;
+    user-select: none;
   }
 
   /* ── Period tabs ─────────────────────────────────────────────── */
@@ -475,6 +466,7 @@ import Layout from '../../layouts/Layout.astro';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface Category {
@@ -530,10 +522,10 @@ let camera: THREE.PerspectiveCamera;
 let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 let polyGroup: THREE.Group | null = null;
+let labelRenderer: CSS2DRenderer;
 let vertexData: { pos: THREE.Vector3; tipPos: THREE.Vector3; name: string; proportion: number }[] = [];
-let labelEls: HTMLElement[] = [];
-// Cached canvas dimensions — updated by ResizeObserver, used in animate().
-// Avoids querying clientWidth (which can be 0 during early layout) every frame.
+let labelObjs: CSS2DObject[] = [];
+let labelEls:  HTMLElement[] = [];
 let canvasW = 400, canvasH = 400;
 
 // ── API ───────────────────────────────────────────────────────────
@@ -582,12 +574,27 @@ function initThree(canvas: HTMLCanvasElement) {
   controls.maxDistance     = 9.0;
   controls.enablePan       = false;
 
+  // CSS2DRenderer overlays HTML labels exactly on top of the WebGL canvas.
+  // It manages its own absolutely-positioned container and handles all 3D→2D
+  // projection internally, so we never need to manually compute screen coords.
+  labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(canvasW, canvasH);
+  const lr = labelRenderer.domElement;
+  lr.style.position = 'absolute';
+  lr.style.top      = '0';
+  lr.style.left     = '0';
+  lr.style.width    = '100%';
+  lr.style.height   = '100%';
+  lr.style.pointerEvents = 'none';
+  canvas.parentElement!.appendChild(lr);
+
   new ResizeObserver(() => {
     canvasW = canvas.clientWidth;
     canvasH = canvas.clientHeight;
     camera.aspect = canvasW / canvasH;
     camera.updateProjectionMatrix();
     renderer.setSize(canvasW, canvasH, false);
+    labelRenderer.setSize(canvasW, canvasH);
   }).observe(canvas);
 
   animate();
@@ -610,8 +617,9 @@ function disposePolyGroup() {
 
 function buildPolyhedron(cats: StatsCat[]) {
   disposePolyGroup();
-  labelEls.forEach(el => el.remove());
-  labelEls = [];
+  labelObjs.forEach(obj => scene.remove(obj));
+  labelObjs = [];
+  labelEls  = [];
   vertexData = [];
 
   const noData = document.getElementById('noDataMsg')!;
@@ -684,14 +692,16 @@ function buildPolyhedron(cats: StatsCat[]) {
     polyGroup!.add(m);
   });
 
-  // ── HTML labels ───────────────────────────────────────────────
-  const overlay = document.getElementById('labelsOverlay')!;
+  // ── CSS2D labels — positioned in world space, projected by CSS2DRenderer ──
   vertexData.forEach(v => {
     const pct = Math.round(v.proportion * 100);
     const el = document.createElement('div');
     el.className = 'vertex-label';
     el.textContent = pct > 0 ? `${v.name} ${pct}%` : v.name;
-    overlay.appendChild(el);
+    const obj = new CSS2DObject(el);
+    obj.position.copy(v.tipPos);
+    scene.add(obj);
+    labelObjs.push(obj);
     labelEls.push(el);
   });
 }
@@ -701,35 +711,17 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  camera.updateMatrixWorld();
-
-  if (labelEls.length > 0) {
-    // getBoundingClientRect gives the exact viewport position of the canvas —
-    // no stale cache, no ancestor-offset guesswork. Labels use position:fixed
-    // so they're positioned in the same viewport coordinate space.
-    const cr = renderer.domElement.getBoundingClientRect();
-    if (cr.width > 0 && cr.height > 0) {
-      vertexData.forEach((v, i) => {
-        const label = labelEls[i];
-        if (!label) return;
-
-        const proj = v.tipPos.clone().project(camera);
-        if (!isFinite(proj.x) || !isFinite(proj.y) || proj.z > 1) return;
-
-        // NDC → viewport pixel (same coordinate space as position:fixed)
-        const vpX = cr.left + (proj.x  + 1) / 2 * cr.width;
-        const vpY = cr.top  + (-proj.y + 1) / 2 * cr.height;
-
-        // Dim labels behind the shape
-        const toV = v.tipPos.clone().sub(camera.position);
-        const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
-        label.style.transform = `translate(calc(${vpX}px - 50%), calc(${vpY}px - 50%))`;
-      });
-    }
-  }
+  // Dim labels whose vertex is on the far side of the shape from the camera
+  const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  vertexData.forEach((v, i) => {
+    const label = labelEls[i];
+    if (!label) return;
+    const toV = v.tipPos.clone().sub(camera.position);
+    label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
+  });
 
   renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
 }
 
 // ── UI helpers ────────────────────────────────────────────────────
