@@ -20,7 +20,8 @@ import Layout from '../../layouts/Layout.astro';
       <!-- CSS2DRenderer injects its own overlay div here at runtime -->
 
       <div class="period-tabs">
-        <button class="period-tab active" data-period="week">This Week</button>
+        <button class="period-tab active" data-period="today">Today</button>
+        <button class="period-tab" data-period="week">This Week</button>
         <button class="period-tab" data-period="year">This Year</button>
         <button class="period-tab" data-period="lifetime">Lifetime</button>
       </div>
@@ -512,7 +513,7 @@ const EPS_POINTS  = [
 let apiBase = (localStorage.getItem('st-api') ?? 'http://localhost:8000').replace(/\/$/, '');
 let categories: Category[]       = [];
 let activeSession: ActiveSession | null = null;
-let currentPeriod: 'week' | 'year' | 'lifetime' = 'week';
+let currentPeriod: 'today' | 'week' | 'year' | 'lifetime' = 'today';
 let clockInterval: ReturnType<typeof setInterval> | null = null;
 let wasConnected = false;
 
