@@ -120,11 +120,11 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   .vertex-label {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
-    /* transform is set entirely by JS — no CSS transform so NaN frames don't
-       leave a stale visual. Off-screen until the first valid projection. */
+    /* Positioned in viewport coords via JS transform. Off-screen until first
+       valid projection so they don't flash at (0,0) on load. */
     transform: translate(-9999px, -9999px);
     font-size: 0.72rem;
     font-weight: 500;
@@ -703,27 +703,30 @@ function animate() {
 
   camera.updateMatrixWorld();
 
-  // Read CSS size each frame — avoids stale cached values when buffer and
-  // CSS dimensions diverge (e.g. before ResizeObserver fires on first load).
-  const cw = renderer.domElement.clientWidth;
-  const ch = renderer.domElement.clientHeight;
+  if (labelEls.length > 0) {
+    // getBoundingClientRect gives the exact viewport position of the canvas —
+    // no stale cache, no ancestor-offset guesswork. Labels use position:fixed
+    // so they're positioned in the same viewport coordinate space.
+    const cr = renderer.domElement.getBoundingClientRect();
+    if (cr.width > 0 && cr.height > 0) {
+      vertexData.forEach((v, i) => {
+        const label = labelEls[i];
+        if (!label) return;
 
-  if (cw > 0 && ch > 0) {
-    vertexData.forEach((v, i) => {
-      const label = labelEls[i];
-      if (!label) return;
+        const proj = v.tipPos.clone().project(camera);
+        if (!isFinite(proj.x) || !isFinite(proj.y) || proj.z > 1) return;
 
-      const proj = v.tipPos.clone().project(camera);
-      if (!isFinite(proj.x) || !isFinite(proj.y) || proj.z > 1) return;
-      const x = (proj.x + 1) / 2 * cw;
-      const y = (-proj.y + 1) / 2 * ch;
+        // NDC → viewport pixel (same coordinate space as position:fixed)
+        const vpX = cr.left + (proj.x  + 1) / 2 * cr.width;
+        const vpY = cr.top  + (-proj.y + 1) / 2 * cr.height;
 
-      // Dim labels on the far side of the shape
-      const toV = v.tipPos.clone().sub(camera.position);
-      const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
-      label.style.transform = `translate(calc(${x}px - 50%), calc(${y}px - 50%))`;
-    });
+        // Dim labels behind the shape
+        const toV = v.tipPos.clone().sub(camera.position);
+        const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
+        label.style.transform = `translate(calc(${vpX}px - 50%), calc(${vpY}px - 50%))`;
+      });
+    }
   }
 
   renderer.render(scene, camera);
