@@ -702,21 +702,29 @@ function animate() {
   controls.update();
 
   camera.updateMatrixWorld();
-  vertexData.forEach((v, i) => {
-    const label = labelEls[i];
-    if (!label) return;
 
-    const proj = v.tipPos.clone().project(camera);
-    if (!isFinite(proj.x) || !isFinite(proj.y)) return;
-    const x = (proj.x + 1) / 2 * canvasW;
-    const y = (-proj.y + 1) / 2 * canvasH;
+  // Read CSS size each frame — avoids stale cached values when buffer and
+  // CSS dimensions diverge (e.g. before ResizeObserver fires on first load).
+  const cw = renderer.domElement.clientWidth;
+  const ch = renderer.domElement.clientHeight;
 
-    // Dim labels on the far side of the shape
-    const toV = v.tipPos.clone().sub(camera.position);
-    const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
-    label.style.transform = `translate(calc(${x}px - 50%), calc(${y}px - 50%))`;
-  });
+  if (cw > 0 && ch > 0) {
+    vertexData.forEach((v, i) => {
+      const label = labelEls[i];
+      if (!label) return;
+
+      const proj = v.tipPos.clone().project(camera);
+      if (!isFinite(proj.x) || !isFinite(proj.y) || proj.z > 1) return;
+      const x = (proj.x + 1) / 2 * cw;
+      const y = (-proj.y + 1) / 2 * ch;
+
+      // Dim labels on the far side of the shape
+      const toV = v.tipPos.clone().sub(camera.position);
+      const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      label.style.opacity = toV.dot(camFwd) > 0 ? '1' : '0.3';
+      label.style.transform = `translate(calc(${x}px - 50%), calc(${y}px - 50%))`;
+    });
+  }
 
   renderer.render(scene, camera);
 }
