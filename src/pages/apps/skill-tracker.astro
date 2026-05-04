@@ -438,7 +438,7 @@ import Layout from '../../layouts/Layout.astro';
   .chart-rows {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: 0.6rem;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
@@ -886,19 +886,41 @@ function renderBarChart(cats: StatsCat[]) {
   const container = document.getElementById('barChartRows')!;
   container.innerHTML = '';
   if (cats.length === 0 || cats.every(c => c.total_seconds === 0)) {
-    container.innerHTML = '<p class="chart-empty">No data for this period.</p>';
+    const p = document.createElement('p');
+    p.style.cssText = 'color:var(--muted);font-size:0.78rem;margin:0';
+    p.textContent = 'No data for this period.';
+    container.appendChild(p);
     return;
   }
-  const max = Math.max(...cats.map(c => c.total_seconds), 1);
-  cats.forEach((c, i) => {
-    const color = PALETTE[i % PALETTE.length];
+  // Sort descending by time, preserving original index for palette consistency with the 3D render
+  const sorted = cats
+    .map((c, i) => ({ ...c, origIdx: i }))
+    .sort((a, b) => b.total_seconds - a.total_seconds);
+  const max = sorted[0].total_seconds;
+  sorted.forEach(c => {
+    const color = PALETTE[c.origIdx % PALETTE.length];
     const pct = Math.round((c.total_seconds / max) * 100);
+
     const row = document.createElement('div');
-    row.className = 'chart-row';
-    row.innerHTML = `
-      <span class="chart-name">${c.name}</span>
-      <div class="chart-bar-bg"><div class="chart-bar-fg" style="width:${pct}%;background:${color}"></div></div>
-      <span class="chart-dur">${c.total_seconds > 0 ? fmtDuration(c.total_seconds) : '—'}</span>`;
+    row.style.cssText = 'display:flex;align-items:center;gap:0.5rem';
+
+    const name = document.createElement('span');
+    name.style.cssText = 'width:5.5rem;flex-shrink:0;font-size:0.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    name.textContent = c.name;
+
+    const barBg = document.createElement('div');
+    barBg.style.cssText = 'flex:1;height:7px;background:color-mix(in srgb,var(--muted),transparent 80%);border-radius:999px;overflow:hidden';
+    const barFg = document.createElement('div');
+    barFg.style.cssText = `height:100%;border-radius:999px;background:${color};width:${pct}%;transition:width 0.4s ease`;
+    barBg.appendChild(barFg);
+
+    const dur = document.createElement('span');
+    dur.style.cssText = 'width:3.5rem;flex-shrink:0;font-size:0.73rem;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap';
+    dur.textContent = c.total_seconds > 0 ? fmtDuration(c.total_seconds) : '—';
+
+    row.appendChild(name);
+    row.appendChild(barBg);
+    row.appendChild(dur);
     container.appendChild(row);
   });
 }
