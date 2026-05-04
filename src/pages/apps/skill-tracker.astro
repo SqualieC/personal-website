@@ -31,45 +31,55 @@ import Layout from '../../layouts/Layout.astro';
       </div>
     </div>
 
-    <!-- ── Control panel ────────────────────────────────────────── -->
-    <aside class="control-panel">
+    <!-- ── Right column (control panel + bar chart) ─────────────── -->
+    <div class="right-col">
 
-      <div class="conn-header">
-        <div class="conn-status">
-          <span id="connDot" class="conn-dot"></span>
-          <span id="connLabel">Not signed in</span>
+      <aside class="control-panel">
+
+        <div class="conn-header">
+          <div class="conn-status">
+            <span id="connDot" class="conn-dot"></span>
+            <span id="connLabel">Not signed in</span>
+          </div>
         </div>
-      </div>
-      <p id="signInHint" class="settings-hint" style="margin:0">
-        Sign in via the account button above to track your skills.
-      </p>
+        <p id="signInHint" class="settings-hint" style="margin:0">
+          Sign in via the account button above to track your skills.
+        </p>
 
-      <div id="activeBanner" class="active-banner" hidden>
-        <span class="conn-dot active pulse"></span>
-        <span id="activeCatName">—</span>
-        <span id="activeClock" class="active-clock">00:00:00</span>
-      </div>
-
-      <div class="cp-card">
-        <h3 class="cp-card-title">Log Time</h3>
-        <select id="categorySelect" class="cp-select">
-          <option value="">Select a skill…</option>
-        </select>
-        <button id="timerBtn" class="timer-btn" disabled>
-          <span id="timerBtnLabel">▶ Start</span>
-        </button>
-      </div>
-
-      <div class="cp-card">
-        <h3 class="cp-card-title">Skills</h3>
-        <ul id="categoryList" class="cat-list"></ul>
-        <div class="add-cat-row">
-          <input id="newCatName" class="cp-input" placeholder="New skill…" maxlength="32" />
-          <button id="addCatBtn" class="btn-sm">Add</button>
+        <div id="activeBanner" class="active-banner" hidden>
+          <span class="conn-dot active pulse"></span>
+          <span id="activeCatName">—</span>
+          <span id="activeClock" class="active-clock">00:00:00</span>
         </div>
+
+        <div class="cp-card">
+          <h3 class="cp-card-title">Log Time</h3>
+          <select id="categorySelect" class="cp-select">
+            <option value="">Select a skill…</option>
+          </select>
+          <button id="timerBtn" class="timer-btn" disabled>
+            <span id="timerBtnLabel">▶ Start</span>
+          </button>
+        </div>
+
+        <div class="cp-card">
+          <h3 class="cp-card-title">Skills</h3>
+          <ul id="categoryList" class="cat-list"></ul>
+          <div class="add-cat-row">
+            <input id="newCatName" class="cp-input" placeholder="New skill…" maxlength="32" />
+            <button id="addCatBtn" class="btn-sm">Add</button>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- ── Bar chart ──────────────────────────────────────────── -->
+      <div class="cp-card chart-card">
+        <h3 class="cp-card-title">Distribution</h3>
+        <div id="barChartRows" class="chart-rows"></div>
       </div>
 
-    </aside>
+    </div>
   </section>
 
   <section class="history-section">
@@ -85,13 +95,14 @@ import Layout from '../../layouts/Layout.astro';
     grid-template-columns: 1fr 300px;
     gap: 1.25rem;
     margin: 1.5rem 0;
-    align-items: start;
+    align-items: stretch;
   }
 
   /* ── Blob panel ──────────────────────────────────────────────── */
   .blob-panel {
     position: relative;
     aspect-ratio: 1;
+    align-self: start;
     background: var(--bg-soft);
     border-radius: 1.5rem;
     /* No overflow:hidden — border-radius on the canvas clips the 3D content
@@ -171,6 +182,12 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   /* ── Control panel ───────────────────────────────────────────── */
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
   .control-panel {
     display: flex;
     flex-direction: column;
@@ -339,7 +356,7 @@ import Layout from '../../layouts/Layout.astro';
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    max-height: 220px;
+    max-height: 185px;
     overflow-y: auto;
   }
 
@@ -410,6 +427,64 @@ import Layout from '../../layouts/Layout.astro';
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  /* ── Bar chart ───────────────────────────────────────────────── */
+  .chart-card {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .chart-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .chart-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 3.5rem;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .chart-name {
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chart-bar-bg {
+    height: 7px;
+    background: color-mix(in srgb, var(--muted), transparent 80%);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .chart-bar-fg {
+    height: 100%;
+    background: #4ade80;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+  }
+
+  .chart-dur {
+    font-size: 0.73rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .chart-empty {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin: 0;
   }
 
   /* ── History ─────────────────────────────────────────────────── */
@@ -801,6 +876,26 @@ function renderHistory(sessions: any[]) {
   });
 }
 
+function renderBarChart(cats: StatsCat[]) {
+  const container = document.getElementById('barChartRows')!;
+  container.innerHTML = '';
+  if (cats.length === 0 || cats.every(c => c.total_seconds === 0)) {
+    container.innerHTML = '<p class="chart-empty">No data for this period.</p>';
+    return;
+  }
+  const max = Math.max(...cats.map(c => c.total_seconds), 1);
+  cats.forEach(c => {
+    const pct = Math.round((c.total_seconds / max) * 100);
+    const row = document.createElement('div');
+    row.className = 'chart-row';
+    row.innerHTML = `
+      <span class="chart-name">${c.name}</span>
+      <div class="chart-bar-bg"><div class="chart-bar-fg" style="width:${pct}%"></div></div>
+      <span class="chart-dur">${c.total_seconds > 0 ? fmtDuration(c.total_seconds) : '—'}</span>`;
+    container.appendChild(row);
+  });
+}
+
 function startClock(startedAt: string) {
   stopClock();
   const banner = document.getElementById('activeBanner')!;
@@ -838,6 +933,7 @@ async function loadAll() {
   ]);
   categories = cats;
   buildPolyhedron(stats.categories);
+  renderBarChart(stats.categories);
   renderCategoryList(stats);
   renderHistory(sessions);
   activeSession = active;
@@ -849,6 +945,7 @@ async function refreshStats() {
   try {
     const stats = await api<StatsResponse>(`/stats/${currentPeriod}`);
     buildPolyhedron(stats.categories);
+    renderBarChart(stats.categories);
     renderCategoryList(stats);
   } catch {}
 }
@@ -860,6 +957,7 @@ async function connect() {
     wasConnected = false;
     document.getElementById('signInHint')!.hidden = false;
     buildPolyhedron([]);
+    renderBarChart([]);
     updateTimerBtn();
     return;
   }
@@ -872,6 +970,7 @@ async function connect() {
     setConnected(false);
     wasConnected = false;
     buildPolyhedron([]);
+    renderBarChart([]);
     updateTimerBtn();
   }
 }
@@ -891,7 +990,7 @@ document.getElementById('timerBtn')!.addEventListener('click', async () => {
         api<StatsResponse>(`/stats/${currentPeriod}`),
         api<any[]>('/sessions'),
       ]);
-      buildPolyhedron(stats.categories); renderCategoryList(stats); renderHistory(sessions);
+      buildPolyhedron(stats.categories); renderBarChart(stats.categories); renderCategoryList(stats); renderHistory(sessions);
     } catch (e) { console.error('Stop failed:', e); }
   } else {
     const catId = parseInt(select.value);
