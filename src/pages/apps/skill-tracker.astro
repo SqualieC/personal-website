@@ -9,7 +9,7 @@ import Layout from '../../layouts/Layout.astro';
   <section class="hero hero-surface">
     <p class="eyebrow">Personal Tool</p>
     <h1>Skill Tracker</h1>
-    <p class="lead">Log time across skills and watch your shape grow. Requires the local backend to be running.</p>
+    <p class="lead">Log time across skills and watch your shape grow. Sign in to sync across devices.</p>
   </section>
 
   <section class="tracker-shell">
@@ -37,19 +37,12 @@ import Layout from '../../layouts/Layout.astro';
       <div class="conn-header">
         <div class="conn-status">
           <span id="connDot" class="conn-dot"></span>
-          <span id="connLabel">Not connected</span>
+          <span id="connLabel">Not signed in</span>
         </div>
-        <button id="settingsToggle" class="icon-btn" title="Backend settings">⚙</button>
       </div>
-
-      <div id="settingsPanel" class="settings-panel">
-        <span class="settings-label">Backend URL</span>
-        <div class="settings-row">
-          <input id="apiUrlInput" class="settings-input" type="url" placeholder="http://localhost:8000" />
-          <button id="connectBtn" class="btn-sm">Connect</button>
-        </div>
-        <p class="settings-hint">Run <code>start.bat</code> inside <code>SkillTracker/backend/</code>, then click Connect.</p>
-      </div>
+      <p id="signInHint" class="settings-hint" style="margin:0">
+        Sign in via the account button above to track your skills.
+      </p>
 
       <div id="activeBanner" class="active-banner" hidden>
         <span class="conn-dot active pulse"></span>
@@ -510,7 +503,7 @@ const EPS_POINTS  = [
   new THREE.Vector3(-0.001,  0,      0    ),
 ];
 
-let apiBase = (localStorage.getItem('st-api') ?? 'http://localhost:8000').replace(/\/$/, '');
+const API = 'https://korean-srs.squaliekid55.workers.dev';
 let categories: Category[]       = [];
 let activeSession: ActiveSession | null = null;
 let currentPeriod: 'today' | 'week' | 'year' | 'lifetime' = 'today';
@@ -530,11 +523,20 @@ let labelEls:  HTMLElement[] = [];
 let canvasW = 400, canvasH = 400;
 
 // ── API ───────────────────────────────────────────────────────────
+function getToken(): string | null {
+  return localStorage.getItem('korean-srs-token');
+}
+
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${apiBase}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API}/st${path}`, { headers, ...opts });
+  if (res.status === 401) {
+    setConnected(false);
+    wasConnected = false;
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) throw new Error(await res.text());
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -729,8 +731,11 @@ function animate() {
 
 // ── UI helpers ────────────────────────────────────────────────────
 function setConnected(ok: boolean) {
-  document.getElementById('connDot')!.className   = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
-  document.getElementById('connLabel')!.textContent = ok ? 'Connected' : 'Not connected';
+  document.getElementById('connDot')!.className = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
+  const email = localStorage.getItem('korean-srs-email');
+  document.getElementById('connLabel')!.textContent = ok
+    ? (email ?? 'Connected')
+    : (getToken() ? 'Not connected' : 'Not signed in');
 }
 
 function fmtDuration(s: number): string {
@@ -850,10 +855,18 @@ async function refreshStats() {
 
 // ── Connection ────────────────────────────────────────────────────
 async function connect() {
+  if (!getToken()) {
+    setConnected(false);
+    wasConnected = false;
+    document.getElementById('signInHint')!.hidden = false;
+    buildPolyhedron([]);
+    updateTimerBtn();
+    return;
+  }
   try {
-    await api('/health');
     setConnected(true);
     wasConnected = true;
+    document.getElementById('signInHint')!.hidden = true;
     await loadAll();
   } catch {
     setConnected(false);
@@ -863,23 +876,9 @@ async function connect() {
   }
 }
 
-// ── Event handlers ────────────────────────────────────────────────
-document.getElementById('settingsToggle')!.addEventListener('click', () => {
-  const panel = document.getElementById('settingsPanel')!;
-  panel.hidden = !panel.hidden;
-  if (!panel.hidden)
-    (document.getElementById('apiUrlInput') as HTMLInputElement).value = apiBase;
-});
-
-document.getElementById('connectBtn')!.addEventListener('click', async () => {
-  const v = (document.getElementById('apiUrlInput') as HTMLInputElement).value.trim().replace(/\/$/, '');
-  if (v) { apiBase = v; localStorage.setItem('st-api', apiBase); }
-  document.getElementById('settingsPanel')!.hidden = true;
-  await connect();
-});
-
-document.getElementById('apiUrlInput')!.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') (document.getElementById('connectBtn') as HTMLButtonElement).click();
+// Re-connect whenever the user logs in/out (the Layout fires a storage event)
+window.addEventListener('storage', (e) => {
+  if (e.key === 'korean-srs-token') connect();
 });
 
 document.getElementById('timerBtn')!.addEventListener('click', async () => {
@@ -953,13 +952,6 @@ document.querySelectorAll<HTMLButtonElement>('.period-tab').forEach(btn => {
 // ── Init ──────────────────────────────────────────────────────────
 const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
 initThree(canvas);
-
-// Pre-fill saved URL; show settings panel open so user can Connect.
-(document.getElementById('apiUrlInput') as HTMLInputElement).value = apiBase;
-// Auto-connect only if the user has previously saved a URL.
-if (localStorage.getItem('st-api')) {
-  document.getElementById('settingsPanel')!.hidden = true;
-  connect();
-  setInterval(() => { if (wasConnected) refreshStats(); }, 15_000);
-}
+connect();
+setInterval(() => { if (wasConnected) refreshStats(); }, 15_000);
 </script>
