@@ -59,6 +59,7 @@ const beaconConfig = cfAnalyticsToken ? JSON.stringify({ token: cfAnalyticsToken
         <a href="/apps">Apps</a>
         <a href="/tools">Tools</a>
         <a href="/dles">Dles</a>
+        <a href="/map" id="mapNavLink" style="display:none">Map</a>
         <button id="authNavBtn" class="nav-auth-btn" type="button">Log In</button>
       </nav>
     </header>
@@ -130,6 +131,8 @@ const beaconConfig = cfAnalyticsToken ? JSON.stringify({ token: cfAnalyticsToken
         const email = getEmail();
         btn.textContent = email ? email.split('@')[0] : 'Log In';
         btn.classList.toggle('nav-auth-logged', !!email);
+        const mapLink = document.getElementById('mapNavLink');
+        if (mapLink) mapLink.style.display = email ? '' : 'none';
       }
 
       function openModal() {
