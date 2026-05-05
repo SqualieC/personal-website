@@ -4,5 +4,5 @@ compatibility_date = "2026-02-28"
 
 [[d1_databases]]
 binding       = "DB"
-database_name = "korean-srs-db"
-database_id   = "17d29743-2af4-4130-adcf-f8f9acf2cf50"
+database_name = "account-db"
+database_id   = "bf88a0bb-fd10-4811-a94c-9069fdfd4b5e"

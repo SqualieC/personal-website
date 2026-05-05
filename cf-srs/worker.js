@@ -432,6 +432,160 @@ export default {
       return json(await stStats(userId, '', []));
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // ── GPS Tracking endpoints (/gps/*) ─────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════════════
+
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // ── POST /gps/track?key=DEVICE_KEY ───────────────────────────────────────
+    // Accepts Overland GeoJSON batch format or simple { lat, lon, ... }
+    if (path === '/gps/track' && request.method === 'POST') {
+      const key = url.searchParams.get('key');
+      if (!key) return err('Missing key', 401);
+
+      const device = await env.DB
+        .prepare('SELECT id, user_id FROM gps_devices WHERE device_key = ?')
+        .bind(key).first();
+      if (!device) return err('Invalid key', 401);
+
+      let body;
+      try { body = await request.json(); } catch { return err('Invalid JSON'); }
+
+      const now = Math.floor(Date.now() / 1000);
+      let positions = [];
+
+      if (body.locations && Array.isArray(body.locations)) {
+        // Overland GeoJSON batch
+        for (const loc of body.locations) {
+          if (loc.geometry?.type !== 'Point') continue;
+          const [lon, lat, alt] = loc.geometry.coordinates;
+          const props = loc.properties ?? {};
+          const ts = props.timestamp
+            ? Math.floor(new Date(props.timestamp).getTime() / 1000)
+            : now;
+          positions.push({
+            lat, lon,
+            altitude: alt ?? props.altitude ?? null,
+            speed: props.speed ?? null,
+            accuracy: props.horizontal_accuracy ?? null,
+            battery: props.battery_level ?? null,
+            timestamp: ts,
+          });
+        }
+      } else if (body.lat !== undefined && body.lon !== undefined) {
+        positions.push({
+          lat: body.lat,
+          lon: body.lon,
+          altitude: body.altitude ?? null,
+          speed: body.speed ?? null,
+          accuracy: body.accuracy ?? null,
+          battery: body.battery ?? null,
+          timestamp: body.timestamp ? Math.floor(body.timestamp) : now,
+        });
+      }
+
+      if (!positions.length) return json({ result: 'ok', stored: 0 });
+
+      positions.sort((a, b) => a.timestamp - b.timestamp);
+
+      const lastStored = await env.DB
+        .prepare('SELECT lat, lon FROM gps_positions WHERE device_id = ? ORDER BY timestamp DESC LIMIT 1')
+        .bind(device.id).first();
+
+      let prevLat = lastStored?.lat;
+      let prevLon = lastStored?.lon;
+      const toInsert = [];
+
+      for (const pos of positions) {
+        if (prevLat !== undefined && prevLon !== undefined) {
+          if (haversineMeters(prevLat, prevLon, pos.lat, pos.lon) < 100) continue;
+        }
+        toInsert.push(pos);
+        prevLat = pos.lat;
+        prevLon = pos.lon;
+      }
+
+      if (toInsert.length > 0) {
+        const stmts = toInsert.map(pos =>
+          env.DB.prepare(
+            'INSERT INTO gps_positions (device_id, user_id, lat, lon, altitude, speed, accuracy, battery, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(device.id, device.user_id, pos.lat, pos.lon, pos.altitude, pos.speed, pos.accuracy, pos.battery, pos.timestamp)
+        );
+        await env.DB.batch(stmts);
+      }
+
+      const latest = positions[positions.length - 1];
+      await env.DB
+        .prepare('UPDATE gps_devices SET last_seen = ?, last_lat = ?, last_lon = ?, battery = ? WHERE id = ?')
+        .bind(now, latest.lat, latest.lon, latest.battery, device.id).run();
+
+      return json({ result: 'ok', stored: toInsert.length });
+    }
+
+    // ── GET /gps/devices ─────────────────────────────────────────────────────
+    if (path === '/gps/devices' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const { results } = await env.DB
+        .prepare('SELECT id, name, device_key, last_seen, last_lat, last_lon, battery FROM gps_devices WHERE user_id = ? ORDER BY id')
+        .bind(userId).all();
+      return json(results);
+    }
+
+    // ── POST /gps/devices ─────────────────────────────────────────────────────
+    // Body: { name }
+    if (path === '/gps/devices' && request.method === 'POST') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      let body; try { body = await request.json(); } catch { return err('Invalid JSON'); }
+      const name = (body?.name ?? '').trim();
+      if (!name) return err('Missing name');
+      const key = randomHex(24);
+      const { meta } = await env.DB
+        .prepare('INSERT INTO gps_devices (user_id, name, device_key) VALUES (?, ?, ?)')
+        .bind(userId, name, key).run();
+      return json({ id: meta.last_row_id, name, device_key: key });
+    }
+
+    // ── DELETE /gps/devices/:id ───────────────────────────────────────────────
+    if (path.startsWith('/gps/devices/') && request.method === 'DELETE') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const deviceId = parseInt(path.split('/')[3]);
+      if (!deviceId) return err('Invalid id');
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM gps_positions WHERE device_id = ? AND user_id = ?').bind(deviceId, userId),
+        env.DB.prepare('DELETE FROM gps_devices WHERE id = ? AND user_id = ?').bind(deviceId, userId),
+      ]);
+      return json({ ok: true });
+    }
+
+    // ── GET /gps/history?deviceId=X&hours=24 ─────────────────────────────────
+    if (path === '/gps/history' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const deviceId = parseInt(url.searchParams.get('deviceId') ?? '0');
+      const hours = Math.min(168, Math.max(1, parseInt(url.searchParams.get('hours') ?? '24')));
+      if (!deviceId) return err('Missing deviceId');
+      const device = await env.DB
+        .prepare('SELECT id FROM gps_devices WHERE id = ? AND user_id = ?')
+        .bind(deviceId, userId).first();
+      if (!device) return err('Device not found', 404);
+      const since = Math.floor(Date.now() / 1000) - hours * 3600;
+      const { results } = await env.DB
+        .prepare('SELECT lat, lon, speed, battery, timestamp FROM gps_positions WHERE device_id = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 2000')
+        .bind(deviceId, since).all();
+      return json(results);
+    }
+
     return err('Not found', 404);
   },
 };

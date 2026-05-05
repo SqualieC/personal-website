@@ -1,0 +1,731 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Map — SqualieC</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ── Auth overlay ── */
+    #auth-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .auth-box {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .auth-box h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .auth-input {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      color: #f9fafb;
+      font-size: 0.9rem;
+      padding: 0.6rem 0.75rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .auth-input:focus { border-color: #3b82f6; }
+
+    .auth-btn {
+      background: #3b82f6;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 0.65rem;
+      transition: background 0.15s;
+    }
+    .auth-btn:hover { background: #2563eb; }
+    .auth-btn:disabled { background: #374151; cursor: not-allowed; }
+
+    #auth-msg {
+      font-size: 0.8rem;
+      text-align: center;
+      color: #9ca3af;
+      min-height: 1.1em;
+    }
+    #auth-msg.err { color: #f87171; }
+
+    /* ── Side panel ── */
+    #panel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 500;
+      background: rgba(17,24,39,0.92);
+      border: 1px solid #374151;
+      border-radius: 10px;
+      width: 240px;
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 24px);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0.875rem;
+      border-bottom: 1px solid #374151;
+      font-size: 0.85rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .panel-header a {
+      color: #9ca3af;
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-weight: 400;
+    }
+    .panel-header a:hover { color: #f9fafb; }
+
+    .panel-section {
+      padding: 0.5rem 0.875rem;
+      border-bottom: 1px solid #1f2937;
+      flex-shrink: 0;
+    }
+
+    .panel-label {
+      font-size: 0.7rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+
+    #history-select {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 5px;
+      color: #f9fafb;
+      font-size: 0.8rem;
+      padding: 0.3rem 0.5rem;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    #device-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 0.4rem 0;
+    }
+
+    .device-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.875rem;
+      cursor: pointer;
+      transition: background 0.1s;
+      font-size: 0.82rem;
+    }
+    .device-row:hover { background: rgba(255,255,255,0.04); }
+
+    .device-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .device-info { flex: 1; min-width: 0; }
+    .device-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .device-meta { font-size: 0.7rem; color: #6b7280; margin-top: 1px; }
+
+    .device-eye {
+      font-size: 0.75rem;
+      color: #6b7280;
+      flex-shrink: 0;
+    }
+    .device-row.hidden-device .device-eye { color: #374151; }
+    .device-row.hidden-device .device-dot { opacity: 0.3; }
+    .device-row.hidden-device .device-name { color: #6b7280; }
+
+    .device-del {
+      background: none;
+      border: none;
+      color: #4b5563;
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 2px 4px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .device-del:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+    .panel-footer {
+      padding: 0.6rem 0.875rem;
+      border-top: 1px solid #374151;
+      flex-shrink: 0;
+    }
+
+    #add-device-btn {
+      background: transparent;
+      border: 1px dashed #374151;
+      border-radius: 6px;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.45rem;
+      width: 100%;
+      transition: all 0.15s;
+    }
+    #add-device-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+
+    /* ── Add-device dialog ── */
+    #add-device-dialog {
+      position: absolute;
+      inset: 0;
+      z-index: 600;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #add-device-dialog.open { display: flex; }
+
+    .dialog-box {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      padding: 1.5rem;
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .dialog-box h3 { font-size: 1rem; font-weight: 600; }
+
+    #new-device-key-block {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.75rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    #new-device-key-block.show { display: flex; }
+
+    .key-url {
+      color: #60a5fa;
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 0.7rem;
+    }
+
+    .copy-btn {
+      background: #374151;
+      border: none;
+      border-radius: 4px;
+      color: #f9fafb;
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      align-self: flex-start;
+    }
+    .copy-btn:hover { background: #4b5563; }
+
+    .dialog-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .btn-sm {
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.45rem 0.9rem;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { background: #374151; cursor: not-allowed; }
+    .btn-ghost { background: #374151; color: #d1d5db; }
+    .btn-ghost:hover { background: #4b5563; }
+
+    /* ── Refresh indicator ── */
+    #refresh-dot {
+      position: absolute;
+      bottom: 20px;
+      right: 12px;
+      z-index: 500;
+      background: rgba(17,24,39,0.85);
+      border: 1px solid #374151;
+      border-radius: 20px;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.72rem;
+      color: #6b7280;
+      backdrop-filter: blur(4px);
+    }
+    #refresh-dot.live { color: #4ade80; }
+
+    /* ── Custom marker pulse ── */
+    .pulse-marker {
+      position: relative;
+    }
+    .pulse-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
+    }
+    @keyframes pulse {
+      0% { transform: translate(-50%,-50%) scale(1); opacity: 0.6; }
+      100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Auth overlay -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>Map</h2>
+    <input id="auth-email" class="auth-input" type="email" placeholder="Email" autocomplete="email" />
+    <input id="auth-password" class="auth-input" type="password" placeholder="Password" autocomplete="current-password" />
+    <button id="auth-login-btn" class="auth-btn">Log In</button>
+    <p id="auth-msg"></p>
+  </div>
+</div>
+
+<!-- Side panel -->
+<div id="panel" style="display:none">
+  <div class="panel-header">
+    <span>Tracking</span>
+    <a href="/" id="logout-link">Log out</a>
+  </div>
+  <div class="panel-section">
+    <div class="panel-label">History</div>
+    <select id="history-select">
+      <option value="1">Last 1 hour</option>
+      <option value="6">Last 6 hours</option>
+      <option value="24" selected>Last 24 hours</option>
+      <option value="72">Last 3 days</option>
+      <option value="168">Last 7 days</option>
+    </select>
+  </div>
+  <div id="device-list"></div>
+  <div class="panel-footer">
+    <button id="add-device-btn">+ Add Device</button>
+  </div>
+</div>
+
+<!-- Add-device dialog -->
+<div id="add-device-dialog">
+  <div class="dialog-box">
+    <h3>Add Device</h3>
+    <input id="new-device-name" class="auth-input" type="text" placeholder="Device name (e.g. iPhone, Car)" />
+    <div id="new-device-key-block">
+      <div class="panel-label">Overland / HTTP endpoint</div>
+      <div id="new-device-url" class="key-url"></div>
+      <button class="copy-btn" id="copy-url-btn">Copy URL</button>
+      <div class="panel-label" style="margin-top:0.25rem">Device key (keep private)</div>
+      <div id="new-device-key" class="key-url"></div>
+    </div>
+    <p id="dialog-msg" style="font-size:0.78rem;color:#9ca3af;min-height:1em"></p>
+    <div class="dialog-actions">
+      <button class="btn-sm btn-ghost" id="dialog-cancel-btn">Close</button>
+      <button class="btn-sm btn-primary" id="dialog-create-btn">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Refresh indicator -->
+<div id="refresh-dot">Connecting…</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPnI=" crossorigin=""></script>
+<script is:inline>
+(function () {
+  const WORKER    = 'https://korean-srs.squaliekid55.workers.dev';
+  const TOKEN_KEY = 'korean-srs-token';
+  const COLORS    = ['#3b82f6','#ef4444','#22c55e','#f97316','#a855f7','#ec4899','#14b8a6','#eab308'];
+  const REFRESH_MS = 30_000;
+
+  let map, token, devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
+  let refreshTimer = null;
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+  async function login() {
+    const email = document.getElementById('auth-email').value.trim();
+    const pass  = document.getElementById('auth-password').value;
+    const btn   = document.getElementById('auth-login-btn');
+    const msg   = document.getElementById('auth-msg');
+    if (!email || !pass) { setAuthMsg('Enter email and password.', true); return; }
+
+    btn.disabled = true;
+    setAuthMsg('Connecting…', false);
+    try {
+      const res  = await fetch(`${WORKER}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAuthMsg(data.error || 'Login failed.', true); btn.disabled = false; return; }
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem('korean-srs-email', data.email);
+      initMap();
+    } catch {
+      setAuthMsg('Connection failed.', true);
+      btn.disabled = false;
+    }
+  }
+
+  function setAuthMsg(msg, isErr) {
+    const el = document.getElementById('auth-msg');
+    el.textContent = msg;
+    el.className = isErr ? 'err' : '';
+  }
+
+  function logout() {
+    const t = getToken();
+    if (t) fetch(`${WORKER}/logout`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + t } }).catch(() => {});
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('korean-srs-email');
+    location.reload();
+  }
+
+  // ── Map init ──────────────────────────────────────────────────────────────
+  function initMap() {
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.getElementById('panel').style.display = 'flex';
+    token = getToken();
+
+    map = L.map('map', { zoomControl: false }).setView([39.5, -98.35], 4);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    document.getElementById('history-select').addEventListener('change', function () {
+      historyHours = parseInt(this.value);
+      refresh();
+    });
+
+    document.getElementById('logout-link').addEventListener('click', function (e) {
+      e.preventDefault();
+      logout();
+    });
+
+    document.getElementById('add-device-btn').addEventListener('click', openAddDialog);
+    document.getElementById('dialog-cancel-btn').addEventListener('click', closeAddDialog);
+    document.getElementById('dialog-create-btn').addEventListener('click', createDevice);
+    document.getElementById('copy-url-btn').addEventListener('click', function () {
+      const url = document.getElementById('new-device-url').textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        this.textContent = 'Copied!';
+        setTimeout(() => { this.textContent = 'Copy URL'; }, 2000);
+      });
+    });
+
+    refresh();
+    refreshTimer = setInterval(refresh, REFRESH_MS);
+  }
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  async function refresh() {
+    const dot = document.getElementById('refresh-dot');
+    dot.textContent = 'Refreshing…';
+    dot.className = '';
+    try {
+      const res = await fetch(`${WORKER}/gps/devices`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (res.status === 401) { logout(); return; }
+      devices = await res.json();
+      renderDeviceList();
+      await loadAllTracks();
+      dot.textContent = 'Live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      dot.className = 'live';
+    } catch {
+      dot.textContent = 'Error refreshing';
+      dot.className = '';
+    }
+  }
+
+  async function loadAllTracks() {
+    await Promise.all(devices.map(d => loadTrack(d)));
+    fitMapToDevices();
+  }
+
+  async function loadTrack(device) {
+    try {
+      const res = await fetch(`${WORKER}/gps/history?deviceId=${device.id}&hours=${historyHours}`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const points = await res.json();
+      renderTrack(device, points);
+    } catch { /* silent fail per device */ }
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+  function colorForIndex(i) { return COLORS[i % COLORS.length]; }
+
+  function renderTrack(device, points) {
+    const idx   = devices.findIndex(d => d.id === device.id);
+    const color = colorForIndex(idx);
+    const hidden = hiddenDevices.has(device.id);
+
+    // Remove old layers
+    if (layersByDevice[device.id]) {
+      layersByDevice[device.id].forEach(l => map.removeLayer(l));
+    }
+    layersByDevice[device.id] = [];
+
+    if (hidden || !points.length) return;
+
+    const latlngs = points.map(p => [p.lat, p.lon]);
+
+    // Trail polyline
+    const line = L.polyline(latlngs, {
+      color,
+      weight: 3,
+      opacity: 0.7,
+    }).addTo(map);
+    layersByDevice[device.id].push(line);
+
+    // Current position marker (last point)
+    const last = points[points.length - 1];
+    const icon = makeIcon(color);
+    const age  = last ? Math.floor((Date.now() / 1000) - last.timestamp) : null;
+    const ageTxt = age !== null ? formatAge(age) : 'unknown';
+    const batTxt = device.battery != null ? `${Math.round(device.battery * 100)}% battery` : '';
+
+    const marker = L.marker([last.lat, last.lon], { icon })
+      .addTo(map)
+      .bindPopup(`<b>${escHtml(device.name)}</b><br>Last seen: ${ageTxt}<br>${batTxt}`);
+    layersByDevice[device.id].push(marker);
+  }
+
+  function makeIcon(color) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+      <circle cx="12" cy="12" r="10" fill="${color}" stroke="#fff" stroke-width="2"/>
+      <polygon points="12,32 6,18 18,18" fill="${color}"/>
+    </svg>`;
+    return L.divIcon({
+      html: svg,
+      className: '',
+      iconSize: [24, 32],
+      iconAnchor: [12, 32],
+      popupAnchor: [0, -32],
+    });
+  }
+
+  function fitMapToDevices() {
+    const allPoints = [];
+    Object.values(layersByDevice).forEach(layers => {
+      layers.forEach(l => {
+        if (l.getLatLngs) {
+          const lls = l.getLatLngs();
+          if (Array.isArray(lls)) lls.forEach(ll => allPoints.push(ll));
+        } else if (l.getLatLng) {
+          allPoints.push(l.getLatLng());
+        }
+      });
+    });
+    if (allPoints.length > 0) {
+      try { map.fitBounds(L.latLngBounds(allPoints), { padding: [40, 40], maxZoom: 15 }); } catch {}
+    }
+  }
+
+  function renderDeviceList() {
+    const list = document.getElementById('device-list');
+    list.innerHTML = '';
+    if (!devices.length) {
+      list.innerHTML = '<div style="padding:0.75rem 0.875rem;font-size:0.8rem;color:#6b7280">No devices yet.</div>';
+      return;
+    }
+    devices.forEach((d, i) => {
+      const color  = colorForIndex(i);
+      const hidden = hiddenDevices.has(d.id);
+      const age    = d.last_seen ? formatAge(Math.floor(Date.now() / 1000) - d.last_seen) : 'never';
+      const bat    = d.battery != null ? ` · ${Math.round(d.battery * 100)}%` : '';
+
+      const row = document.createElement('div');
+      row.className = 'device-row' + (hidden ? ' hidden-device' : '');
+      row.innerHTML = `
+        <div class="device-dot" style="background:${color}"></div>
+        <div class="device-info">
+          <div class="device-name">${escHtml(d.name)}</div>
+          <div class="device-meta">${age}${bat}</div>
+        </div>
+        <span class="device-eye">${hidden ? '○' : '●'}</span>
+        <button class="device-del" data-id="${d.id}" title="Remove device">✕</button>
+      `;
+
+      // Toggle visibility
+      row.addEventListener('click', function (e) {
+        if (e.target.classList.contains('device-del')) return;
+        if (hiddenDevices.has(d.id)) hiddenDevices.delete(d.id);
+        else hiddenDevices.add(d.id);
+        renderDeviceList();
+        devices.forEach(dev => {
+          const cached = layersByDevice[dev.id];
+          if (cached) {
+            cached.forEach(l => map.removeLayer(l));
+            layersByDevice[dev.id] = [];
+          }
+        });
+        loadAllTracks();
+      });
+
+      // Delete
+      row.querySelector('.device-del').addEventListener('click', async function (e) {
+        e.stopPropagation();
+        if (!confirm(`Remove "${d.name}" and all its position history?`)) return;
+        await fetch(`${WORKER}/gps/devices/${d.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        refresh();
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  // ── Add device dialog ─────────────────────────────────────────────────────
+  function openAddDialog() {
+    document.getElementById('new-device-name').value = '';
+    document.getElementById('new-device-key-block').className = '';
+    document.getElementById('dialog-msg').textContent = '';
+    document.getElementById('dialog-create-btn').disabled = false;
+    document.getElementById('dialog-create-btn').textContent = 'Create';
+    document.getElementById('add-device-dialog').className = 'open';
+    setTimeout(() => document.getElementById('new-device-name').focus(), 50);
+  }
+
+  function closeAddDialog() {
+    document.getElementById('add-device-dialog').className = '';
+    refresh();
+  }
+
+  async function createDevice() {
+    const name = document.getElementById('new-device-name').value.trim();
+    const btn  = document.getElementById('dialog-create-btn');
+    const msg  = document.getElementById('dialog-msg');
+    if (!name) { msg.textContent = 'Enter a device name.'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+    msg.textContent = '';
+
+    try {
+      const res  = await fetch(`${WORKER}/gps/devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) { msg.textContent = data.error || 'Failed.'; btn.disabled = false; btn.textContent = 'Create'; return; }
+
+      const trackUrl = `${WORKER}/gps/track?key=${data.device_key}`;
+      document.getElementById('new-device-url').textContent = trackUrl;
+      document.getElementById('new-device-key').textContent = data.device_key;
+      document.getElementById('new-device-key-block').className = 'show';
+      msg.textContent = 'Device created! Copy the URL and configure your app.';
+      btn.textContent = 'Done';
+      btn.disabled = false;
+    } catch {
+      msg.textContent = 'Connection failed.';
+      btn.disabled = false;
+      btn.textContent = 'Create';
+    }
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function formatAge(seconds) {
+    if (seconds < 60)  return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('auth-login-btn').addEventListener('click', login);
+    document.getElementById('auth-password').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') login();
+    });
+    document.getElementById('auth-email').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('auth-password').focus();
+    });
+    document.getElementById('new-device-name').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') createDevice();
+    });
+
+    if (getToken()) {
+      initMap();
+    }
+  });
+})();
+</script>
+</body>
+</html>
