@@ -21,7 +21,7 @@ import Layout from '../../layouts/Layout.astro';
       <svg id="radarSvg"
            style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:1.5rem;display:none;overflow:visible;"
            xmlns="http://www.w3.org/2000/svg"></svg>
-      <button id="viewToggle" class="view-toggle-btn">3D</button>
+      <button id="viewToggle" class="view-toggle-btn is-3d">3D</button>
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="today">Today</button>
@@ -547,7 +547,7 @@ import Layout from '../../layouts/Layout.astro';
     transition: color 0.15s, border-color 0.15s, background 0.15s;
   }
   .view-toggle-btn:hover { color: var(--text); border-color: color-mix(in srgb, var(--muted), transparent 40%); }
-  .view-toggle-btn.is-2d {
+  .view-toggle-btn.is-3d {
     background: color-mix(in srgb, #4ade80, transparent 84%);
     border-color: color-mix(in srgb, #4ade80, transparent 45%);
     color: #4ade80;
@@ -1000,9 +1000,9 @@ function renderRadar(cats: StatsCat[]) {
   const N  = cats.length;
   const cx = W / 2, cy = H / 2;
   const S  = Math.min(W, H);
-  const R  = S * 0.28;           // outer ring radius
-  const labelDist = R + S * 0.1; // label anchor distance from center
-  const fs = S * 0.034;          // font size
+  const R  = S * 0.28;            // outer ring radius
+  const labelDist = R + S * 0.04; // label anchor just outside the outer ring
+  const fs = S * 0.020;           // font size
 
   function mk(tag: string, attrs: Record<string, string | number>): Element {
     const e = document.createElementNS(NS, tag);
@@ -1089,7 +1089,7 @@ function setView(mode: '2d' | '3d') {
   labelRenderer.domElement.style.display = is2D ? 'none' : '';
   (svg as HTMLElement).style.display     = is2D ? 'block' : 'none';
   btn.textContent = is2D ? '2D' : '3D';
-  btn.classList.toggle('is-2d', is2D);
+  btn.classList.toggle('is-3d', !is2D);
   if (is2D) renderRadar(lastStatsCats);
   else       buildPolyhedron(lastStatsCats);
 }
