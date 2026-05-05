@@ -20,9 +20,7 @@ import Layout from '../../layouts/Layout.astro';
       <!-- CSS2DRenderer injects its own overlay div here at runtime -->
       <svg id="radarSvg"
            style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:1.5rem;display:none;"
-           viewBox="-115 -115 230 230"
-           xmlns="http://www.w3.org/2000/svg"
-           preserveAspectRatio="xMidYMid meet"></svg>
+           xmlns="http://www.w3.org/2000/svg"></svg>
       <button id="viewToggle" class="view-toggle-btn">2D</button>
 
       <div class="period-tabs">
@@ -988,13 +986,22 @@ function renderBarChart(cats: StatsCat[]) {
 }
 
 function renderRadar(cats: StatsCat[]) {
-  const svg = document.getElementById('radarSvg')!;
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const svgEl = document.getElementById('radarSvg')!;
+  while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
   if (cats.length === 0) return;
 
-  const NS = 'http://www.w3.org/2000/svg';
-  const N  = cats.length;
-  const R  = 80;
+  // Measure actual pixel size (getBoundingClientRect works after display:block is set)
+  const rect = svgEl.getBoundingClientRect();
+  const W = rect.width  || 400;
+  const H = rect.height || 400;
+  // Set viewBox programmatically — HTML parser lowercases "viewBox" to "viewbox" which SVG ignores
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const NS  = 'http://www.w3.org/2000/svg';
+  const N   = cats.length;
+  const cx  = W / 2, cy = H / 2;
+  const R   = Math.min(W, H) * 0.36;
+  const fs  = W * 0.028; // font-size proportional to panel width
 
   function mk(tag: string, attrs: Record<string, string | number>): Element {
     const e = document.createElementNS(NS, tag);
@@ -1002,16 +1009,15 @@ function renderRadar(cats: StatsCat[]) {
     return e;
   }
 
-  const gridG  = mk('g', {}), axisG  = mk('g', {});
-  const shapeG = mk('g', {}), dotG   = mk('g', {}), labelG = mk('g', {});
-  [gridG, axisG, shapeG, dotG, labelG].forEach(g => svg.appendChild(g));
+  const gridG = mk('g', {}), axisG = mk('g', {});
+  const shapeG = mk('g', {}), dotG = mk('g', {}), labelG = mk('g', {});
+  [gridG, axisG, shapeG, dotG, labelG].forEach(g => svgEl.appendChild(g));
 
   // Reference rings
   [0.25, 0.5, 0.75, 1].forEach(r => gridG.appendChild(mk('circle', {
-    cx: 0, cy: 0, r: r * R,
-    fill: 'none',
+    cx, cy, r: r * R, fill: 'none',
     stroke: r === 1 ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)',
-    'stroke-dasharray': r < 1 ? '3 5' : '',
+    'stroke-dasharray': r < 1 ? '5 7' : '',
   })));
 
   const pts: Array<{ x: number; y: number; color: string }> = [];
@@ -1020,20 +1026,24 @@ function renderRadar(cats: StatsCat[]) {
     const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
     const ax = Math.cos(angle), ay = Math.sin(angle);
     const pr  = (c.proportion > 0 ? c.proportion : 0.05) * R;
-    pts.push({ x: ax * pr, y: ay * pr, color: PALETTE[i % PALETTE.length] });
+    pts.push({ x: cx + ax * pr, y: cy + ay * pr, color: PALETTE[i % PALETTE.length] });
 
     // Axis spoke
-    axisG.appendChild(mk('line', { x1: 0, y1: 0, x2: ax * R, y2: ay * R,
-      stroke: 'rgba(255,255,255,0.13)', 'stroke-width': 0.8 }));
+    axisG.appendChild(mk('line', {
+      x1: cx, y1: cy, x2: cx + ax * R, y2: cy + ay * R,
+      stroke: 'rgba(255,255,255,0.12)', 'stroke-width': 1,
+    }));
 
     // Label
-    const lx = ax * (R + 16), ly = ay * (R + 16);
+    const lx = cx + ax * (R + W * 0.07);
+    const ly = cy + ay * (R + W * 0.07);
     const anchor   = ax > 0.25 ? 'start' : ax < -0.25 ? 'end' : 'middle';
     const baseline = ay > 0.25 ? 'hanging' : ay < -0.25 ? 'auto' : 'middle';
     const pct = Math.round(c.proportion * 100);
-    const txt = mk('text', { x: lx, y: ly, 'text-anchor': anchor,
-      'dominant-baseline': baseline, 'font-size': 7,
-      fill: 'rgba(255,255,255,0.82)', 'font-family': 'system-ui,sans-serif' });
+    const txt = mk('text', {
+      x: lx, y: ly, 'text-anchor': anchor, 'dominant-baseline': baseline,
+      'font-size': fs, fill: 'rgba(255,255,255,0.82)', 'font-family': 'system-ui,sans-serif',
+    });
     txt.textContent = pct > 0 ? `${c.name} ${pct}%` : c.name;
     labelG.appendChild(txt);
   });
@@ -1046,12 +1056,17 @@ function renderRadar(cats: StatsCat[]) {
       'stroke-width': 1.5, 'stroke-linejoin': 'round',
     }));
   } else if (pts.length === 2) {
-    shapeG.appendChild(mk('line', { x1: pts[0].x, y1: pts[0].y, x2: pts[1].x, y2: pts[1].y,
-      stroke: '#4ade80', 'stroke-width': 1.5 }));
+    shapeG.appendChild(mk('line', {
+      x1: pts[0].x, y1: pts[0].y, x2: pts[1].x, y2: pts[1].y,
+      stroke: '#4ade80', 'stroke-width': 1.5,
+    }));
   }
 
   // Colored vertex dots
-  pts.forEach(p => dotG.appendChild(mk('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 4, fill: p.color })));
+  const dotR = Math.max(4, W * 0.007);
+  pts.forEach(p => dotG.appendChild(mk('circle', {
+    cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: dotR, fill: p.color,
+  })));
 }
 
 function setView(mode: '2d' | '3d') {
@@ -1062,7 +1077,7 @@ function setView(mode: '2d' | '3d') {
   canvas.style.display                   = is2D ? 'none' : '';
   labelRenderer.domElement.style.display = is2D ? 'none' : '';
   (svg as HTMLElement).style.display     = is2D ? 'block' : 'none';
-  btn.textContent = is2D ? '3D' : '2D';
+  btn.textContent = is2D ? '2D' : '3D';
   btn.classList.toggle('is-2d', is2D);
   if (is2D) renderRadar(lastStatsCats);
   else       buildPolyhedron(lastStatsCats);
