@@ -239,7 +239,6 @@
     }
 
     .device-row {
-      position: relative;
       display: flex;
       align-items: center;
       gap: 0.55rem;
@@ -259,7 +258,7 @@
       box-shadow: 0 0 6px currentColor;
     }
 
-    .device-info { flex: 1; min-width: 0; padding-right: 1.4rem; }
+    .device-info { flex: 1; min-width: 0; }
 
     .device-name {
       font-size: 0.8rem;
@@ -281,26 +280,19 @@
     .device-row.hidden-layer .device-name { color: color-mix(in srgb, var(--muted), transparent 30%); }
 
     .device-del {
-      position: absolute;
-      right: 0.7rem;
-      top: 50%;
-      transform: translateY(-50%);
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       border-radius: 4px;
       color: color-mix(in srgb, var(--muted), transparent 40%);
       cursor: pointer;
       opacity: 0;
       transition: opacity 0.15s, color 0.15s, background 0.15s;
-      pointer-events: none;
     }
-    .device-row:hover .device-del {
-      opacity: 1;
-      pointer-events: auto;
-    }
+    .device-row:hover .device-del { opacity: 1; }
     .device-del:hover {
       color: #f87171;
       background: color-mix(in srgb, #f87171, transparent 88%);
