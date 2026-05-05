@@ -414,6 +414,15 @@
     #status-bar.live .status-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
     #status-bar.live { color: var(--text); }
 
+    /* ── Storage info ── */
+    #storage-info {
+      padding: 0.45rem 0.9rem 0.5rem;
+      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
+      font-size: 0.67rem;
+      color: color-mix(in srgb, var(--muted), transparent 25%);
+      line-height: 1.6;
+    }
+
     /* ── Empty state ── */
     .empty-msg {
       padding: 0.7rem 0.9rem;
@@ -459,6 +468,7 @@
     </select>
   </div>
   <div id="device-list"></div>
+  <div id="storage-info"></div>
   <div class="panel-footer">
     <button id="add-device-btn">+ Add Device</button>
   </div>
@@ -500,6 +510,7 @@
   const REFRESH_MS = 30_000;
 
   let map, token, devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
+  let mapFitted = false;
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
 
@@ -551,7 +562,7 @@
     map = L.map('map', { zoomControl: false }).setView([39.5, -98.35], 4);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19,
@@ -588,7 +599,8 @@
       devices = await res.json();
       renderDeviceList();
       await Promise.all(devices.map(loadTrack));
-      fitMap();
+      if (!mapFitted) { fitMap(); mapFitted = true; }
+      loadStats();
       setStatus(true, 'Live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch {
       setStatus(false, 'Error — retrying…');
@@ -642,6 +654,21 @@
       <circle cx="11" cy="11" r="4" fill="#0c1729"/>
     </svg>`;
     return L.divIcon({ html: svg, className: '', iconSize: [22, 30], iconAnchor: [11, 30], popupAnchor: [0, -30] });
+  }
+
+  async function loadStats() {
+    try {
+      const res   = await fetch(`${WORKER}/gps/stats`, { headers: { 'Authorization': 'Bearer ' + token } });
+      const rows  = await res.json();
+      const el    = document.getElementById('storage-info');
+      if (!rows.length) { el.textContent = ''; return; }
+      const total = rows.reduce((s, r) => s + r.total_points, 0);
+      const oldest = rows.reduce((m, r) => Math.min(m, r.oldest), Infinity);
+      const span  = oldest < Infinity
+        ? Math.ceil((Date.now() / 1000 - oldest) / 86400)
+        : 0;
+      el.textContent = `${total.toLocaleString()} points stored · ${span}d history`;
+    } catch {}
   }
 
   function fitMap() {

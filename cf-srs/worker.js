@@ -568,6 +568,23 @@ export default {
       return json({ ok: true });
     }
 
+    // ── GET /gps/stats ────────────────────────────────────────────────────────
+    if (path === '/gps/stats' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const { results } = await env.DB.prepare(`
+        SELECT p.device_id, d.name AS device_name,
+               COUNT(*)            AS total_points,
+               MIN(p.timestamp)   AS oldest,
+               MAX(p.timestamp)   AS newest
+        FROM gps_positions p
+        JOIN gps_devices d ON d.id = p.device_id
+        WHERE p.user_id = ?
+        GROUP BY p.device_id
+      `).bind(userId).all();
+      return json(results);
+    }
+
     // ── GET /gps/history?deviceId=X&hours=24 ─────────────────────────────────
     if (path === '/gps/history' && request.method === 'GET') {
       const userId = await getUserId(request, env);
