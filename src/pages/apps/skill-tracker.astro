@@ -21,7 +21,7 @@ import Layout from '../../layouts/Layout.astro';
       <svg id="radarSvg"
            style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:1.5rem;display:none;"
            xmlns="http://www.w3.org/2000/svg"></svg>
-      <button id="viewToggle" class="view-toggle-btn">2D</button>
+      <button id="viewToggle" class="view-toggle-btn">3D</button>
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="today">Today</button>
@@ -990,18 +990,19 @@ function renderRadar(cats: StatsCat[]) {
   while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
   if (cats.length === 0) return;
 
-  // Measure actual pixel size (getBoundingClientRect works after display:block is set)
-  const rect = svgEl.getBoundingClientRect();
-  const W = rect.width  || 400;
-  const H = rect.height || 400;
-  // Set viewBox programmatically — HTML parser lowercases "viewBox" to "viewbox" which SVG ignores
+  // Use parent dimensions (always in layout, avoids stale getBCR on just-shown element)
+  const panel = svgEl.parentElement!;
+  const W = panel.clientWidth  || 400;
+  const H = panel.clientHeight || 400;
   svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-  const NS  = 'http://www.w3.org/2000/svg';
-  const N   = cats.length;
-  const cx  = W / 2, cy = H / 2;
-  const R   = Math.min(W, H) * 0.36;
-  const fs  = W * 0.028; // font-size proportional to panel width
+  const NS = 'http://www.w3.org/2000/svg';
+  const N  = cats.length;
+  const cx = W / 2, cy = H / 2;
+  const S  = Math.min(W, H);
+  const R  = S * 0.28;           // outer ring radius
+  const labelDist = R + S * 0.1; // label anchor distance from center
+  const fs = S * 0.034;          // font size
 
   function mk(tag: string, attrs: Record<string, string | number>): Element {
     const e = document.createElementNS(NS, tag);
@@ -1009,15 +1010,24 @@ function renderRadar(cats: StatsCat[]) {
     return e;
   }
 
+  // N-gon ring points at a given radius
+  function ngon(r: number): string {
+    return Array.from({ length: N }, (_, i) => {
+      const a = -Math.PI / 2 + i * (2 * Math.PI / N);
+      return `${(cx + Math.cos(a) * r).toFixed(1)},${(cy + Math.sin(a) * r).toFixed(1)}`;
+    }).join(' ');
+  }
+
   const gridG = mk('g', {}), axisG = mk('g', {});
   const shapeG = mk('g', {}), dotG = mk('g', {}), labelG = mk('g', {});
   [gridG, axisG, shapeG, dotG, labelG].forEach(g => svgEl.appendChild(g));
 
-  // Reference rings
-  [0.25, 0.5, 0.75, 1].forEach(r => gridG.appendChild(mk('circle', {
-    cx, cy, r: r * R, fill: 'none',
-    stroke: r === 1 ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)',
-    'stroke-dasharray': r < 1 ? '5 7' : '',
+  // Reference N-gon rings at 25 / 50 / 75 / 100 %
+  [0.25, 0.5, 0.75, 1].forEach(r => gridG.appendChild(mk('polygon', {
+    points: ngon(r * R), fill: 'none',
+    stroke: r === 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)',
+    'stroke-dasharray': r < 1 ? '4 6' : '',
+    'stroke-linejoin': 'round',
   })));
 
   const pts: Array<{ x: number; y: number; color: string }> = [];
@@ -1028,27 +1038,28 @@ function renderRadar(cats: StatsCat[]) {
     const pr  = (c.proportion > 0 ? c.proportion : 0.05) * R;
     pts.push({ x: cx + ax * pr, y: cy + ay * pr, color: PALETTE[i % PALETTE.length] });
 
-    // Axis spoke
+    // Axis spoke to outer ring corner
     axisG.appendChild(mk('line', {
       x1: cx, y1: cy, x2: cx + ax * R, y2: cy + ay * R,
       stroke: 'rgba(255,255,255,0.12)', 'stroke-width': 1,
     }));
 
-    // Label
-    const lx = cx + ax * (R + W * 0.07);
-    const ly = cy + ay * (R + W * 0.07);
-    const anchor   = ax > 0.25 ? 'start' : ax < -0.25 ? 'end' : 'middle';
-    const baseline = ay > 0.25 ? 'hanging' : ay < -0.25 ? 'auto' : 'middle';
-    const pct = Math.round(c.proportion * 100);
-    const txt = mk('text', {
+    // Label — truncate long names, anchor determined by horizontal side
+    const lx = cx + ax * labelDist;
+    const ly = cy + ay * labelDist;
+    const anchor   = ax > 0.2 ? 'start' : ax < -0.2 ? 'end' : 'middle';
+    const baseline = ay > 0.2 ? 'hanging' : ay < -0.2 ? 'auto' : 'middle';
+    const pct  = Math.round(c.proportion * 100);
+    const name = c.name.length > 11 ? c.name.slice(0, 10) + '…' : c.name;
+    const txt  = mk('text', {
       x: lx, y: ly, 'text-anchor': anchor, 'dominant-baseline': baseline,
-      'font-size': fs, fill: 'rgba(255,255,255,0.82)', 'font-family': 'system-ui,sans-serif',
+      'font-size': fs, fill: 'rgba(255,255,255,0.85)', 'font-family': 'system-ui,sans-serif',
     });
-    txt.textContent = pct > 0 ? `${c.name} ${pct}%` : c.name;
+    txt.textContent = pct > 0 ? `${name} ${pct}%` : name;
     labelG.appendChild(txt);
   });
 
-  // Filled shape
+  // Filled data shape
   if (pts.length >= 3) {
     shapeG.appendChild(mk('polygon', {
       points: pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '),
@@ -1062,8 +1073,8 @@ function renderRadar(cats: StatsCat[]) {
     }));
   }
 
-  // Colored vertex dots
-  const dotR = Math.max(4, W * 0.007);
+  // Small colored vertex dots
+  const dotR = S * 0.012;
   pts.forEach(p => dotG.appendChild(mk('circle', {
     cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: dotR, fill: p.color,
   })));
