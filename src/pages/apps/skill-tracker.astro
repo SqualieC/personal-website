@@ -18,8 +18,11 @@ import Layout from '../../layouts/Layout.astro';
     <div class="blob-panel">
       <canvas id="blobCanvas"></canvas>
       <!-- CSS2DRenderer injects its own overlay div here at runtime -->
-      <svg id="radarSvg" class="radar-svg" viewBox="-115 -115 230 230"
-           xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" hidden></svg>
+      <svg id="radarSvg"
+           style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:1.5rem;display:none;"
+           viewBox="-115 -115 230 230"
+           xmlns="http://www.w3.org/2000/svg"
+           preserveAspectRatio="xMidYMid meet"></svg>
       <button id="viewToggle" class="view-toggle-btn">2D</button>
 
       <div class="period-tabs">
@@ -1056,9 +1059,9 @@ function setView(mode: '2d' | '3d') {
   const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
   const svg    = document.getElementById('radarSvg')!;
   const btn    = document.getElementById('viewToggle')!;
-  canvas.style.display              = is2D ? 'none' : '';
+  canvas.style.display                   = is2D ? 'none' : '';
   labelRenderer.domElement.style.display = is2D ? 'none' : '';
-  svg.hidden = !is2D;
+  (svg as HTMLElement).style.display     = is2D ? 'block' : 'none';
   btn.textContent = is2D ? '3D' : '2D';
   btn.classList.toggle('is-2d', is2D);
   if (is2D) renderRadar(lastStatsCats);
