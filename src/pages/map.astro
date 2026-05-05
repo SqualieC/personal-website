@@ -20,6 +20,8 @@
       --muted:   #b8ceee;
       --accent:  #28edc4;
       --accent2: #ff6b38;
+      --poi:     #a78bfa;
+      --trip:    #facc15;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -86,11 +88,7 @@
       gap: 0.65rem;
     }
 
-    .auth-box h2 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 0.15rem;
-    }
+    .auth-box h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.15rem; }
 
     .auth-box .site-link {
       font-size: 0.8rem;
@@ -143,11 +141,7 @@
     }
     .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
 
-    #auth-msg {
-      font-size: 0.82rem;
-      color: var(--muted);
-      min-height: 1em;
-    }
+    #auth-msg { font-size: 0.82rem; color: var(--muted); min-height: 1em; }
     #auth-msg.err { color: #f87171; }
 
     /* ── Side panel ── */
@@ -156,7 +150,7 @@
       top: 14px;
       left: 14px;
       z-index: 500;
-      width: 230px;
+      width: 240px;
       background: color-mix(in srgb, var(--bg-soft), transparent 8%);
       border: 1px solid color-mix(in srgb, var(--muted), transparent 68%);
       border-radius: 16px;
@@ -204,6 +198,39 @@
     }
     .icon-btn:hover { color: var(--text); }
 
+    /* ── Tab bar ── */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+      flex-shrink: 0;
+    }
+
+    .tab {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 0.5rem 0.25rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Tab contents ── */
+    .tab-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
     .panel-section {
       padding: 0.55rem 0.9rem;
       border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
@@ -232,12 +259,13 @@
     }
     .panel-select:focus { border-color: var(--accent); }
 
-    #device-list {
+    .scrollable-list {
       overflow-y: auto;
       flex: 1;
       padding: 0.3rem 0;
     }
 
+    /* ── Device rows ── */
     .device-row {
       display: flex;
       align-items: center;
@@ -270,11 +298,7 @@
       transition: color 0.15s;
     }
 
-    .device-meta {
-      font-size: 0.68rem;
-      color: var(--muted);
-      margin-top: 1px;
-    }
+    .device-meta { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
 
     .device-row.hidden-layer .device-dot  { opacity: 0.2; box-shadow: none; }
     .device-row.hidden-layer .device-name { color: color-mix(in srgb, var(--muted), transparent 30%); }
@@ -298,13 +322,55 @@
       background: color-mix(in srgb, #f87171, transparent 88%);
     }
 
+    /* ── Trip rows ── */
+    .trip-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      padding: 0.52rem 0.9rem;
+      cursor: pointer;
+      transition: background 0.1s;
+      user-select: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
+    }
+    .trip-row:hover { background: color-mix(in srgb, var(--muted), transparent 92%); }
+    .trip-row.selected { background: color-mix(in srgb, var(--trip), transparent 90%); }
+
+    .trip-active-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      flex-shrink: 0;
+      margin-top: 4px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .trip-info { flex: 1; min-width: 0; }
+    .trip-device {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .trip-date { font-weight: 400; color: var(--muted); }
+    .trip-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+    /* ── Panel footer ── */
     .panel-footer {
       padding: 0.55rem 0.9rem;
       border-top: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
       flex-shrink: 0;
     }
 
-    #add-device-btn {
+    .add-btn {
       background: transparent;
       border: 1px dashed color-mix(in srgb, var(--muted), transparent 60%);
       border-radius: 8px;
@@ -316,10 +382,20 @@
       width: 100%;
       transition: border-color 0.14s, color 0.14s;
     }
-    #add-device-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Add-device dialog ── */
-    #add-device-dialog {
+    /* ── Storage info ── */
+    #storage-info {
+      padding: 0.45rem 0.9rem 0.5rem;
+      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
+      font-size: 0.67rem;
+      color: color-mix(in srgb, var(--muted), transparent 25%);
+      line-height: 1.6;
+      flex-shrink: 0;
+    }
+
+    /* ── Dialogs ── */
+    .dialog-overlay {
       position: absolute;
       inset: 0;
       z-index: 600;
@@ -329,7 +405,7 @@
       align-items: center;
       justify-content: center;
     }
-    #add-device-dialog.open { display: flex; }
+    .dialog-overlay.open { display: flex; }
 
     .dialog-box {
       background: var(--bg-soft);
@@ -342,6 +418,21 @@
       gap: 0.7rem;
     }
     .dialog-box h3 { font-size: 0.95rem; font-weight: 700; }
+
+    .dialog-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .dialog-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 0.1rem;
+    }
+
+    .dialog-msg { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
 
     #new-device-key-block {
       background: color-mix(in srgb, var(--bg), transparent 5%);
@@ -377,14 +468,39 @@
     }
     .copy-btn:hover { border-color: var(--accent); }
 
-    .dialog-actions {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
-      margin-top: 0.1rem;
+    /* ── POI add banner ── */
+    #poi-banner {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: color-mix(in srgb, var(--poi), transparent 10%);
+      border: 1px solid var(--poi);
+      border-radius: 999px;
+      padding: 0.4rem 1rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #fff;
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
     }
+    #poi-banner.active { display: flex; }
 
-    #dialog-msg { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
+    #poi-cancel-banner {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.4);
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.72rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #poi-cancel-banner:hover { background: rgba(255,255,255,0.1); }
 
     /* ── Status bar ── */
     #status-bar {
@@ -414,15 +530,6 @@
     #status-bar.live .status-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
     #status-bar.live { color: var(--text); }
 
-    /* ── Storage info ── */
-    #storage-info {
-      padding: 0.45rem 0.9rem 0.5rem;
-      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
-      font-size: 0.67rem;
-      color: color-mix(in srgb, var(--muted), transparent 25%);
-      line-height: 1.6;
-    }
-
     /* ── Empty state ── */
     .empty-msg {
       padding: 0.7rem 0.9rem;
@@ -430,6 +537,10 @@
       color: var(--muted);
       line-height: 1.5;
     }
+
+    /* ── Map crosshair cursor when placing POI ── */
+    .map-placing { cursor: crosshair !important; }
+    .map-placing .leaflet-interactive { cursor: crosshair !important; }
   </style>
 </head>
 <body>
@@ -457,25 +568,54 @@
       <button class="icon-btn" id="logout-btn">Log out</button>
     </div>
   </div>
-  <div class="panel-section">
-    <div class="panel-label">History</div>
-    <select id="history-select" class="panel-select">
-      <option value="1">Last 1 hour</option>
-      <option value="6">Last 6 hours</option>
-      <option value="24" selected>Last 24 hours</option>
-      <option value="72">Last 3 days</option>
-      <option value="168">Last 7 days</option>
-    </select>
+
+  <div class="tab-bar">
+    <button class="tab active" data-tab="devices">Devices</button>
+    <button class="tab" data-tab="trips">Trips</button>
+    <button class="tab" data-tab="places">Places</button>
   </div>
-  <div id="device-list"></div>
-  <div id="storage-info"></div>
-  <div class="panel-footer">
-    <button id="add-device-btn">+ Add Device</button>
+
+  <!-- Devices tab -->
+  <div id="tab-devices" class="tab-content">
+    <div class="panel-section">
+      <div class="panel-label">History</div>
+      <select id="history-select" class="panel-select">
+        <option value="1">Last 1 hour</option>
+        <option value="6">Last 6 hours</option>
+        <option value="24" selected>Last 24 hours</option>
+        <option value="72">Last 3 days</option>
+        <option value="168">Last 7 days</option>
+      </select>
+    </div>
+    <div id="device-list" class="scrollable-list"></div>
+    <div id="storage-info"></div>
+    <div class="panel-footer">
+      <button id="add-device-btn" class="add-btn">+ Add Device</button>
+    </div>
+  </div>
+
+  <!-- Trips tab -->
+  <div id="tab-trips" class="tab-content" style="display:none">
+    <div id="trip-list" class="scrollable-list"></div>
+  </div>
+
+  <!-- Places tab -->
+  <div id="tab-places" class="tab-content" style="display:none">
+    <div id="poi-list" class="scrollable-list"></div>
+    <div class="panel-footer">
+      <button id="add-poi-btn" class="add-btn">+ Add Place</button>
+    </div>
   </div>
 </div>
 
-<!-- Add-device dialog -->
-<div id="add-device-dialog">
+<!-- POI add banner -->
+<div id="poi-banner">
+  Click on the map to place a point of interest
+  <button id="poi-cancel-banner">Cancel</button>
+</div>
+
+<!-- Add device dialog -->
+<div id="add-device-dialog" class="dialog-overlay">
   <div class="dialog-box">
     <h3>Add Device</h3>
     <input id="new-device-name" class="field" type="text" placeholder="Name (e.g. iPhone, Car)" />
@@ -486,10 +626,27 @@
       <div class="panel-label" style="margin-top:0.2rem">Secret key — keep private</div>
       <div id="new-device-key" class="key-url"></div>
     </div>
-    <p id="dialog-msg"></p>
+    <p id="dialog-msg" class="dialog-msg"></p>
     <div class="dialog-actions">
       <button class="btn-ghost" id="dialog-cancel-btn">Close</button>
       <button class="btn-accent" id="dialog-create-btn">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add POI dialog -->
+<div id="add-poi-dialog" class="dialog-overlay">
+  <div class="dialog-box">
+    <h3>Add Place</h3>
+    <input id="poi-name-input" class="field" type="text" placeholder="Name (e.g. Home, Work)" />
+    <div class="dialog-row">
+      <input id="poi-radius-input" class="field" type="number" min="50" max="5000" placeholder="Radius" value="100" style="width:110px;flex-shrink:0" />
+      <span style="font-size:0.8rem;color:var(--muted)">meters radius</span>
+    </div>
+    <p id="poi-dialog-msg" class="dialog-msg"></p>
+    <div class="dialog-actions">
+      <button class="btn-ghost" id="poi-cancel-dialog-btn">Cancel</button>
+      <button class="btn-accent" id="poi-create-btn">Save Place</button>
     </div>
   </div>
 </div>
@@ -509,8 +666,13 @@
   const COLORS     = ['#28edc4','#ff6b38','#60a5fa','#f472b6','#a78bfa','#facc15','#34d399','#fb923c'];
   const REFRESH_MS = 30_000;
 
-  let map, token, devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
+  let map, token;
+  let devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
+  let trips = [], selectedTripId = null, tripRouteLayer = null;
+  let pois = [], poiLayers = {};
+  let addingPoi = false, pendingPoiLatLng = null;
   let mapFitted = false;
+  let activeTab = 'devices';
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
 
@@ -568,14 +730,39 @@
       maxZoom: 19,
     }).addTo(map);
 
+    map.on('click', function (e) {
+      if (!addingPoi) return;
+      pendingPoiLatLng = e.latlng;
+      document.getElementById('poi-name-input').value = '';
+      document.getElementById('poi-radius-input').value = '100';
+      document.getElementById('poi-dialog-msg').textContent = '';
+      document.getElementById('poi-create-btn').disabled = false;
+      document.getElementById('add-poi-dialog').classList.add('open');
+      setTimeout(() => document.getElementById('poi-name-input').focus(), 50);
+    });
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', function () {
+        activeTab = this.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('tab-devices').style.display = activeTab === 'devices' ? 'flex' : 'none';
+        document.getElementById('tab-trips').style.display   = activeTab === 'trips'   ? 'flex' : 'none';
+        document.getElementById('tab-places').style.display  = activeTab === 'places'  ? 'flex' : 'none';
+        if (activeTab === 'trips') loadTrips();
+        if (activeTab === 'places') loadPois();
+      });
+    });
+
     document.getElementById('history-select').addEventListener('change', function () {
       historyHours = parseInt(this.value);
       refresh();
     });
 
     document.getElementById('logout-btn').addEventListener('click', logout);
-    document.getElementById('add-device-btn').addEventListener('click', openAddDialog);
-    document.getElementById('dialog-cancel-btn').addEventListener('click', closeAddDialog);
+    document.getElementById('add-device-btn').addEventListener('click', openAddDeviceDialog);
+    document.getElementById('dialog-cancel-btn').addEventListener('click', closeAddDeviceDialog);
     document.getElementById('dialog-create-btn').addEventListener('click', createDevice);
     document.getElementById('copy-url-btn').addEventListener('click', function () {
       navigator.clipboard.writeText(document.getElementById('new-device-url').textContent).then(() => {
@@ -584,11 +771,17 @@
       });
     });
 
+    document.getElementById('add-poi-btn').addEventListener('click', startAddPoi);
+    document.getElementById('poi-cancel-banner').addEventListener('click', cancelAddPoi);
+    document.getElementById('poi-cancel-dialog-btn').addEventListener('click', cancelAddPoi);
+    document.getElementById('poi-create-btn').addEventListener('click', createPoi);
+    document.getElementById('poi-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') createPoi(); });
+
     refresh();
     setInterval(refresh, REFRESH_MS);
   }
 
-  // ── Data ──────────────────────────────────────────────────────────────────
+  // ── Data refresh ──────────────────────────────────────────────────────────
   async function refresh() {
     setStatus(false, 'Refreshing…');
     try {
@@ -601,6 +794,9 @@
       await Promise.all(devices.map(loadTrack));
       if (!mapFitted) { fitMap(); mapFitted = true; }
       loadStats();
+      if (activeTab === 'trips') loadTrips();
+      if (activeTab === 'places') loadPois();
+      else loadPois(); // always keep POI markers fresh
       setStatus(true, 'Live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch {
       setStatus(false, 'Error — retrying…');
@@ -616,7 +812,225 @@
     } catch {}
   }
 
-  // ── Rendering ─────────────────────────────────────────────────────────────
+  // ── Trips ─────────────────────────────────────────────────────────────────
+  async function loadTrips() {
+    try {
+      const res = await fetch(`${WORKER}/gps/trips?limit=50`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      trips = await res.json();
+      renderTripList();
+    } catch {}
+  }
+
+  function renderTripList() {
+    const list = document.getElementById('trip-list');
+    list.innerHTML = '';
+    if (!trips.length) {
+      list.innerHTML = '<div class="empty-msg">No trips yet.<br>Move more than 50 m to start one.</div>';
+      return;
+    }
+    trips.forEach(trip => {
+      const isActive = !trip.ended_at;
+      const dist = trip.distance_meters
+        ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi'
+        : '—';
+      const dur = trip.duration_seconds
+        ? fmtDuration(trip.duration_seconds)
+        : (isActive ? 'Active' : '—');
+      const speeds = trip.avg_speed_mph
+        ? `${Math.round(trip.avg_speed_mph)} avg / ${Math.round(trip.max_speed_mph)} max mph`
+        : '';
+      const date = new Date(trip.started_at * 1000).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+
+      const row = document.createElement('div');
+      row.className = 'trip-row' + (trip.id === selectedTripId ? ' selected' : '');
+
+      if (isActive) {
+        const dot = document.createElement('div');
+        dot.className = 'trip-active-dot';
+        row.appendChild(dot);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'trip-info';
+      info.innerHTML = `
+        <div class="trip-device">${esc(trip.device_name)} <span class="trip-date">${date}</span></div>
+        <div class="trip-meta">${dist} · ${dur}${speeds ? '<br>' + speeds : ''}</div>
+      `;
+      row.appendChild(info);
+
+      row.addEventListener('click', () => selectTrip(trip));
+      list.appendChild(row);
+    });
+  }
+
+  async function selectTrip(trip) {
+    selectedTripId = trip.id;
+    renderTripList();
+
+    if (tripRouteLayer) { map.removeLayer(tripRouteLayer); tripRouteLayer = null; }
+
+    try {
+      const res = await fetch(`${WORKER}/gps/trips/${trip.id}/positions`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const pts = await res.json();
+      if (!pts.length) return;
+
+      const latlngs = pts.map(p => [p.lat, p.lon]);
+      tripRouteLayer = L.featureGroup();
+
+      L.polyline(latlngs, { color: '#facc15', weight: 4, opacity: 0.9, zIndex: 600 }).addTo(tripRouteLayer);
+
+      // Start dot (green)
+      L.circleMarker(latlngs[0], {
+        radius: 6, color: '#0c1729', weight: 2,
+        fillColor: '#22c55e', fillOpacity: 1,
+      }).addTo(tripRouteLayer);
+
+      // End dot
+      if (latlngs.length > 1) {
+        const endColor = trip.ended_at ? '#f87171' : '#facc15';
+        const dist = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi' : '—';
+        const dur  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : '—';
+        const popup = `<b>${esc(trip.device_name)}</b><br>${dist} · ${dur}`
+          + (trip.avg_speed_mph ? `<br>${Math.round(trip.avg_speed_mph)} avg / ${Math.round(trip.max_speed_mph)} max mph` : '');
+        L.circleMarker(latlngs[latlngs.length - 1], {
+          radius: 6, color: '#0c1729', weight: 2,
+          fillColor: endColor, fillOpacity: 1,
+        }).bindPopup(popup).addTo(tripRouteLayer);
+      }
+
+      tripRouteLayer.addTo(map);
+      try { map.fitBounds(tripRouteLayer.getBounds(), { padding: [44, 44], maxZoom: 16 }); } catch {}
+    } catch {}
+  }
+
+  // ── POIs ─────────────────────────────────────────────────────────────────
+  async function loadPois() {
+    try {
+      const res = await fetch(`${WORKER}/gps/pois`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      pois = await res.json();
+      renderPoiList();
+      renderPoiMarkers();
+    } catch {}
+  }
+
+  function renderPoiMarkers() {
+    Object.values(poiLayers).forEach(g => map.removeLayer(g));
+    poiLayers = {};
+    pois.forEach(poi => {
+      const group = L.featureGroup();
+      L.circle([poi.lat, poi.lon], {
+        radius: poi.radius,
+        color: '#a78bfa',
+        fillColor: '#a78bfa',
+        fillOpacity: 0.12,
+        weight: 1.5,
+        dashArray: '4 4',
+      }).addTo(group);
+      L.marker([poi.lat, poi.lon], { icon: makePoiIcon() })
+        .bindPopup(`<b>${esc(poi.name)}</b><br>Radius: ${poi.radius} m`)
+        .addTo(group);
+      group.addTo(map);
+      poiLayers[poi.id] = group;
+    });
+  }
+
+  function makePoiIcon() {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+      <polygon points="9,1 11.2,6.8 17,7.6 12.8,11.6 14,17.2 9,14.2 4,17.2 5.2,11.6 1,7.6 6.8,6.8"
+        fill="#a78bfa" stroke="#0c1729" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>`;
+    return L.divIcon({ html: svg, className: '', iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -10] });
+  }
+
+  function renderPoiList() {
+    const list = document.getElementById('poi-list');
+    list.innerHTML = '';
+    if (!pois.length) {
+      list.innerHTML = '<div class="empty-msg">No places saved yet.<br>Add one to mark a location.</div>';
+      return;
+    }
+    pois.forEach(poi => {
+      const row = document.createElement('div');
+      row.className = 'device-row';
+      row.innerHTML = `
+        <div class="device-dot" style="background:#a78bfa;color:#a78bfa;border-radius:2px;transform:rotate(45deg)"></div>
+        <div class="device-info">
+          <div class="device-name">${esc(poi.name)}</div>
+          <div class="device-meta">${poi.radius} m radius</div>
+        </div>
+        <span class="device-del" title="Remove place">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+      `;
+
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('.device-del')) return;
+        if (poiLayers[poi.id]) {
+          map.fitBounds(poiLayers[poi.id].getBounds(), { padding: [40, 40], maxZoom: 16 });
+        }
+      });
+
+      row.querySelector('.device-del').addEventListener('click', async function (e) {
+        e.stopPropagation();
+        if (!confirm(`Remove "${poi.name}"?`)) return;
+        await fetch(`${WORKER}/gps/pois/${poi.id}`, {
+          method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
+        });
+        loadPois();
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  function startAddPoi() {
+    addingPoi = true;
+    document.getElementById('poi-banner').classList.add('active');
+    document.getElementById('map').classList.add('map-placing');
+  }
+
+  function cancelAddPoi() {
+    addingPoi = false;
+    pendingPoiLatLng = null;
+    document.getElementById('poi-banner').classList.remove('active');
+    document.getElementById('map').classList.remove('map-placing');
+    document.getElementById('add-poi-dialog').classList.remove('open');
+  }
+
+  async function createPoi() {
+    if (!pendingPoiLatLng) return;
+    const name   = document.getElementById('poi-name-input').value.trim();
+    const radius = Math.min(5000, Math.max(50, parseInt(document.getElementById('poi-radius-input').value) || 100));
+    const btn    = document.getElementById('poi-create-btn');
+    const msg    = document.getElementById('poi-dialog-msg');
+    if (!name) { msg.textContent = 'Enter a name.'; return; }
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${WORKER}/gps/pois`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ name, lat: pendingPoiLatLng.lat, lon: pendingPoiLatLng.lng, radius }),
+      });
+      if (!res.ok) { msg.textContent = 'Failed to save.'; btn.disabled = false; return; }
+      cancelAddPoi();
+      loadPois();
+    } catch {
+      msg.textContent = 'Connection failed.';
+      btn.disabled = false;
+    }
+  }
+
+  // ── Device rendering ─────────────────────────────────────────────────────
   function colorFor(i) { return COLORS[i % COLORS.length]; }
 
   function renderTrack(device, points) {
@@ -631,7 +1045,6 @@
     if (hidden || !points.length) return;
 
     const latlngs = points.map(p => [p.lat, p.lon]);
-
     const line = L.polyline(latlngs, { color, weight: 3, opacity: 0.75 }).addTo(map);
     layersByDevice[device.id].push(line);
 
@@ -639,15 +1052,15 @@
     const ageSec = Math.floor(Date.now() / 1000) - last.timestamp;
     const bat    = device.battery != null ? `<br>Battery: ${Math.round(device.battery * 100)}%` : '';
     const spd    = last.speed != null && last.speed > 0.5
-      ? `<br>Speed: ${Math.round(last.speed * 3.6)} km/h` : '';
+      ? `<br>Speed: ${(last.speed * 2.237).toFixed(1)} mph` : '';
 
-    const marker = L.marker([last.lat, last.lon], { icon: makeIcon(color) })
+    const marker = L.marker([last.lat, last.lon], { icon: makeDeviceIcon(color) })
       .addTo(map)
       .bindPopup(`<b>${esc(device.name)}</b><br>${fmtAge(ageSec)}${bat}${spd}`);
     layersByDevice[device.id].push(marker);
   }
 
-  function makeIcon(color) {
+  function makeDeviceIcon(color) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30">
       <circle cx="11" cy="11" r="9" fill="${color}" stroke="#0c1729" stroke-width="2"/>
       <polygon points="11,30 5,17 17,17" fill="${color}"/>
@@ -662,11 +1075,9 @@
       const rows  = await res.json();
       const el    = document.getElementById('storage-info');
       if (!rows.length) { el.textContent = ''; return; }
-      const total = rows.reduce((s, r) => s + r.total_points, 0);
+      const total  = rows.reduce((s, r) => s + r.total_points, 0);
       const oldest = rows.reduce((m, r) => Math.min(m, r.oldest), Infinity);
-      const span  = oldest < Infinity
-        ? Math.ceil((Date.now() / 1000 - oldest) / 86400)
-        : 0;
+      const span   = oldest < Infinity ? Math.ceil((Date.now() / 1000 - oldest) / 86400) : 0;
       el.textContent = `${total.toLocaleString()} points stored · ${span}d history`;
     } catch {}
   }
@@ -705,8 +1116,8 @@
           <div class="device-name">${esc(d.name)}</div>
           <div class="device-meta">${age}${bat}</div>
         </div>
-        <span class="device-del" data-id="${d.id}" title="Remove device">
-          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <span class="device-del" title="Remove device">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
             <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </span>
@@ -736,19 +1147,19 @@
     });
   }
 
-  // ── Add device ────────────────────────────────────────────────────────────
-  function openAddDialog() {
+  // ── Add device dialog ─────────────────────────────────────────────────────
+  function openAddDeviceDialog() {
     document.getElementById('new-device-name').value = '';
     document.getElementById('new-device-key-block').className = '';
     document.getElementById('dialog-msg').textContent = '';
     document.getElementById('dialog-create-btn').disabled = false;
     document.getElementById('dialog-create-btn').textContent = 'Create';
-    document.getElementById('add-device-dialog').className = 'open';
+    document.getElementById('add-device-dialog').classList.add('open');
     setTimeout(() => document.getElementById('new-device-name').focus(), 50);
   }
 
-  function closeAddDialog() {
-    document.getElementById('add-device-dialog').className = '';
+  function closeAddDeviceDialog() {
+    document.getElementById('add-device-dialog').classList.remove('open');
     refresh();
   }
 
@@ -788,6 +1199,14 @@
     return `${Math.floor(s / 86400)}d ago`;
   }
 
+  function fmtDuration(s) {
+    if (s < 60)    return `${s}s`;
+    if (s < 3600)  return `${Math.floor(s / 60)}m`;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -801,9 +1220,15 @@
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('auth-login-btn').addEventListener('click', login);
-    document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
-    document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-    document.getElementById('new-device-name').addEventListener('keydown', e => { if (e.key === 'Enter') createDevice(); });
+    document.getElementById('auth-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-password').focus();
+    });
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') login();
+    });
+    document.getElementById('new-device-name').addEventListener('keydown', e => {
+      if (e.key === 'Enter') createDevice();
+    });
 
     if (getToken()) initMap();
   });

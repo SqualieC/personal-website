@@ -445,14 +445,134 @@ export default {
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    // Close an active trip and write its final stats
+    async function endTrip(tripId, deviceId, userId, endPos, distance, maxSpeedMph, pointCount) {
+      const trip = await env.DB
+        .prepare('SELECT started_at FROM gps_trips WHERE id = ?')
+        .bind(tripId).first();
+      if (!trip) return;
+      const duration = endPos.timestamp - trip.started_at;
+      const avgSpeedMph = duration > 0 && distance > 0
+        ? (distance / 1609.34) / (duration / 3600) : 0;
+      await env.DB.prepare(`
+        UPDATE gps_trips
+        SET ended_at=?, end_lat=?, end_lon=?,
+            distance_meters=?, avg_speed_mph=?, max_speed_mph=?,
+            duration_seconds=?, point_count=?
+        WHERE id=?
+      `).bind(
+        endPos.timestamp, endPos.lat, endPos.lon,
+        distance, avgSpeedMph, maxSpeedMph,
+        duration, pointCount, tripId
+      ).run();
+    }
+
+    // Run trip-detection state machine over a batch of positions
+    async function detectTrips(dev, positions) {
+      let tripState   = dev.trip_state      || 'idle';
+      let tripId      = dev.current_trip_id || null;
+      let anchorLat   = dev.trip_anchor_lat  ?? null;
+      let anchorLon   = dev.trip_anchor_lon  ?? null;
+      let anchorTime  = dev.trip_anchor_time ?? null;
+      let lastLat     = dev.trip_last_lat    ?? null;
+      let lastLon     = dev.trip_last_lon    ?? null;
+      let lastTime    = dev.trip_last_time   ?? null;
+      let distance    = dev.trip_distance    ?? 0;
+      let maxSpeed    = dev.trip_max_speed   ?? 0;
+      let pointCount  = dev.trip_point_count ?? 0;
+
+      for (const pos of positions) {
+        const speedMph = (pos.speed || 0) * 2.237;
+
+        // First ping ever — just initialise anchor
+        if (anchorLat === null) {
+          anchorLat = pos.lat; anchorLon = pos.lon; anchorTime = pos.timestamp;
+          lastLat   = pos.lat; lastLon   = pos.lon; lastTime   = pos.timestamp;
+          continue;
+        }
+
+        // Long gap while moving → treat as implicit stop, end trip
+        if (tripState === 'moving' && lastTime && (pos.timestamp - lastTime) > 600) {
+          await endTrip(tripId, dev.id, dev.user_id,
+            { timestamp: lastTime, lat: lastLat, lon: lastLon },
+            distance, maxSpeed, pointCount);
+          tripId = null; tripState = 'idle';
+          distance = 0; maxSpeed = 0; pointCount = 0;
+          anchorLat = lastLat; anchorLon = lastLon; anchorTime = lastTime;
+        }
+
+        const distFromAnchor = haversineMeters(anchorLat, anchorLon, pos.lat, pos.lon);
+
+        if (distFromAnchor > 50) {
+          // ── MOVING ──
+          // Was cooling → moved again before trip ended → close old trip first
+          if (tripState === 'cooling' && tripId) {
+            await endTrip(tripId, dev.id, dev.user_id,
+              { timestamp: anchorTime, lat: anchorLat, lon: anchorLon },
+              distance, maxSpeed, pointCount);
+            tripId = null;
+            distance = 0; maxSpeed = 0; pointCount = 0;
+          }
+
+          if (!tripId) {
+            const { meta } = await env.DB.prepare(
+              'INSERT INTO gps_trips (device_id, user_id, started_at, start_lat, start_lon) VALUES (?, ?, ?, ?, ?)'
+            ).bind(dev.id, dev.user_id, pos.timestamp, anchorLat, anchorLon).run();
+            tripId   = meta.last_row_id;
+            lastLat  = anchorLat; lastLon = anchorLon; lastTime = anchorTime;
+            distance = 0; maxSpeed = 0; pointCount = 0;
+          }
+
+          tripState = 'moving';
+          if (lastLat !== null) distance += haversineMeters(lastLat, lastLon, pos.lat, pos.lon);
+          if (speedMph > maxSpeed) maxSpeed = speedMph;
+          pointCount++;
+          lastLat = pos.lat; lastLon = pos.lon; lastTime = pos.timestamp;
+
+        } else {
+          // ── STATIONARY ──
+          if (tripState === 'moving') {
+            tripState  = 'cooling';
+            anchorTime = pos.timestamp; // mark when we stopped
+          }
+          if (tripState === 'cooling' && tripId && (pos.timestamp - anchorTime) >= 300) {
+            await endTrip(tripId, dev.id, dev.user_id,
+              { timestamp: anchorTime, lat: pos.lat, lon: pos.lon },
+              distance, maxSpeed, pointCount);
+            tripId    = null; tripState = 'idle';
+            distance  = 0; maxSpeed = 0; pointCount = 0;
+          }
+          // Drift anchor when idle
+          if (tripState === 'idle') {
+            anchorLat = pos.lat; anchorLon = pos.lon; anchorTime = pos.timestamp;
+          }
+        }
+      }
+
+      // Persist updated state
+      await env.DB.prepare(`
+        UPDATE gps_devices
+        SET trip_state=?, current_trip_id=?,
+            trip_anchor_lat=?, trip_anchor_lon=?, trip_anchor_time=?,
+            trip_last_lat=?,   trip_last_lon=?,   trip_last_time=?,
+            trip_distance=?,   trip_max_speed=?,  trip_point_count=?
+        WHERE id=?
+      `).bind(
+        tripState, tripId,
+        anchorLat, anchorLon, anchorTime,
+        lastLat,   lastLon,   lastTime,
+        distance,  maxSpeed,  pointCount,
+        dev.id
+      ).run();
+    }
+
     // ── POST /gps/track?key=DEVICE_KEY ───────────────────────────────────────
-    // Accepts Overland GeoJSON batch format or simple { lat, lon, ... }
     if (path === '/gps/track' && request.method === 'POST') {
       const key = url.searchParams.get('key');
       if (!key) return err('Missing key', 401);
 
       const device = await env.DB
-        .prepare('SELECT id, user_id FROM gps_devices WHERE device_key = ?')
+        .prepare('SELECT * FROM gps_devices WHERE device_key = ?')
         .bind(key).first();
       if (!device) return err('Invalid key', 401);
 
@@ -463,14 +583,12 @@ export default {
       let positions = [];
 
       if (body.locations && Array.isArray(body.locations)) {
-        // Overland GeoJSON batch
         for (const loc of body.locations) {
           if (loc.geometry?.type !== 'Point') continue;
           const [lon, lat, alt] = loc.geometry.coordinates;
           const props = loc.properties ?? {};
           const ts = props.timestamp
-            ? Math.floor(new Date(props.timestamp).getTime() / 1000)
-            : now;
+            ? Math.floor(new Date(props.timestamp).getTime() / 1000) : now;
           positions.push({
             lat, lon,
             altitude: alt ?? props.altitude ?? null,
@@ -482,49 +600,41 @@ export default {
         }
       } else if (body.lat !== undefined && body.lon !== undefined) {
         positions.push({
-          lat: body.lat,
-          lon: body.lon,
-          altitude: body.altitude ?? null,
-          speed: body.speed ?? null,
-          accuracy: body.accuracy ?? null,
-          battery: body.battery ?? null,
+          lat: body.lat, lon: body.lon,
+          altitude: body.altitude ?? null, speed: body.speed ?? null,
+          accuracy: body.accuracy ?? null, battery: body.battery ?? null,
           timestamp: body.timestamp ? Math.floor(body.timestamp) : now,
         });
       }
 
       if (!positions.length) return json({ result: 'ok', stored: 0 });
-
       positions.sort((a, b) => a.timestamp - b.timestamp);
 
+      // Trip detection runs on every position (before dedup filter)
+      await detectTrips(device, positions);
+
+      // 100m dedup filter for stored positions
       const lastStored = await env.DB
         .prepare('SELECT lat, lon FROM gps_positions WHERE device_id = ? ORDER BY timestamp DESC LIMIT 1')
         .bind(device.id).first();
-
-      let prevLat = lastStored?.lat;
-      let prevLon = lastStored?.lon;
+      let prevLat = lastStored?.lat, prevLon = lastStored?.lon;
       const toInsert = [];
-
       for (const pos of positions) {
-        if (prevLat !== undefined && prevLon !== undefined) {
-          if (haversineMeters(prevLat, prevLon, pos.lat, pos.lon) < 100) continue;
-        }
+        if (prevLat !== undefined && haversineMeters(prevLat, prevLon, pos.lat, pos.lon) < 100) continue;
         toInsert.push(pos);
-        prevLat = pos.lat;
-        prevLon = pos.lon;
+        prevLat = pos.lat; prevLon = pos.lon;
       }
-
       if (toInsert.length > 0) {
-        const stmts = toInsert.map(pos =>
+        await env.DB.batch(toInsert.map(pos =>
           env.DB.prepare(
             'INSERT INTO gps_positions (device_id, user_id, lat, lon, altitude, speed, accuracy, battery, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
           ).bind(device.id, device.user_id, pos.lat, pos.lon, pos.altitude, pos.speed, pos.accuracy, pos.battery, pos.timestamp)
-        );
-        await env.DB.batch(stmts);
+        ));
       }
 
       const latest = positions[positions.length - 1];
       await env.DB
-        .prepare('UPDATE gps_devices SET last_seen = ?, last_lat = ?, last_lon = ?, battery = ? WHERE id = ?')
+        .prepare('UPDATE gps_devices SET last_seen=?, last_lat=?, last_lon=?, battery=? WHERE id=?')
         .bind(now, latest.lat, latest.lon, latest.battery, device.id).run();
 
       return json({ result: 'ok', stored: toInsert.length });
@@ -535,13 +645,14 @@ export default {
       const userId = await getUserId(request, env);
       if (!userId) return err('Unauthorized', 401);
       const { results } = await env.DB
-        .prepare('SELECT id, name, device_key, last_seen, last_lat, last_lon, battery FROM gps_devices WHERE user_id = ? ORDER BY id')
+        .prepare(`SELECT id, name, device_key, last_seen, last_lat, last_lon, battery,
+                         trip_state, current_trip_id
+                  FROM gps_devices WHERE user_id = ? ORDER BY id`)
         .bind(userId).all();
       return json(results);
     }
 
     // ── POST /gps/devices ─────────────────────────────────────────────────────
-    // Body: { name }
     if (path === '/gps/devices' && request.method === 'POST') {
       const userId = await getUserId(request, env);
       if (!userId) return err('Unauthorized', 401);
@@ -562,8 +673,9 @@ export default {
       const deviceId = parseInt(path.split('/')[3]);
       if (!deviceId) return err('Invalid id');
       await env.DB.batch([
-        env.DB.prepare('DELETE FROM gps_positions WHERE device_id = ? AND user_id = ?').bind(deviceId, userId),
-        env.DB.prepare('DELETE FROM gps_devices WHERE id = ? AND user_id = ?').bind(deviceId, userId),
+        env.DB.prepare('DELETE FROM gps_positions WHERE device_id=? AND user_id=?').bind(deviceId, userId),
+        env.DB.prepare('DELETE FROM gps_trips     WHERE device_id=? AND user_id=?').bind(deviceId, userId),
+        env.DB.prepare('DELETE FROM gps_devices   WHERE id=?        AND user_id=?').bind(deviceId, userId),
       ]);
       return json({ ok: true });
     }
@@ -574,13 +686,11 @@ export default {
       if (!userId) return err('Unauthorized', 401);
       const { results } = await env.DB.prepare(`
         SELECT p.device_id, d.name AS device_name,
-               COUNT(*)            AS total_points,
-               MIN(p.timestamp)   AS oldest,
-               MAX(p.timestamp)   AS newest
-        FROM gps_positions p
-        JOIN gps_devices d ON d.id = p.device_id
-        WHERE p.user_id = ?
-        GROUP BY p.device_id
+               COUNT(*)          AS total_points,
+               MIN(p.timestamp)  AS oldest,
+               MAX(p.timestamp)  AS newest
+        FROM gps_positions p JOIN gps_devices d ON d.id = p.device_id
+        WHERE p.user_id = ? GROUP BY p.device_id
       `).bind(userId).all();
       return json(results);
     }
@@ -590,19 +700,98 @@ export default {
       const userId = await getUserId(request, env);
       if (!userId) return err('Unauthorized', 401);
       const deviceId = parseInt(url.searchParams.get('deviceId') ?? '0');
-      const hours = Math.min(168, Math.max(1, parseInt(url.searchParams.get('hours') ?? '24')));
+      const hours    = Math.min(168, Math.max(1, parseInt(url.searchParams.get('hours') ?? '24')));
       if (!deviceId) return err('Missing deviceId');
       const device = await env.DB
-        .prepare('SELECT id FROM gps_devices WHERE id = ? AND user_id = ?')
+        .prepare('SELECT id FROM gps_devices WHERE id=? AND user_id=?')
         .bind(deviceId, userId).first();
       if (!device) return err('Device not found', 404);
       const since = Math.floor(Date.now() / 1000) - hours * 3600;
       const { results } = await env.DB
-        .prepare('SELECT lat, lon, speed, battery, timestamp FROM gps_positions WHERE device_id = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 2000')
+        .prepare('SELECT lat, lon, speed, battery, timestamp FROM gps_positions WHERE device_id=? AND timestamp>=? ORDER BY timestamp ASC LIMIT 2000')
         .bind(deviceId, since).all();
       return json(results);
     }
 
+    // ── GET /gps/trips?deviceId=X&limit=30 ───────────────────────────────────
+    if (path === '/gps/trips' && request.method === 'GET') {
+      const userId   = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const deviceId = parseInt(url.searchParams.get('deviceId') ?? '0') || null;
+      const limit    = Math.min(100, parseInt(url.searchParams.get('limit') ?? '30'));
+      const where    = deviceId ? 'AND t.device_id = ?' : '';
+      const params   = deviceId ? [userId, deviceId, limit] : [userId, limit];
+      const { results } = await env.DB.prepare(`
+        SELECT t.id, t.device_id, d.name AS device_name,
+               t.started_at, t.ended_at, t.start_lat, t.start_lon,
+               t.end_lat, t.end_lon, t.distance_meters,
+               t.avg_speed_mph, t.max_speed_mph, t.duration_seconds, t.point_count
+        FROM gps_trips t JOIN gps_devices d ON d.id = t.device_id
+        WHERE t.user_id = ? ${where}
+        ORDER BY t.started_at DESC LIMIT ?
+      `).bind(...params).all();
+      return json(results);
+    }
+
+    // ── GET /gps/trips/:id/positions ──────────────────────────────────────────
+    if (path.match(/^\/gps\/trips\/\d+\/positions$/) && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const tripId = parseInt(path.split('/')[3]);
+      const trip   = await env.DB
+        .prepare('SELECT device_id, started_at, ended_at FROM gps_trips WHERE id=? AND user_id=?')
+        .bind(tripId, userId).first();
+      if (!trip) return err('Trip not found', 404);
+      const endTs = trip.ended_at ?? Math.floor(Date.now() / 1000);
+      const { results } = await env.DB
+        .prepare('SELECT lat, lon, speed, timestamp FROM gps_positions WHERE device_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC LIMIT 2000')
+        .bind(trip.device_id, trip.started_at, endTs).all();
+      return json(results);
+    }
+
+    // ── GET /gps/pois ─────────────────────────────────────────────────────────
+    if (path === '/gps/pois' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const { results } = await env.DB
+        .prepare('SELECT id, name, lat, lon, radius FROM gps_pois WHERE user_id=? ORDER BY id')
+        .bind(userId).all();
+      return json(results);
+    }
+
+    // ── POST /gps/pois ────────────────────────────────────────────────────────
+    if (path === '/gps/pois' && request.method === 'POST') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      let body; try { body = await request.json(); } catch { return err('Invalid JSON'); }
+      const { name, lat, lon, radius } = body ?? {};
+      if (!name || lat == null || lon == null) return err('Missing name, lat, or lon');
+      const r = Math.max(50, Math.min(5000, parseInt(radius ?? 100)));
+      const { meta } = await env.DB
+        .prepare('INSERT INTO gps_pois (user_id, name, lat, lon, radius) VALUES (?, ?, ?, ?, ?)')
+        .bind(userId, String(name).trim(), lat, lon, r).run();
+      return json({ id: meta.last_row_id, name, lat, lon, radius: r });
+    }
+
+    // ── DELETE /gps/pois/:id ──────────────────────────────────────────────────
+    if (path.startsWith('/gps/pois/') && request.method === 'DELETE') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const poiId = parseInt(path.split('/')[3]);
+      if (!poiId) return err('Invalid id');
+      await env.DB.prepare('DELETE FROM gps_pois WHERE id=? AND user_id=?').bind(poiId, userId).run();
+      return json({ ok: true });
+    }
+
     return err('Not found', 404);
+  },
+
+  // ── Scheduled: nightly data retention (90 days) ──────────────────────────
+  async scheduled(_event, env) {
+    const cutoff = Math.floor(Date.now() / 1000) - 90 * 86400;
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM gps_positions WHERE timestamp < ?').bind(cutoff),
+      env.DB.prepare('DELETE FROM gps_trips WHERE ended_at IS NOT NULL AND ended_at < ?').bind(cutoff),
+    ]);
   },
 };

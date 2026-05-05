@@ -6,3 +6,6 @@ compatibility_date = "2026-02-28"
 binding       = "DB"
 database_name = "account-db"
 database_id   = "bf88a0bb-fd10-4811-a94c-9069fdfd4b5e"
+
+[triggers]
+crons = ["0 4 * * *"]
