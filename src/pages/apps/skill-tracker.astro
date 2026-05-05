@@ -1005,7 +1005,7 @@ function renderRadar(cats: StatsCat[]) {
   const labelDist = S / 2 - PAD;   // anchor distance, always within bounds
   const R   = labelDist * 0.82;    // outer ring a bit inside the label anchors
   const fs  = 13;                  // fixed px — not scaled with panel size
-  const dotR = 4;                  // fixed px radius
+  const dotR = 3;                  // fixed px radius
 
   function mk(tag: string, attrs: Record<string, string | number>): Element {
     const e = document.createElementNS(NS, tag);
@@ -1038,7 +1038,7 @@ function renderRadar(cats: StatsCat[]) {
   cats.forEach((c, i) => {
     const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
     const ax = Math.cos(angle), ay = Math.sin(angle);
-    const pr  = (c.proportion > 0 ? c.proportion : 0.05) * R;
+    const pr  = (c.proportion > 0 ? c.proportion : 0.12) * R;
     pts.push({ x: cx + ax * pr, y: cy + ay * pr, color: PALETTE[i % PALETTE.length] });
 
     // Axis spoke to outer ring corner
