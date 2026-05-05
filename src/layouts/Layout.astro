@@ -103,9 +103,9 @@ const beaconConfig = cfAnalyticsToken ? JSON.stringify({ token: cfAnalyticsToken
     </main>
     <script is:inline>
     (function () {
-      const WORKER    = 'https://korean-srs.squaliekid55.workers.dev';
-      const TOKEN_KEY = 'korean-srs-token';
-      const EMAIL_KEY = 'korean-srs-email';
+      const WORKER    = 'https://squalie-account.squaliekid55.workers.dev';
+      const TOKEN_KEY = 'squalie-token';
+      const EMAIL_KEY = 'squalie-email';
 
       function getToken() { return localStorage.getItem(TOKEN_KEY); }
       function getEmail() { return localStorage.getItem(EMAIL_KEY); }
@@ -114,14 +114,14 @@ const beaconConfig = cfAnalyticsToken ? JSON.stringify({ token: cfAnalyticsToken
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(EMAIL_KEY, email);
         updateNavBtn();
-        document.dispatchEvent(new CustomEvent('srs-auth-changed', { detail: { token, email } }));
+        document.dispatchEvent(new CustomEvent('auth-changed', { detail: { token, email } }));
       }
 
       function clearAuth() {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(EMAIL_KEY);
         updateNavBtn();
-        document.dispatchEvent(new CustomEvent('srs-auth-changed', { detail: { token: null, email: null } }));
+        document.dispatchEvent(new CustomEvent('auth-changed', { detail: { token: null, email: null } }));
       }
 
       function updateNavBtn() {

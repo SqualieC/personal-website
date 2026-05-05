@@ -635,7 +635,7 @@ const PALETTE = [
   '#38bdf8', '#c084fc',
 ];
 
-const API = 'https://korean-srs.squaliekid55.workers.dev';
+const API = 'https://squalie-account.squaliekid55.workers.dev';
 let categories: Category[]       = [];
 let activeSession: ActiveSession | null = null;
 let currentPeriod: 'today' | 'week' | 'year' | 'lifetime' = 'today';
@@ -658,7 +658,7 @@ let canvasW = 400, canvasH = 400;
 
 // ── API ───────────────────────────────────────────────────────────
 function getToken(): string | null {
-  return localStorage.getItem('korean-srs-token');
+  return localStorage.getItem('squalie-token');
 }
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -866,7 +866,7 @@ function animate() {
 // ── UI helpers ────────────────────────────────────────────────────
 function setConnected(ok: boolean) {
   document.getElementById('connDot')!.className = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
-  const email = localStorage.getItem('korean-srs-email');
+  const email = localStorage.getItem('squalie-email');
   document.getElementById('connLabel')!.textContent = ok
     ? (email ?? 'Connected')
     : (getToken() ? 'Not connected' : 'Not signed in');
@@ -1177,7 +1177,7 @@ async function connect() {
 
 // Re-connect whenever the user logs in/out (the Layout fires a storage event)
 window.addEventListener('storage', (e) => {
-  if (e.key === 'korean-srs-token') connect();
+  if (e.key === 'squalie-token') connect();
 });
 
 document.getElementById('timerBtn')!.addEventListener('click', async () => {

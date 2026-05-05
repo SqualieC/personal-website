@@ -1803,9 +1803,9 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   // ── SRS Cloud Sync ─────────────────────────────────────────
   // Auth is handled globally in the site header (Layout.astro).
   // This page just reads the stored token and responds to auth events.
-  const SRS_WORKER_URL   = "https://korean-srs.squaliekid55.workers.dev";
-  const SRS_TOKEN_LS_KEY = "korean-srs-token";
-  const SRS_EMAIL_LS_KEY = "korean-srs-email";
+  const SRS_WORKER_URL   = "https://squalie-account.squaliekid55.workers.dev";
+  const SRS_TOKEN_LS_KEY = "squalie-token";
+  const SRS_EMAIL_LS_KEY = "squalie-email";
 
   const srsSyncMsgEl        = document.getElementById("srsSyncMsg");
   const srsSyncGuestRow     = document.getElementById("srsSyncGuestRow");
@@ -1906,7 +1906,7 @@ const kor111Units = [...new Set(kor111.map((x: any) => x.unit as number))]
   }
 
   // When the user logs in/out from the header, update the sync UI
-  document.addEventListener("srs-auth-changed", async ({ detail }) => {
+  document.addEventListener("auth-changed", async ({ detail }) => {
     renderSyncUI();
     if (detail.token && appMode === "srs") {
       setSyncMsg("Syncing…");

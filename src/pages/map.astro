@@ -395,8 +395,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPnI=" crossorigin=""></script>
 <script is:inline>
 (function () {
-  const WORKER    = 'https://korean-srs.squaliekid55.workers.dev';
-  const TOKEN_KEY = 'korean-srs-token';
+  const WORKER    = 'https://squalie-account.squaliekid55.workers.dev';
+  const TOKEN_KEY = 'squalie-token';
   const COLORS    = ['#3b82f6','#ef4444','#22c55e','#f97316','#a855f7','#ec4899','#14b8a6','#eab308'];
   const REFRESH_MS = 30_000;
 
@@ -424,7 +424,7 @@
       const data = await res.json();
       if (!res.ok) { setAuthMsg(data.error || 'Login failed.', true); btn.disabled = false; return; }
       localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem('korean-srs-email', data.email);
+      localStorage.setItem('squalie-email', data.email);
       initMap();
     } catch {
       setAuthMsg('Connection failed.', true);
@@ -442,7 +442,7 @@
     const t = getToken();
     if (t) fetch(`${WORKER}/logout`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + t } }).catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem('korean-srs-email');
+    localStorage.removeItem('squalie-email');
     location.reload();
   }
 
