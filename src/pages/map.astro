@@ -281,20 +281,18 @@
     .device-row.hidden-layer .device-name { color: color-mix(in srgb, var(--muted), transparent 30%); }
 
     .device-del {
-      appearance: none;
-      -webkit-appearance: none;
       position: absolute;
       right: 0.7rem;
       top: 50%;
       transform: translateY(-50%);
-      background: transparent;
-      border: none;
-      color: color-mix(in srgb, var(--muted), transparent 55%);
-      cursor: pointer;
-      font-size: 0.7rem;
-      line-height: 1;
-      padding: 0.2rem 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
       border-radius: 4px;
+      color: color-mix(in srgb, var(--muted), transparent 40%);
+      cursor: pointer;
       opacity: 0;
       transition: opacity 0.15s, color 0.15s, background 0.15s;
       pointer-events: none;
@@ -688,11 +686,15 @@
           <div class="device-name">${esc(d.name)}</div>
           <div class="device-meta">${age}${bat}</div>
         </div>
-        <button class="device-del" data-id="${d.id}" title="Remove device">✕</button>
+        <span class="device-del" data-id="${d.id}" title="Remove device">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
       `;
 
       row.addEventListener('click', function (e) {
-        if (e.target.classList.contains('device-del')) return;
+        if (e.target.closest('.device-del')) return;
         hiddenDevices.has(d.id) ? hiddenDevices.delete(d.id) : hiddenDevices.add(d.id);
         renderDeviceList();
         devices.forEach(dev => {
