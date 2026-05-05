@@ -786,9 +786,9 @@ export default {
     return err('Not found', 404);
   },
 
-  // ── Scheduled: nightly data retention (90 days) ──────────────────────────
+  // ── Scheduled: nightly data retention (7 days) ───────────────────────────
   async scheduled(_event, env) {
-    const cutoff = Math.floor(Date.now() / 1000) - 90 * 86400;
+    const cutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
     await env.DB.batch([
       env.DB.prepare('DELETE FROM gps_positions WHERE timestamp < ?').bind(cutoff),
       env.DB.prepare('DELETE FROM gps_trips WHERE ended_at IS NOT NULL AND ended_at < ?').bind(cutoff),
