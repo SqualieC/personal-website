@@ -18,6 +18,9 @@ import Layout from '../../layouts/Layout.astro';
     <div class="blob-panel">
       <canvas id="blobCanvas"></canvas>
       <!-- CSS2DRenderer injects its own overlay div here at runtime -->
+      <svg id="radarSvg" class="radar-svg" viewBox="-115 -115 230 230"
+           xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" hidden></svg>
+      <button id="viewToggle" class="view-toggle-btn">2D</button>
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="today">Today</button>
@@ -525,6 +528,54 @@ import Layout from '../../layouts/Layout.astro';
 
   .empty-msg { color: var(--muted); font-size: 0.83rem; padding: 0.5rem 0; }
 
+  /* ── 2D radar toggle ─────────────────────────────────────────── */
+  .view-toggle-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg), transparent 18%);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 65%);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 0.28rem 0.75rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .view-toggle-btn:hover { color: var(--text); border-color: color-mix(in srgb, var(--muted), transparent 40%); }
+  .view-toggle-btn.is-2d {
+    background: color-mix(in srgb, #4ade80, transparent 84%);
+    border-color: color-mix(in srgb, #4ade80, transparent 45%);
+    color: #4ade80;
+  }
+
+  .radar-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 1.5rem;
+  }
+
+  /* ── Session delete button ────────────────────────────────────── */
+  .hist-del {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.3rem;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .history-item:hover .hist-del { opacity: 1; }
+  .hist-del:hover { color: #f87171; }
+
   /* ── Responsive ──────────────────────────────────────────────── */
   @media (max-width: 700px) {
     .tracker-shell { grid-template-columns: 1fr; }
@@ -589,6 +640,8 @@ let activeSession: ActiveSession | null = null;
 let currentPeriod: 'today' | 'week' | 'year' | 'lifetime' = 'today';
 let clockInterval: ReturnType<typeof setInterval> | null = null;
 let wasConnected = false;
+let is2D = false;
+let lastStatsCats: StatsCat[] = [];
 
 // ── Three.js globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -700,19 +753,18 @@ function disposePolyGroup() {
 }
 
 function buildPolyhedron(cats: StatsCat[]) {
+  lastStatsCats = cats;
+  document.getElementById('noDataMsg')!.hidden = cats.length > 0;
+
+  if (is2D) { renderRadar(cats); return; }
+
   disposePolyGroup();
   labelObjs.forEach(obj => scene.remove(obj));
   labelObjs = [];
   labelEls  = [];
   vertexData = [];
 
-  const noData = document.getElementById('noDataMsg')!;
-
-  if (cats.length === 0) {
-    noData.hidden = false;
-    return;
-  }
-  noData.hidden = true;
+  if (cats.length === 0) return;
 
   // Position each vertex: 0-proportion → sits near origin (0.06),
   // full proportion → MAX_R out along its axis.
@@ -840,7 +892,13 @@ function renderCategoryList(stats: StatsResponse | null) {
   list.innerHTML   = '';
   select.innerHTML = '<option value="">Select a skill…</option>';
 
-  for (const cat of categories) {
+  const sortedCats = [...categories].sort((a, b) => {
+    const sa = stats?.categories.find(c => c.id === a.id)?.total_seconds ?? 0;
+    const sb = stats?.categories.find(c => c.id === b.id)?.total_seconds ?? 0;
+    return sb - sa;
+  });
+
+  for (const cat of sortedCats) {
     const sec = stats?.categories.find(c => c.id === cat.id)?.total_seconds ?? 0;
 
     const li = document.createElement('li');
@@ -877,7 +935,8 @@ function renderHistory(sessions: any[]) {
     el.innerHTML = `
       <span class="history-cat"><span class="cat-dot"></span>${s.category_name}</span>
       <span class="history-dur">${fmtDuration(s.duration_seconds)}</span>
-      <span class="history-date">${dateStr} · ${timeStr}</span>`;
+      <span class="history-date">${dateStr} · ${timeStr}</span>
+      <button class="hist-del" data-id="${s.id}" title="Delete session">✕</button>`;
     list.appendChild(el);
   });
 }
@@ -923,6 +982,87 @@ function renderBarChart(cats: StatsCat[]) {
     row.appendChild(dur);
     container.appendChild(row);
   });
+}
+
+function renderRadar(cats: StatsCat[]) {
+  const svg = document.getElementById('radarSvg')!;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  if (cats.length === 0) return;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const N  = cats.length;
+  const R  = 80;
+
+  function mk(tag: string, attrs: Record<string, string | number>): Element {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    return e;
+  }
+
+  const gridG  = mk('g', {}), axisG  = mk('g', {});
+  const shapeG = mk('g', {}), dotG   = mk('g', {}), labelG = mk('g', {});
+  [gridG, axisG, shapeG, dotG, labelG].forEach(g => svg.appendChild(g));
+
+  // Reference rings
+  [0.25, 0.5, 0.75, 1].forEach(r => gridG.appendChild(mk('circle', {
+    cx: 0, cy: 0, r: r * R,
+    fill: 'none',
+    stroke: r === 1 ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)',
+    'stroke-dasharray': r < 1 ? '3 5' : '',
+  })));
+
+  const pts: Array<{ x: number; y: number; color: string }> = [];
+
+  cats.forEach((c, i) => {
+    const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
+    const ax = Math.cos(angle), ay = Math.sin(angle);
+    const pr  = (c.proportion > 0 ? c.proportion : 0.05) * R;
+    pts.push({ x: ax * pr, y: ay * pr, color: PALETTE[i % PALETTE.length] });
+
+    // Axis spoke
+    axisG.appendChild(mk('line', { x1: 0, y1: 0, x2: ax * R, y2: ay * R,
+      stroke: 'rgba(255,255,255,0.13)', 'stroke-width': 0.8 }));
+
+    // Label
+    const lx = ax * (R + 16), ly = ay * (R + 16);
+    const anchor   = ax > 0.25 ? 'start' : ax < -0.25 ? 'end' : 'middle';
+    const baseline = ay > 0.25 ? 'hanging' : ay < -0.25 ? 'auto' : 'middle';
+    const pct = Math.round(c.proportion * 100);
+    const txt = mk('text', { x: lx, y: ly, 'text-anchor': anchor,
+      'dominant-baseline': baseline, 'font-size': 7,
+      fill: 'rgba(255,255,255,0.82)', 'font-family': 'system-ui,sans-serif' });
+    txt.textContent = pct > 0 ? `${c.name} ${pct}%` : c.name;
+    labelG.appendChild(txt);
+  });
+
+  // Filled shape
+  if (pts.length >= 3) {
+    shapeG.appendChild(mk('polygon', {
+      points: pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '),
+      fill: 'rgba(74,222,128,0.13)', stroke: '#4ade80',
+      'stroke-width': 1.5, 'stroke-linejoin': 'round',
+    }));
+  } else if (pts.length === 2) {
+    shapeG.appendChild(mk('line', { x1: pts[0].x, y1: pts[0].y, x2: pts[1].x, y2: pts[1].y,
+      stroke: '#4ade80', 'stroke-width': 1.5 }));
+  }
+
+  // Colored vertex dots
+  pts.forEach(p => dotG.appendChild(mk('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 4, fill: p.color })));
+}
+
+function setView(mode: '2d' | '3d') {
+  is2D = mode === '2d';
+  const canvas = document.getElementById('blobCanvas') as HTMLCanvasElement;
+  const svg    = document.getElementById('radarSvg')!;
+  const btn    = document.getElementById('viewToggle')!;
+  canvas.style.display              = is2D ? 'none' : '';
+  labelRenderer.domElement.style.display = is2D ? 'none' : '';
+  svg.hidden = !is2D;
+  btn.textContent = is2D ? '3D' : '2D';
+  btn.classList.toggle('is-2d', is2D);
+  if (is2D) renderRadar(lastStatsCats);
+  else       buildPolyhedron(lastStatsCats);
 }
 
 function startClock(startedAt: string) {
@@ -1075,6 +1215,26 @@ document.querySelectorAll<HTMLButtonElement>('.period-tab').forEach(btn => {
     currentPeriod = btn.dataset.period as typeof currentPeriod;
     if (wasConnected) await refreshStats();
   });
+});
+
+document.getElementById('viewToggle')!.addEventListener('click', () => {
+  setView(is2D ? '3d' : '2d');
+});
+
+document.getElementById('historyList')!.addEventListener('click', async (e) => {
+  const btn = (e.target as HTMLElement).closest('button.hist-del') as HTMLButtonElement | null;
+  if (!btn) return;
+  const id = parseInt(btn.dataset.id!);
+  if (!confirm('Delete this session? This cannot be undone.')) return;
+  try {
+    await api(`/sessions/${id}`, { method: 'DELETE' });
+    const [stats, sessions] = await Promise.all([
+      api<StatsResponse>(`/stats/${currentPeriod}`),
+      api<any[]>('/sessions'),
+    ]);
+    buildPolyhedron(stats.categories); renderBarChart(stats.categories);
+    renderCategoryList(stats); renderHistory(sessions);
+  } catch (err) { console.error('Delete session failed:', err); }
 });
 
 // ── Init ──────────────────────────────────────────────────────────

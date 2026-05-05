@@ -381,6 +381,18 @@ export default {
       return json({ ok: true });
     }
 
+    // ── DELETE /st/sessions/:id ──────────────────────────────────────────────
+    if (path.startsWith('/st/sessions/') && request.method === 'DELETE') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const sessId = parseInt(path.split('/')[3]);
+      if (!sessId) return err('Invalid id');
+      await env.DB
+        .prepare('DELETE FROM st_sessions WHERE id=? AND user_id=?')
+        .bind(sessId, userId).run();
+      return json({ ok: true });
+    }
+
     // ── GET /st/stats/today ───────────────────────────────────────────────────
     if (path === '/st/stats/today' && request.method === 'GET') {
       const userId = await getUserId(request, env);
