@@ -996,13 +996,16 @@ function renderRadar(cats: StatsCat[]) {
   const H = panel.clientHeight || 400;
   svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-  const NS = 'http://www.w3.org/2000/svg';
-  const N  = cats.length;
-  const cx = W / 2, cy = H / 2;
-  const S  = Math.min(W, H);
-  const R  = S * 0.28;            // outer ring radius
-  const labelDist = R + S * 0.04; // label anchor just outside the outer ring
-  const fs = S * 0.020;           // font size
+  const NS  = 'http://www.w3.org/2000/svg';
+  const N   = cats.length;
+  const cx  = W / 2, cy = H / 2;
+  const S   = Math.min(W, H);
+  // Fixed label padding budget — labels stay ≥90px from each edge
+  const PAD  = 90;
+  const labelDist = S / 2 - PAD;   // anchor distance, always within bounds
+  const R   = labelDist * 0.82;    // outer ring a bit inside the label anchors
+  const fs  = 13;                  // fixed px — not scaled with panel size
+  const dotR = 4;                  // fixed px radius
 
   function mk(tag: string, attrs: Record<string, string | number>): Element {
     const e = document.createElementNS(NS, tag);
@@ -1074,7 +1077,6 @@ function renderRadar(cats: StatsCat[]) {
   }
 
   // Small colored vertex dots
-  const dotR = S * 0.012;
   pts.forEach(p => dotG.appendChild(mk('circle', {
     cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: dotR, fill: p.color,
   })));
