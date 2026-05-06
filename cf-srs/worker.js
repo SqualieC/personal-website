@@ -436,6 +436,12 @@ export default {
     // ── GPS Tracking endpoints (/gps/*) ─────────────────────────────────────
     // ════════════════════════════════════════════════════════════════════════
 
+    // Minimum distance between stored positions. Lower = higher resolution path.
+    // 20m  → good for 1s intervals (smooth gradient, detailed playback)
+    // 50m  → good for 5s intervals
+    // 100m → good for 30s intervals
+    const GPS_DEDUP_METERS = 20;
+
     function haversineMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -620,7 +626,7 @@ export default {
       let prevLat = lastStored?.lat, prevLon = lastStored?.lon;
       const toInsert = [];
       for (const pos of positions) {
-        if (prevLat !== undefined && haversineMeters(prevLat, prevLon, pos.lat, pos.lon) < 100) continue;
+        if (prevLat !== undefined && haversineMeters(prevLat, prevLon, pos.lat, pos.lon) < GPS_DEDUP_METERS) continue;
         toInsert.push(pos);
         prevLat = pos.lat; prevLon = pos.lon;
       }
