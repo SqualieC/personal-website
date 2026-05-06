@@ -796,17 +796,22 @@ function buildPolyhedron(cats: StatsCat[]) {
 
   if (cats.length === 0) return;
 
+  // In streak mode recompute proportions as √(seconds × active_days) so the
+  // shape and labels reflect both time and consistency, not raw time alone.
+  const effectiveProps = streakMode ? streakProportions(cats) : cats.map(c => c.proportion);
+
   // Position each vertex: 0-proportion → sits near origin (0.06),
   // full proportion → MAX_R out along its axis.
   vertexData = cats.map((c, i) => {
     const color = PALETTE[i % PALETTE.length];
+    const ep = effectiveProps[i];
     // Map proportion → [0.06, 1] so non-zero values always exceed the zero baseline.
-    const radFrac = c.proportion > 0 ? 0.06 + c.proportion * 0.94 : 0.06;
+    const radFrac = ep > 0 ? 0.06 + ep * 0.94 : 0.06;
     const pos = new THREE.Vector3(...c.axis).multiplyScalar(radFrac * MAX_R);
     const dir = pos.clone().normalize();
     const tipPos   = pos.clone().addScaledVector(dir, 0.35);
     const labelPos = pos.clone().addScaledVector(dir, 0.58);
-    return { pos, tipPos, labelPos, name: c.name, proportion: c.proportion, color };
+    return { pos, tipPos, labelPos, name: c.name, proportion: ep, color };
   });
 
   polyGroup = new THREE.Group();
@@ -1089,12 +1094,14 @@ function renderRadar(cats: StatsCat[]) {
   })));
 
   const pts: Array<{ x: number; y: number; color: string }> = [];
+  const effectiveProps = streakMode ? streakProportions(cats) : cats.map(c => c.proportion);
 
   cats.forEach((c, i) => {
     const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
     const ax = Math.cos(angle), ay = Math.sin(angle);
+    const ep = effectiveProps[i];
     // Map proportion → [0.12, 1] so non-zero values always exceed the zero baseline.
-    const pr = (c.proportion > 0 ? 0.12 + c.proportion * 0.88 : 0.12) * R;
+    const pr = (ep > 0 ? 0.12 + ep * 0.88 : 0.12) * R;
     pts.push({ x: cx + ax * pr, y: cy + ay * pr, color: PALETTE[i % PALETTE.length] });
 
     // Axis spoke to outer ring corner
@@ -1122,7 +1129,7 @@ function renderRadar(cats: StatsCat[]) {
     const ly = cy + ay * labelDist;
     const anchor   = ax > 0.2 ? 'start' : ax < -0.2 ? 'end' : 'middle';
     const baseline = ay > 0.2 ? 'hanging' : ay < -0.2 ? 'auto' : 'middle';
-    const pct  = Math.round(c.proportion * 100);
+    const pct  = Math.round(ep * 100);
     const name = c.name.length > 11 ? c.name.slice(0, 10) + '…' : c.name;
     const txt  = mk('text', {
       x: lx, y: ly, 'text-anchor': anchor, 'dominant-baseline': baseline,
@@ -1231,6 +1238,14 @@ async function loadStreak(w: 7 | 30) {
 
 function getStreakData(): Record<number, number> {
   return streakWindow === 7 ? streakData7 : streakData30;
+}
+
+function streakProportions(cats: StatsCat[]): number[] {
+  const data = getStreakData();
+  const scores = cats.map(c => Math.sqrt(c.total_seconds * (data[c.id] ?? 0)));
+  const total = scores.reduce((a, b) => a + b, 0);
+  if (total === 0) return cats.map(c => c.proportion);
+  return scores.map(s => s / total);
 }
 
 // ── Connection ────────────────────────────────────────────────────
