@@ -800,9 +800,9 @@ function buildPolyhedron(cats: StatsCat[]) {
   // full proportion → MAX_R out along its axis.
   vertexData = cats.map((c, i) => {
     const color = PALETTE[i % PALETTE.length];
-    const pos = new THREE.Vector3(...c.axis).multiplyScalar(
-      (c.proportion > 0 ? c.proportion : 0.06) * MAX_R
-    );
+    // Map proportion → [0.06, 1] so non-zero values always exceed the zero baseline.
+    const radFrac = c.proportion > 0 ? 0.06 + c.proportion * 0.94 : 0.06;
+    const pos = new THREE.Vector3(...c.axis).multiplyScalar(radFrac * MAX_R);
     const dir = pos.clone().normalize();
     const tipPos   = pos.clone().addScaledVector(dir, 0.35);
     const labelPos = pos.clone().addScaledVector(dir, 0.58);
@@ -1093,7 +1093,8 @@ function renderRadar(cats: StatsCat[]) {
   cats.forEach((c, i) => {
     const angle = -Math.PI / 2 + i * (2 * Math.PI / N);
     const ax = Math.cos(angle), ay = Math.sin(angle);
-    const pr  = (c.proportion > 0 ? c.proportion : 0.12) * R;
+    // Map proportion → [0.12, 1] so non-zero values always exceed the zero baseline.
+    const pr = (c.proportion > 0 ? 0.12 + c.proportion * 0.88 : 0.12) * R;
     pts.push({ x: cx + ax * pr, y: cy + ay * pr, color: PALETTE[i % PALETTE.length] });
 
     // Axis spoke to outer ring corner
