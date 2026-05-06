@@ -20,8 +20,10 @@
       --muted:   #b8ceee;
       --accent:  #28edc4;
       --accent2: #ff6b38;
+      --ring:    #50edda;
       --poi:     #a78bfa;
-      --trip:    #facc15;
+      --slow:    #22c55e;
+      --fast:    #ff6b38;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,16 +72,20 @@
       position: absolute;
       inset: 0;
       z-index: 1000;
-      background: rgba(12, 23, 41, 0.82);
-      backdrop-filter: blur(8px);
+      background: rgba(12, 23, 41, 0.85);
+      backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .auth-box {
-      background: var(--bg-soft);
-      border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+      background: linear-gradient(155deg,
+        color-mix(in srgb, var(--card), transparent 5%),
+        color-mix(in srgb, var(--bg-soft), transparent 8%)
+      );
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 65%);
+      border-left: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
       border-radius: 16px;
       padding: 1.75rem;
       width: min(380px, 90vw);
@@ -87,17 +93,16 @@
       flex-direction: column;
       gap: 0.65rem;
     }
-
-    .auth-box h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.15rem; }
-
+    .auth-box h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.1rem; }
     .auth-box .site-link {
       font-size: 0.8rem;
       color: var(--muted);
       text-decoration: none;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.3rem;
     }
     .auth-box .site-link:hover { color: var(--text); }
 
+    /* ── Shared form elements ── */
     .field {
       border: 1px solid color-mix(in srgb, var(--muted), transparent 55%);
       border-radius: 10px;
@@ -112,28 +117,35 @@
     .field:focus { border-color: var(--accent); }
     .field::placeholder { color: color-mix(in srgb, var(--muted), transparent 40%); }
 
-    .btn-accent {
-      background: var(--accent);
-      color: var(--bg);
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
       border: none;
       border-radius: 10px;
       padding: 0.58rem 1.2rem;
-      font-size: 0.93rem;
+      font-size: 0.9rem;
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
-      align-self: flex-start;
       transition: filter 0.12s;
+      color: #dcfff8;
+      border: 1px solid color-mix(in srgb, var(--accent), transparent 48%);
+      background: linear-gradient(120deg,
+        color-mix(in srgb, var(--accent), black 38%),
+        color-mix(in srgb, var(--accent), var(--bg-soft) 55%)
+      );
     }
-    .btn-accent:hover { filter: brightness(1.08); }
-    .btn-accent:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 
     .btn-ghost {
       background: transparent;
       border: 1px solid color-mix(in srgb, var(--muted), transparent 58%);
       color: var(--muted);
       border-radius: 8px;
-      padding: 0.4rem 0.85rem;
+      padding: 0.38rem 0.85rem;
       font-size: 0.85rem;
       font-family: inherit;
       cursor: pointer;
@@ -150,30 +162,35 @@
       top: 14px;
       left: 14px;
       z-index: 500;
-      width: 240px;
-      background: color-mix(in srgb, var(--bg-soft), transparent 8%);
+      width: 268px;
+      background: linear-gradient(155deg,
+        color-mix(in srgb, var(--card), transparent 10%),
+        color-mix(in srgb, var(--bg-soft), transparent 8%)
+      );
       border: 1px solid color-mix(in srgb, var(--muted), transparent 68%);
+      border-left: 2px solid color-mix(in srgb, var(--accent), transparent 60%);
       border-radius: 16px;
-      backdrop-filter: blur(14px);
+      backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
       max-height: calc(100dvh - 28px);
       overflow: hidden;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.3);
     }
 
     .panel-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.7rem 0.9rem 0.55rem;
-      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+      padding: 0.75rem 1rem 0.6rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 82%);
       flex-shrink: 0;
     }
 
     .panel-title {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--accent);
     }
@@ -181,7 +198,7 @@
     .panel-top-right {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.5rem;
     }
 
     .icon-btn {
@@ -189,38 +206,47 @@
       border: none;
       color: var(--muted);
       cursor: pointer;
-      font-size: 0.8rem;
-      padding: 2px 4px;
-      border-radius: 4px;
+      font-size: 0.78rem;
+      padding: 2px 5px;
+      border-radius: 5px;
       font-family: inherit;
       transition: color 0.12s;
       text-decoration: none;
+      white-space: nowrap;
     }
     .icon-btn:hover { color: var(--text); }
 
-    /* ── Tab bar ── */
+    /* ── Pill tab bar (matches global.css auth-tabs) ── */
     .tab-bar {
       display: flex;
-      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+      gap: 3px;
+      background: color-mix(in srgb, var(--muted), transparent 88%);
+      border-radius: 10px;
+      padding: 3px;
+      margin: 0.55rem 0.9rem 0;
       flex-shrink: 0;
     }
 
     .tab {
       flex: 1;
-      background: none;
+      background: transparent;
       border: none;
+      border-radius: 7px;
       color: var(--muted);
-      font-size: 0.75rem;
+      font-size: 0.74rem;
       font-weight: 600;
       font-family: inherit;
-      padding: 0.5rem 0.25rem;
+      padding: 5px 4px;
       cursor: pointer;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
-      transition: color 0.12s, border-color 0.12s;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
     }
     .tab:hover { color: var(--text); }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab.active {
+      background: var(--card);
+      color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
 
     /* ── Tab contents ── */
     .tab-content {
@@ -229,20 +255,22 @@
       flex: 1;
       overflow: hidden;
       min-height: 0;
+      margin-top: 0.45rem;
     }
 
+    /* ── Sections / selects ── */
     .panel-section {
-      padding: 0.55rem 0.9rem;
+      padding: 0.5rem 0.9rem;
       border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
       flex-shrink: 0;
     }
 
     .panel-label {
-      font-size: 0.67rem;
-      color: color-mix(in srgb, var(--muted), transparent 30%);
+      font-size: 0.66rem;
+      color: color-mix(in srgb, var(--muted), transparent 25%);
       text-transform: uppercase;
-      letter-spacing: 0.07em;
-      margin-bottom: 0.3rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.28rem;
     }
 
     .panel-select {
@@ -262,7 +290,6 @@
     .scrollable-list {
       overflow-y: auto;
       flex: 1;
-      padding: 0.3rem 0;
     }
 
     /* ── Device rows ── */
@@ -270,7 +297,7 @@
       display: flex;
       align-items: center;
       gap: 0.55rem;
-      padding: 0.48rem 0.9rem;
+      padding: 0.5rem 0.9rem;
       cursor: pointer;
       transition: background 0.1s;
       user-select: none;
@@ -282,12 +309,11 @@
       height: 9px;
       border-radius: 50%;
       flex-shrink: 0;
-      transition: opacity 0.15s, box-shadow 0.15s;
       box-shadow: 0 0 6px currentColor;
+      transition: opacity 0.15s, box-shadow 0.15s;
     }
 
     .device-info { flex: 1; min-width: 0; }
-
     .device-name {
       font-size: 0.8rem;
       font-weight: 600;
@@ -297,13 +323,12 @@
       color: var(--text);
       transition: color 0.15s;
     }
-
     .device-meta { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
 
     .device-row.hidden-layer .device-dot  { opacity: 0.2; box-shadow: none; }
     .device-row.hidden-layer .device-name { color: color-mix(in srgb, var(--muted), transparent 30%); }
 
-    .device-del {
+    .row-del {
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -316,27 +341,24 @@
       opacity: 0;
       transition: opacity 0.15s, color 0.15s, background 0.15s;
     }
-    .device-row:hover .device-del { opacity: 1; }
-    .device-del:hover {
-      color: #f87171;
-      background: color-mix(in srgb, #f87171, transparent 88%);
-    }
+    .device-row:hover .row-del { opacity: 1; }
+    .row-del:hover { color: #f87171; background: color-mix(in srgb, #f87171, transparent 88%); }
 
     /* ── Trip rows ── */
     .trip-row {
       display: flex;
       align-items: flex-start;
-      gap: 0.55rem;
-      padding: 0.52rem 0.9rem;
+      gap: 0.5rem;
+      padding: 0.55rem 0.9rem;
       cursor: pointer;
       transition: background 0.1s;
       user-select: none;
       border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
     }
     .trip-row:hover { background: color-mix(in srgb, var(--muted), transparent 92%); }
-    .trip-row.selected { background: color-mix(in srgb, var(--trip), transparent 90%); }
+    .trip-row.active-trip { background: color-mix(in srgb, var(--accent), transparent 93%); }
 
-    .trip-active-dot {
+    .active-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
@@ -346,27 +368,137 @@
       margin-top: 4px;
       animation: pulse 1.5s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
     .trip-info { flex: 1; min-width: 0; }
-    .trip-device {
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
+    .trip-device { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+    .trip-date { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
+    .trip-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+
+    /* ── Trip detail view ── */
+    #trip-detail {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
-    .trip-date { font-weight: 400; color: var(--muted); }
-    .trip-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+    .detail-back {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.9rem 0.35rem;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color 0.12s;
+      text-align: left;
+      flex-shrink: 0;
+    }
+    .detail-back:hover { color: var(--accent); }
+
+    .detail-header {
+      padding: 0 0.9rem 0.6rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 85%);
+      flex-shrink: 0;
+    }
+    .detail-device { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+    .detail-date { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+
+    /* Stats grid — mini cards matching site's card style */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+      padding: 0.65rem 0.9rem;
+      flex-shrink: 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 85%);
+    }
+
+    .stat-card {
+      background: linear-gradient(155deg,
+        color-mix(in srgb, var(--card), transparent 20%),
+        color-mix(in srgb, var(--bg-soft), transparent 12%)
+      );
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
+      border-radius: 10px;
+      padding: 0.5rem 0.45rem;
+      text-align: center;
+      transition: border-color 0.14s;
+    }
+    .stat-card:hover { border-color: color-mix(in srgb, var(--accent), transparent 55%); }
+
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.63rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 3px;
+    }
+
+    /* ── Speed chart ── */
+    .speed-chart-section {
+      padding: 0.6rem 0.9rem 0.55rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 85%);
+      flex-shrink: 0;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.45rem;
+    }
+    .chart-title { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+    .chart-legend {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.62rem;
+      color: var(--muted);
+    }
+    .legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #speed-chart-svg {
+      width: 100%;
+      height: 64px;
+      display: block;
+      border-radius: 6px;
+      overflow: visible;
+    }
+
+    /* ── Detail actions ── */
+    .detail-actions {
+      padding: 0.6rem 0.9rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
 
     /* ── Panel footer ── */
     .panel-footer {
       padding: 0.55rem 0.9rem;
-      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 82%);
       flex-shrink: 0;
     }
 
@@ -378,7 +510,7 @@
       cursor: pointer;
       font-size: 0.78rem;
       font-family: inherit;
-      padding: 0.4rem;
+      padding: 0.42rem;
       width: 100%;
       transition: border-color 0.14s, color 0.14s;
     }
@@ -386,12 +518,138 @@
 
     /* ── Storage info ── */
     #storage-info {
-      padding: 0.45rem 0.9rem 0.5rem;
-      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 88%);
-      font-size: 0.67rem;
+      padding: 0.4rem 0.9rem 0.5rem;
+      border-top: 1px solid color-mix(in srgb, var(--muted), transparent 90%);
+      font-size: 0.66rem;
       color: color-mix(in srgb, var(--muted), transparent 25%);
       line-height: 1.6;
       flex-shrink: 0;
+    }
+
+    /* ── Playback bar ── */
+    #playback-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--card), transparent 5%),
+        color-mix(in srgb, var(--bg-soft), transparent 5%)
+      );
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+      border-radius: 14px;
+      backdrop-filter: blur(18px);
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+      padding: 0.6rem 0.9rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: min(480px, calc(100vw - 300px));
+      min-width: 260px;
+    }
+
+    .pb-top {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .pb-play-btn {
+      background: linear-gradient(120deg,
+        color-mix(in srgb, var(--accent), black 38%),
+        color-mix(in srgb, var(--accent), var(--bg-soft) 55%)
+      );
+      border: 1px solid color-mix(in srgb, var(--accent), transparent 48%);
+      color: #dcfff8;
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: filter 0.12s;
+    }
+    .pb-play-btn:hover { filter: brightness(1.12); }
+
+    .pb-info { flex: 1; min-width: 0; }
+    .pb-trip-name {
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pb-time { font-size: 0.65rem; color: var(--muted); margin-top: 1px; }
+
+    .pb-speed-now {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .pb-mult-select {
+      background: color-mix(in srgb, var(--bg), transparent 5%);
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 68%);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.73rem;
+      font-family: inherit;
+      padding: 0.2rem 0.3rem;
+      cursor: pointer;
+      outline: none;
+      flex-shrink: 0;
+    }
+    .pb-mult-select:focus { border-color: var(--accent); }
+
+    .pb-close-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.12s;
+      flex-shrink: 0;
+    }
+    .pb-close-btn:hover { color: #f87171; }
+
+    /* Progress scrubber */
+    .pb-scrubber {
+      height: 6px;
+      background: color-mix(in srgb, var(--muted), transparent 78%);
+      border-radius: 999px;
+      cursor: pointer;
+      position: relative;
+      overflow: visible;
+    }
+    .pb-scrubber-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--ring));
+      border-radius: 999px;
+      transition: width 0.1s linear;
+      pointer-events: none;
+    }
+    .pb-scrubber-thumb {
+      position: absolute;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg-soft);
+      transform: translate(-50%, -50%);
+      transition: left 0.1s linear;
+      pointer-events: none;
+      box-shadow: 0 0 6px var(--accent);
     }
 
     /* ── Dialogs ── */
@@ -399,7 +657,7 @@
       position: absolute;
       inset: 0;
       z-index: 600;
-      background: rgba(12, 23, 41, 0.7);
+      background: rgba(12, 23, 41, 0.72);
       backdrop-filter: blur(6px);
       display: none;
       align-items: center;
@@ -408,30 +666,23 @@
     .dialog-overlay.open { display: flex; }
 
     .dialog-box {
-      background: var(--bg-soft);
+      background: linear-gradient(155deg,
+        color-mix(in srgb, var(--card), transparent 5%),
+        color-mix(in srgb, var(--bg-soft), transparent 8%)
+      );
       border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+      border-left: 2px solid color-mix(in srgb, var(--accent), transparent 55%);
       border-radius: 16px;
       padding: 1.5rem;
       width: min(360px, 90vw);
       display: flex;
       flex-direction: column;
       gap: 0.7rem;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
     }
     .dialog-box h3 { font-size: 0.95rem; font-weight: 700; }
-
-    .dialog-row {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-
-    .dialog-actions {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
-      margin-top: 0.1rem;
-    }
-
+    .dialog-row { display: flex; gap: 0.5rem; align-items: center; }
+    .dialog-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.1rem; }
     .dialog-msg { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
 
     #new-device-key-block {
@@ -445,7 +696,6 @@
       gap: 0.45rem;
     }
     #new-device-key-block.show { display: flex; }
-
     .key-url {
       color: var(--accent);
       word-break: break-all;
@@ -453,7 +703,6 @@
       font-size: 0.68rem;
       line-height: 1.45;
     }
-
     .copy-btn {
       background: color-mix(in srgb, var(--card), transparent 10%);
       border: 1px solid color-mix(in srgb, var(--muted), transparent 65%);
@@ -489,7 +738,6 @@
       backdrop-filter: blur(8px);
     }
     #poi-banner.active { display: flex; }
-
     #poi-cancel-banner {
       background: none;
       border: 1px solid rgba(255,255,255,0.4);
@@ -514,12 +762,11 @@
       padding: 0.25rem 0.75rem;
       font-size: 0.7rem;
       color: var(--muted);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
       display: flex;
       align-items: center;
       gap: 0.4rem;
     }
-
     .status-dot {
       width: 6px;
       height: 6px;
@@ -532,14 +779,14 @@
 
     /* ── Empty state ── */
     .empty-msg {
-      padding: 0.7rem 0.9rem;
+      padding: 0.8rem 0.9rem;
       font-size: 0.78rem;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.55;
     }
 
-    /* ── Map crosshair cursor when placing POI ── */
-    .map-placing { cursor: crosshair !important; }
+    /* ── Crosshair mode ── */
+    .map-placing,
     .map-placing .leaflet-interactive { cursor: crosshair !important; }
   </style>
 </head>
@@ -547,32 +794,32 @@
 
 <div id="map"></div>
 
-<!-- Auth overlay -->
+<!-- ── Auth overlay ──────────────────────────────────────────────────── -->
 <div id="auth-overlay">
   <div class="auth-box">
     <a href="/" class="site-link">← squalie.cc</a>
     <h2>Map</h2>
-    <input id="auth-email" class="field" type="email" placeholder="Email" autocomplete="email" />
+    <input id="auth-email"    class="field" type="email"    placeholder="Email"    autocomplete="email" />
     <input id="auth-password" class="field" type="password" placeholder="Password" autocomplete="current-password" />
-    <button id="auth-login-btn" class="btn-accent">Log In</button>
+    <button id="auth-login-btn" class="btn-primary">Log In</button>
     <p id="auth-msg"></p>
   </div>
 </div>
 
-<!-- Side panel -->
+<!-- ── Side panel ─────────────────────────────────────────────────────── -->
 <div id="panel" style="display:none">
   <div class="panel-top">
     <span class="panel-title">Map</span>
     <div class="panel-top-right">
       <a href="/" class="icon-btn">← Home</a>
-      <button class="icon-btn" id="logout-btn">Log out</button>
+      <button id="logout-btn" class="icon-btn">Log out</button>
     </div>
   </div>
 
   <div class="tab-bar">
     <button class="tab active" data-tab="devices">Devices</button>
-    <button class="tab" data-tab="trips">Trips</button>
-    <button class="tab" data-tab="places">Places</button>
+    <button class="tab"        data-tab="trips">Trips</button>
+    <button class="tab"        data-tab="places">Places</button>
   </div>
 
   <!-- Devices tab -->
@@ -596,7 +843,42 @@
 
   <!-- Trips tab -->
   <div id="tab-trips" class="tab-content" style="display:none">
-    <div id="trip-list" class="scrollable-list"></div>
+    <div id="trip-list-view" class="scrollable-list"></div>
+    <div id="trip-detail" style="display:none; flex:1; overflow:hidden; flex-direction:column">
+      <button id="trip-back-btn" class="detail-back">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M6.5 1.5L3 5l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        All Trips
+      </button>
+      <div class="detail-header">
+        <div id="detail-device" class="detail-device"></div>
+        <div id="detail-date"   class="detail-date"></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div id="stat-dist" class="stat-value">—</div><div class="stat-label">miles</div></div>
+        <div class="stat-card"><div id="stat-dur"  class="stat-value">—</div><div class="stat-label">duration</div></div>
+        <div class="stat-card"><div id="stat-avg"  class="stat-value">—</div><div class="stat-label">avg mph</div></div>
+        <div class="stat-card"><div id="stat-max"  class="stat-value">—</div><div class="stat-label">max mph</div></div>
+      </div>
+      <div class="speed-chart-section">
+        <div class="chart-header">
+          <span class="chart-title">Speed</span>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--slow)"></div>slow</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>mid</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--fast)"></div>fast</div>
+          </div>
+        </div>
+        <svg id="speed-chart-svg" viewBox="0 0 240 60" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="detail-actions">
+        <button id="play-trip-btn" class="btn-primary" style="flex:1">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg>
+          Play Trip
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Places tab -->
@@ -608,13 +890,36 @@
   </div>
 </div>
 
-<!-- POI add banner -->
+<!-- ── POI crosshair banner ───────────────────────────────────────────── -->
 <div id="poi-banner">
   Click on the map to place a point of interest
   <button id="poi-cancel-banner">Cancel</button>
 </div>
 
-<!-- Add device dialog -->
+<!-- ── Playback bar ───────────────────────────────────────────────────── -->
+<div id="playback-bar">
+  <div class="pb-top">
+    <button id="pb-play-btn" class="pb-play-btn">▶</button>
+    <div class="pb-info">
+      <div id="pb-trip-name" class="pb-trip-name"></div>
+      <div id="pb-time"      class="pb-time">0:00 / 0:00</div>
+    </div>
+    <span id="pb-speed-now" class="pb-speed-now">— mph</span>
+    <select id="pb-mult" class="pb-mult-select">
+      <option value="5">5×</option>
+      <option value="20" selected>20×</option>
+      <option value="60">60×</option>
+      <option value="120">120×</option>
+    </select>
+    <button id="pb-close-btn" class="pb-close-btn">✕</button>
+  </div>
+  <div id="pb-scrubber" class="pb-scrubber">
+    <div id="pb-fill"  class="pb-scrubber-fill"  style="width:0%"></div>
+    <div id="pb-thumb" class="pb-scrubber-thumb" style="left:0%"></div>
+  </div>
+</div>
+
+<!-- ── Add device dialog ─────────────────────────────────────────────── -->
 <div id="add-device-dialog" class="dialog-overlay">
   <div class="dialog-box">
     <h3>Add Device</h3>
@@ -622,36 +927,36 @@
     <div id="new-device-key-block">
       <div class="panel-label">Overland / HTTP endpoint</div>
       <div id="new-device-url" class="key-url"></div>
-      <button class="copy-btn" id="copy-url-btn">Copy URL</button>
+      <button id="copy-url-btn" class="copy-btn">Copy URL</button>
       <div class="panel-label" style="margin-top:0.2rem">Secret key — keep private</div>
       <div id="new-device-key" class="key-url"></div>
     </div>
     <p id="dialog-msg" class="dialog-msg"></p>
     <div class="dialog-actions">
-      <button class="btn-ghost" id="dialog-cancel-btn">Close</button>
-      <button class="btn-accent" id="dialog-create-btn">Create</button>
+      <button id="dialog-cancel-btn" class="btn-ghost">Close</button>
+      <button id="dialog-create-btn" class="btn-primary">Create</button>
     </div>
   </div>
 </div>
 
-<!-- Add POI dialog -->
+<!-- ── Add POI dialog ────────────────────────────────────────────────── -->
 <div id="add-poi-dialog" class="dialog-overlay">
   <div class="dialog-box">
     <h3>Add Place</h3>
-    <input id="poi-name-input" class="field" type="text" placeholder="Name (e.g. Home, Work)" />
+    <input id="poi-name-input"   class="field" type="text"   placeholder="Name (e.g. Home, Work)" />
     <div class="dialog-row">
-      <input id="poi-radius-input" class="field" type="number" min="50" max="5000" placeholder="Radius" value="100" style="width:110px;flex-shrink:0" />
+      <input id="poi-radius-input" class="field" type="number" min="50" max="5000" value="100" placeholder="Radius" style="width:110px;flex-shrink:0" />
       <span style="font-size:0.8rem;color:var(--muted)">meters radius</span>
     </div>
     <p id="poi-dialog-msg" class="dialog-msg"></p>
     <div class="dialog-actions">
-      <button class="btn-ghost" id="poi-cancel-dialog-btn">Cancel</button>
-      <button class="btn-accent" id="poi-create-btn">Save Place</button>
+      <button id="poi-cancel-dialog-btn" class="btn-ghost">Cancel</button>
+      <button id="poi-create-btn"        class="btn-primary">Save Place</button>
     </div>
   </div>
 </div>
 
-<!-- Status bar -->
+<!-- ── Status bar ────────────────────────────────────────────────────── -->
 <div id="status-bar">
   <div class="status-dot"></div>
   <span id="status-text">Connecting…</span>
@@ -660,62 +965,59 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPnI=" crossorigin=""></script>
 <script is:inline>
 (function () {
-  const WORKER     = 'https://squalie-account.squaliekid55.workers.dev';
-  const TOKEN_KEY  = 'squalie-token';
-  const EMAIL_KEY  = 'squalie-email';
-  const COLORS     = ['#28edc4','#ff6b38','#60a5fa','#f472b6','#a78bfa','#facc15','#34d399','#fb923c'];
-  const REFRESH_MS = 30_000;
+  const WORKER    = 'https://squalie-account.squaliekid55.workers.dev';
+  const TOKEN_KEY = 'squalie-token';
+  const COLORS    = ['#28edc4','#ff6b38','#60a5fa','#f472b6','#a78bfa','#facc15','#34d399','#fb923c'];
+  const REFRESH   = 30_000;
 
   let map, token;
   let devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
-  let trips = [], selectedTripId = null, tripRouteLayer = null;
+  let trips = [], selectedTrip = null, tripRouteGroup = null;
   let pois = [], poiLayers = {};
-  let addingPoi = false, pendingPoiLatLng = null;
-  let mapFitted = false;
-  let activeTab = 'devices';
+  let addingPoi = false, pendingLatLng = null;
+  let mapFitted = false, activeTab = 'devices';
+
+  // ── Playback state ──────────────────────────────────────────────────────
+  const pb = {
+    active: false, positions: [], index: 0, multiplier: 20,
+    marker: null, rafId: null, startWall: 0, startGps: 0, trip: null,
+  };
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
+  // ── Auth ──────────────────────────────────────────────────────────────
   async function login() {
     const email = document.getElementById('auth-email').value.trim();
     const pass  = document.getElementById('auth-password').value;
     const btn   = document.getElementById('auth-login-btn');
     if (!email || !pass) { setAuthMsg('Enter email and password.', true); return; }
-    btn.disabled = true;
-    setAuthMsg('Connecting…', false);
+    btn.disabled = true; setAuthMsg('Connecting…', false);
     try {
       const res  = await fetch(`${WORKER}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass }),
       });
       const data = await res.json();
       if (!res.ok) { setAuthMsg(data.error || 'Login failed.', true); btn.disabled = false; return; }
       localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(EMAIL_KEY, data.email);
+      localStorage.setItem('squalie-email', data.email);
       initMap();
-    } catch {
-      setAuthMsg('Connection failed.', true);
-      btn.disabled = false;
-    }
+    } catch { setAuthMsg('Connection failed.', true); btn.disabled = false; }
   }
 
   function setAuthMsg(msg, isErr) {
     const el = document.getElementById('auth-msg');
-    el.textContent = msg;
-    el.className = isErr ? 'err' : '';
+    el.textContent = msg; el.className = isErr ? 'err' : '';
   }
 
   function logout() {
     const t = getToken();
     if (t) fetch(`${WORKER}/logout`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + t } }).catch(() => {});
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(EMAIL_KEY);
+    localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('squalie-email');
     location.reload();
   }
 
-  // ── Map init ──────────────────────────────────────────────────────────────
+  // ── Map init ──────────────────────────────────────────────────────────
   function initMap() {
     document.getElementById('auth-overlay').style.display = 'none';
     document.getElementById('panel').style.display = 'flex';
@@ -723,16 +1025,14 @@
 
     map = L.map('map', { zoomControl: false }).setView([39.5, -98.35], 4);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19,
+      subdomains: 'abcd', maxZoom: 19,
     }).addTo(map);
 
     map.on('click', function (e) {
       if (!addingPoi) return;
-      pendingPoiLatLng = e.latlng;
+      pendingLatLng = e.latlng;
       document.getElementById('poi-name-input').value = '';
       document.getElementById('poi-radius-input').value = '100';
       document.getElementById('poi-dialog-msg').textContent = '';
@@ -750,16 +1050,14 @@
         document.getElementById('tab-devices').style.display = activeTab === 'devices' ? 'flex' : 'none';
         document.getElementById('tab-trips').style.display   = activeTab === 'trips'   ? 'flex' : 'none';
         document.getElementById('tab-places').style.display  = activeTab === 'places'  ? 'flex' : 'none';
-        if (activeTab === 'trips') loadTrips();
+        if (activeTab === 'trips')  loadTrips();
         if (activeTab === 'places') loadPois();
       });
     });
 
     document.getElementById('history-select').addEventListener('change', function () {
-      historyHours = parseInt(this.value);
-      refresh();
+      historyHours = parseInt(this.value); refresh();
     });
-
     document.getElementById('logout-btn').addEventListener('click', logout);
     document.getElementById('add-device-btn').addEventListener('click', openAddDeviceDialog);
     document.getElementById('dialog-cancel-btn').addEventListener('click', closeAddDeviceDialog);
@@ -777,30 +1075,47 @@
     document.getElementById('poi-create-btn').addEventListener('click', createPoi);
     document.getElementById('poi-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') createPoi(); });
 
+    document.getElementById('trip-back-btn').addEventListener('click', showTripList);
+    document.getElementById('play-trip-btn').addEventListener('click', function () {
+      if (pb.active) stopPlayback(); else startPlayback();
+    });
+
+    // Playback bar controls
+    document.getElementById('pb-play-btn').addEventListener('click', function () {
+      pb.active ? pausePlayback() : resumePlayback();
+    });
+    document.getElementById('pb-close-btn').addEventListener('click', stopPlayback);
+    document.getElementById('pb-mult').addEventListener('change', function () {
+      pb.multiplier = parseInt(this.value);
+      if (pb.active) {
+        pb.startGps  = pb.positions[pb.index].timestamp;
+        pb.startWall = performance.now();
+      }
+    });
+    document.getElementById('pb-scrubber').addEventListener('click', function (e) {
+      const rect = this.getBoundingClientRect();
+      seekPlayback((e.clientX - rect.left) / rect.width);
+    });
+
     refresh();
-    setInterval(refresh, REFRESH_MS);
+    setInterval(refresh, REFRESH);
   }
 
-  // ── Data refresh ──────────────────────────────────────────────────────────
+  // ── Refresh ───────────────────────────────────────────────────────────
   async function refresh() {
     setStatus(false, 'Refreshing…');
     try {
-      const res = await fetch(`${WORKER}/gps/devices`, {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
+      const res = await fetch(`${WORKER}/gps/devices`, { headers: { 'Authorization': 'Bearer ' + token } });
       if (res.status === 401) { logout(); return; }
       devices = await res.json();
       renderDeviceList();
       await Promise.all(devices.map(loadTrack));
       if (!mapFitted) { fitMap(); mapFitted = true; }
       loadStats();
+      loadPois();
       if (activeTab === 'trips') loadTrips();
-      if (activeTab === 'places') loadPois();
-      else loadPois(); // always keep POI markers fresh
       setStatus(true, 'Live · ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } catch {
-      setStatus(false, 'Error — retrying…');
-    }
+    } catch { setStatus(false, 'Error — retrying…'); }
   }
 
   async function loadTrack(device) {
@@ -812,67 +1127,82 @@
     } catch {}
   }
 
-  // ── Trips ─────────────────────────────────────────────────────────────────
+  // ── Trips ─────────────────────────────────────────────────────────────
   async function loadTrips() {
     try {
-      const res = await fetch(`${WORKER}/gps/trips?limit=50`, {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
+      const res = await fetch(`${WORKER}/gps/trips?limit=60`, { headers: { 'Authorization': 'Bearer ' + token } });
       trips = await res.json();
       renderTripList();
     } catch {}
   }
 
+  function showTripList() {
+    document.getElementById('trip-list-view').style.display = '';
+    document.getElementById('trip-detail').style.display = 'none';
+    if (tripRouteGroup) { map.removeLayer(tripRouteGroup); tripRouteGroup = null; }
+    stopPlayback();
+    selectedTrip = null;
+  }
+
   function renderTripList() {
-    const list = document.getElementById('trip-list');
+    const list = document.getElementById('trip-list-view');
     list.innerHTML = '';
     if (!trips.length) {
-      list.innerHTML = '<div class="empty-msg">No trips yet.<br>Move more than 50 m to start one.</div>';
+      list.innerHTML = '<div class="empty-msg">No trips yet.<br>Move more than 50 m to start one automatically.</div>';
       return;
     }
     trips.forEach(trip => {
       const isActive = !trip.ended_at;
-      const dist = trip.distance_meters
-        ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi'
-        : '—';
-      const dur = trip.duration_seconds
-        ? fmtDuration(trip.duration_seconds)
-        : (isActive ? 'Active' : '—');
-      const speeds = trip.avg_speed_mph
-        ? `${Math.round(trip.avg_speed_mph)} avg / ${Math.round(trip.max_speed_mph)} max mph`
-        : '';
+      const dist = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi' : '—';
+      const dur  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : (isActive ? 'Active' : '—');
       const date = new Date(trip.started_at * 1000).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
       });
-
       const row = document.createElement('div');
-      row.className = 'trip-row' + (trip.id === selectedTripId ? ' selected' : '');
-
+      row.className = 'trip-row' + (isActive ? ' active-trip' : '');
       if (isActive) {
         const dot = document.createElement('div');
-        dot.className = 'trip-active-dot';
+        dot.className = 'active-dot';
         row.appendChild(dot);
       }
-
       const info = document.createElement('div');
       info.className = 'trip-info';
       info.innerHTML = `
-        <div class="trip-device">${esc(trip.device_name)} <span class="trip-date">${date}</span></div>
-        <div class="trip-meta">${dist} · ${dur}${speeds ? '<br>' + speeds : ''}</div>
+        <div class="trip-device">${esc(trip.device_name)}</div>
+        <div class="trip-date">${date}</div>
+        <div class="trip-meta">${dist} · ${dur}${trip.avg_speed_mph ? ' · ' + Math.round(trip.avg_speed_mph) + ' avg mph' : ''}</div>
       `;
       row.appendChild(info);
-
-      row.addEventListener('click', () => selectTrip(trip));
+      row.addEventListener('click', () => openTripDetail(trip));
       list.appendChild(row);
     });
   }
 
-  async function selectTrip(trip) {
-    selectedTripId = trip.id;
-    renderTripList();
+  async function openTripDetail(trip) {
+    selectedTrip = trip;
 
-    if (tripRouteLayer) { map.removeLayer(tripRouteLayer); tripRouteLayer = null; }
+    // Switch to detail view
+    document.getElementById('trip-list-view').style.display = 'none';
+    document.getElementById('trip-detail').style.display = 'flex';
 
+    // Fill header
+    document.getElementById('detail-device').textContent = trip.device_name;
+    document.getElementById('detail-date').textContent   = new Date(trip.started_at * 1000).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+
+    // Fill stats
+    document.getElementById('stat-dist').textContent = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) : '—';
+    document.getElementById('stat-dur').textContent  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : '—';
+    document.getElementById('stat-avg').textContent  = trip.avg_speed_mph    ? Math.round(trip.avg_speed_mph)     : '—';
+    document.getElementById('stat-max').textContent  = trip.max_speed_mph    ? Math.round(trip.max_speed_mph)     : '—';
+
+    // Clear chart placeholder
+    document.getElementById('speed-chart-svg').innerHTML = '';
+    if (tripRouteGroup) { map.removeLayer(tripRouteGroup); tripRouteGroup = null; }
+    stopPlayback();
+
+    // Fetch positions
     try {
       const res = await fetch(`${WORKER}/gps/trips/${trip.id}/positions`, {
         headers: { 'Authorization': 'Bearer ' + token },
@@ -880,41 +1210,219 @@
       const pts = await res.json();
       if (!pts.length) return;
 
-      const latlngs = pts.map(p => [p.lat, p.lon]);
-      tripRouteLayer = L.featureGroup();
+      const speeds = pts.map(p => (p.speed || 0) * 2.237);
+      const sorted = [...speeds].sort((a, b) => a - b);
+      const q1 = sorted[Math.floor(sorted.length * 0.25)];
+      const q3 = sorted[Math.floor(sorted.length * 0.75)];
 
-      L.polyline(latlngs, { color: '#facc15', weight: 4, opacity: 0.9, zIndex: 600 }).addTo(tripRouteLayer);
+      buildSpeedChart(pts, speeds, q1, q3);
+      renderColoredRoute(pts, speeds, q1, q3);
 
-      // Start dot (green)
-      L.circleMarker(latlngs[0], {
-        radius: 6, color: '#0c1729', weight: 2,
-        fillColor: '#22c55e', fillOpacity: 1,
-      }).addTo(tripRouteLayer);
-
-      // End dot
-      if (latlngs.length > 1) {
-        const endColor = trip.ended_at ? '#f87171' : '#facc15';
-        const dist = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi' : '—';
-        const dur  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : '—';
-        const popup = `<b>${esc(trip.device_name)}</b><br>${dist} · ${dur}`
-          + (trip.avg_speed_mph ? `<br>${Math.round(trip.avg_speed_mph)} avg / ${Math.round(trip.max_speed_mph)} max mph` : '');
-        L.circleMarker(latlngs[latlngs.length - 1], {
-          radius: 6, color: '#0c1729', weight: 2,
-          fillColor: endColor, fillOpacity: 1,
-        }).bindPopup(popup).addTo(tripRouteLayer);
-      }
-
-      tripRouteLayer.addTo(map);
-      try { map.fitBounds(tripRouteLayer.getBounds(), { padding: [44, 44], maxZoom: 16 }); } catch {}
+      pb.positions = pts;
+      pb.trip = trip;
+      document.getElementById('play-trip-btn').textContent = '';
+      document.getElementById('play-trip-btn').innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg> Play Trip';
     } catch {}
   }
 
-  // ── POIs ─────────────────────────────────────────────────────────────────
+  // ── Speed chart ───────────────────────────────────────────────────────
+  function buildSpeedChart(pts, speeds, q1, q3) {
+    const W = 240, H = 60, pad = 3;
+    const maxSpeed = Math.max(...speeds, 1);
+    const xScale = i => pad + (i / Math.max(speeds.length - 1, 1)) * (W - pad * 2);
+    const yScale = s => H - pad - (s / maxSpeed) * (H - pad * 2);
+    const q1y = yScale(q1).toFixed(1);
+    const q3y = yScale(q3).toFixed(1);
+    const bandH = Math.max(0, parseFloat(q1y) - parseFloat(q3y)).toFixed(1);
+
+    const pathD = speeds.map((s, i) =>
+      `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(s).toFixed(1)}`
+    ).join(' ');
+
+    // Build gradient fill path (area under line)
+    const areaD = pathD + ` L${xScale(speeds.length - 1).toFixed(1)},${H} L${xScale(0).toFixed(1)},${H} Z`;
+
+    const svg = document.getElementById('speed-chart-svg');
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#28edc4" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#28edc4" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Q1-Q3 band -->
+      <rect x="${pad}" y="${q3y}" width="${W - pad * 2}" height="${bandH}"
+            fill="rgba(40,237,196,0.07)" rx="2"/>
+      <!-- Q3 line -->
+      <line x1="${pad}" y1="${q3y}" x2="${W - pad}" y2="${q3y}"
+            stroke="#ff6b38" stroke-width="1" stroke-dasharray="3 2" opacity="0.65"/>
+      <!-- Q1 line -->
+      <line x1="${pad}" y1="${q1y}" x2="${W - pad}" y2="${q1y}"
+            stroke="#22c55e" stroke-width="1" stroke-dasharray="3 2" opacity="0.65"/>
+      <!-- Area fill -->
+      <path d="${areaD}" fill="url(#speedGrad)"/>
+      <!-- Speed line -->
+      <path d="${pathD}" fill="none" stroke="#28edc4" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <!-- Labels -->
+      <text x="${W - 1}" y="${q3y}" fill="#ff6b38" font-size="6.5" dominant-baseline="middle" text-anchor="end" opacity="0.85">Q3 ${Math.round(q3)} mph</text>
+      <text x="${W - 1}" y="${q1y}" fill="#22c55e" font-size="6.5" dominant-baseline="middle" text-anchor="end" opacity="0.85">Q1 ${Math.round(q1)} mph</text>
+    `;
+  }
+
+  // ── Color-coded route ─────────────────────────────────────────────────
+  function renderColoredRoute(pts, speeds, q1, q3) {
+    if (tripRouteGroup) map.removeLayer(tripRouteGroup);
+    tripRouteGroup = L.featureGroup();
+
+    // Group consecutive points of same speed band into single polylines
+    let seg = [[pts[0].lat, pts[0].lon]];
+    let segColor = speedColor(speeds[0], q1, q3);
+
+    for (let i = 1; i < pts.length; i++) {
+      const c = speedColor(speeds[i], q1, q3);
+      seg.push([pts[i].lat, pts[i].lon]);
+      if (c !== segColor || i === pts.length - 1) {
+        L.polyline(seg, { color: segColor, weight: 4, opacity: 0.88 }).addTo(tripRouteGroup);
+        seg = [[pts[i].lat, pts[i].lon]];
+        segColor = c;
+      }
+    }
+
+    // Start and end markers
+    L.circleMarker([pts[0].lat, pts[0].lon], {
+      radius: 6, fillColor: '#22c55e', fillOpacity: 1, color: '#0c1729', weight: 2,
+    }).addTo(tripRouteGroup);
+
+    if (pts.length > 1) {
+      const last = pts[pts.length - 1];
+      const endColor = selectedTrip && !selectedTrip.ended_at ? '#facc15' : '#f87171';
+      const dist = selectedTrip && selectedTrip.distance_meters
+        ? (selectedTrip.distance_meters / 1609.34).toFixed(2) + ' mi' : '';
+      const dur  = selectedTrip && selectedTrip.duration_seconds
+        ? fmtDuration(selectedTrip.duration_seconds) : '';
+      L.circleMarker([last.lat, last.lon], {
+        radius: 6, fillColor: endColor, fillOpacity: 1, color: '#0c1729', weight: 2,
+      }).bindPopup(`<b>${esc(selectedTrip.device_name)}</b>${dist ? '<br>' + dist : ''}${dur ? ' · ' + dur : ''}`).addTo(tripRouteGroup);
+    }
+
+    tripRouteGroup.addTo(map);
+    try { map.fitBounds(tripRouteGroup.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
+  }
+
+  function speedColor(mph, q1, q3) {
+    if (mph <= q1) return '#22c55e';
+    if (mph <= q3) return '#28edc4';
+    return '#ff6b38';
+  }
+
+  // ── Playback ──────────────────────────────────────────────────────────
+  function startPlayback() {
+    if (!pb.positions.length) return;
+    pb.index = 0;
+    pb.active = true;
+    pb.multiplier = parseInt(document.getElementById('pb-mult').value);
+    pb.startWall  = performance.now();
+    pb.startGps   = pb.positions[0].timestamp;
+
+    if (pb.marker) map.removeLayer(pb.marker);
+    pb.marker = L.circleMarker([pb.positions[0].lat, pb.positions[0].lon], {
+      radius: 7, fillColor: '#fff', fillOpacity: 1, color: '#0c1729', weight: 2.5,
+      zIndexOffset: 1000,
+    }).addTo(map);
+
+    document.getElementById('pb-trip-name').textContent = pb.trip ? pb.trip.device_name : '';
+    document.getElementById('playback-bar').style.display = 'flex';
+    document.getElementById('play-trip-btn').innerHTML =
+      '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1.5" y="1" width="3" height="8" rx="1"/><rect x="5.5" y="1" width="3" height="8" rx="1"/></svg> Pause';
+
+    runFrame(performance.now());
+  }
+
+  function runFrame(now) {
+    if (!pb.active) return;
+    const elapsed = (now - pb.startWall) / 1000 * pb.multiplier;
+    const targetGps = pb.startGps + elapsed;
+
+    while (pb.index < pb.positions.length - 1 &&
+           pb.positions[pb.index + 1].timestamp <= targetGps) pb.index++;
+
+    if (pb.index >= pb.positions.length - 1) {
+      pb.active = false;
+      syncPbUI();
+      document.getElementById('play-trip-btn').innerHTML =
+        '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg> Play Trip';
+      return;
+    }
+
+    // Interpolate between current and next
+    const curr = pb.positions[pb.index];
+    const next = pb.positions[pb.index + 1];
+    const span = next.timestamp - curr.timestamp;
+    const t    = span > 0 ? Math.min((targetGps - curr.timestamp) / span, 1) : 0;
+    pb.marker.setLatLng([curr.lat + (next.lat - curr.lat) * t, curr.lon + (next.lon - curr.lon) * t]);
+
+    syncPbUI();
+    pb.rafId = requestAnimationFrame(runFrame);
+  }
+
+  function syncPbUI() {
+    const positions = pb.positions;
+    if (!positions.length) return;
+    const curr  = positions[Math.min(pb.index, positions.length - 1)];
+    const total = positions[positions.length - 1].timestamp - positions[0].timestamp;
+    const prog  = total > 0 ? ((curr.timestamp - positions[0].timestamp) / total) * 100 : 0;
+    document.getElementById('pb-fill').style.width   = prog + '%';
+    document.getElementById('pb-thumb').style.left   = prog + '%';
+    document.getElementById('pb-speed-now').textContent = curr.speed
+      ? (curr.speed * 2.237).toFixed(1) + ' mph' : '0 mph';
+    document.getElementById('pb-time').textContent =
+      fmtDuration(Math.floor(curr.timestamp - positions[0].timestamp)) +
+      ' / ' + fmtDuration(Math.floor(total));
+    document.getElementById('pb-play-btn').textContent = pb.active ? '⏸' : '▶';
+  }
+
+  function pausePlayback() {
+    pb.active = false;
+    if (pb.rafId) cancelAnimationFrame(pb.rafId);
+    document.getElementById('pb-play-btn').textContent = '▶';
+  }
+
+  function resumePlayback() {
+    if (!pb.positions.length) return;
+    pb.active = true;
+    pb.startGps  = pb.positions[Math.min(pb.index, pb.positions.length - 1)].timestamp;
+    pb.startWall = performance.now();
+    pb.rafId = requestAnimationFrame(runFrame);
+    document.getElementById('pb-play-btn').textContent = '⏸';
+  }
+
+  function stopPlayback() {
+    pb.active = false;
+    if (pb.rafId) cancelAnimationFrame(pb.rafId);
+    if (pb.marker) { map.removeLayer(pb.marker); pb.marker = null; }
+    document.getElementById('playback-bar').style.display = 'none';
+    document.getElementById('play-trip-btn').innerHTML =
+      '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg> Play Trip';
+  }
+
+  function seekPlayback(frac) {
+    const positions = pb.positions;
+    if (!positions.length) return;
+    const total = positions[positions.length - 1].timestamp - positions[0].timestamp;
+    const targetGps = positions[0].timestamp + frac * total;
+    let idx = 0;
+    while (idx < positions.length - 1 && positions[idx + 1].timestamp <= targetGps) idx++;
+    pb.index = idx;
+    pb.startGps  = positions[idx].timestamp;
+    pb.startWall = performance.now();
+    if (pb.marker) pb.marker.setLatLng([positions[idx].lat, positions[idx].lon]);
+    if (!pb.active) syncPbUI();
+  }
+
+  // ── POIs ──────────────────────────────────────────────────────────────
   async function loadPois() {
     try {
-      const res = await fetch(`${WORKER}/gps/pois`, {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
+      const res = await fetch(`${WORKER}/gps/pois`, { headers: { 'Authorization': 'Bearer ' + token } });
       pois = await res.json();
       renderPoiList();
       renderPoiMarkers();
@@ -927,12 +1435,8 @@
     pois.forEach(poi => {
       const group = L.featureGroup();
       L.circle([poi.lat, poi.lon], {
-        radius: poi.radius,
-        color: '#a78bfa',
-        fillColor: '#a78bfa',
-        fillOpacity: 0.12,
-        weight: 1.5,
-        dashArray: '4 4',
+        radius: poi.radius, color: '#a78bfa', fillColor: '#a78bfa',
+        fillOpacity: 0.1, weight: 1.5, dashArray: '4 4',
       }).addTo(group);
       L.marker([poi.lat, poi.lon], { icon: makePoiIcon() })
         .bindPopup(`<b>${esc(poi.name)}</b><br>Radius: ${poi.radius} m`)
@@ -966,29 +1470,22 @@
           <div class="device-name">${esc(poi.name)}</div>
           <div class="device-meta">${poi.radius} m radius</div>
         </div>
-        <span class="device-del" title="Remove place">
+        <span class="row-del" title="Remove">
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
             <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </span>
       `;
-
-      row.addEventListener('click', function (e) {
-        if (e.target.closest('.device-del')) return;
-        if (poiLayers[poi.id]) {
-          map.fitBounds(poiLayers[poi.id].getBounds(), { padding: [40, 40], maxZoom: 16 });
-        }
+      row.addEventListener('click', e => {
+        if (e.target.closest('.row-del')) return;
+        if (poiLayers[poi.id]) map.fitBounds(poiLayers[poi.id].getBounds(), { padding: [40, 40], maxZoom: 16 });
       });
-
-      row.querySelector('.device-del').addEventListener('click', async function (e) {
+      row.querySelector('.row-del').addEventListener('click', async e => {
         e.stopPropagation();
         if (!confirm(`Remove "${poi.name}"?`)) return;
-        await fetch(`${WORKER}/gps/pois/${poi.id}`, {
-          method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
-        });
+        await fetch(`${WORKER}/gps/pois/${poi.id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
         loadPois();
       });
-
       list.appendChild(row);
     });
   }
@@ -998,65 +1495,52 @@
     document.getElementById('poi-banner').classList.add('active');
     document.getElementById('map').classList.add('map-placing');
   }
-
   function cancelAddPoi() {
-    addingPoi = false;
-    pendingPoiLatLng = null;
+    addingPoi = false; pendingLatLng = null;
     document.getElementById('poi-banner').classList.remove('active');
     document.getElementById('map').classList.remove('map-placing');
     document.getElementById('add-poi-dialog').classList.remove('open');
   }
-
   async function createPoi() {
-    if (!pendingPoiLatLng) return;
+    if (!pendingLatLng) return;
     const name   = document.getElementById('poi-name-input').value.trim();
     const radius = Math.min(5000, Math.max(50, parseInt(document.getElementById('poi-radius-input').value) || 100));
-    const btn    = document.getElementById('poi-create-btn');
-    const msg    = document.getElementById('poi-dialog-msg');
+    const btn = document.getElementById('poi-create-btn');
+    const msg = document.getElementById('poi-dialog-msg');
     if (!name) { msg.textContent = 'Enter a name.'; return; }
     btn.disabled = true;
     try {
       const res = await fetch(`${WORKER}/gps/pois`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ name, lat: pendingPoiLatLng.lat, lon: pendingPoiLatLng.lng, radius }),
+        body: JSON.stringify({ name, lat: pendingLatLng.lat, lon: pendingLatLng.lng, radius }),
       });
-      if (!res.ok) { msg.textContent = 'Failed to save.'; btn.disabled = false; return; }
-      cancelAddPoi();
-      loadPois();
-    } catch {
-      msg.textContent = 'Connection failed.';
-      btn.disabled = false;
-    }
+      if (!res.ok) { msg.textContent = 'Failed.'; btn.disabled = false; return; }
+      cancelAddPoi(); loadPois();
+    } catch { msg.textContent = 'Connection failed.'; btn.disabled = false; }
   }
 
-  // ── Device rendering ─────────────────────────────────────────────────────
+  // ── Device rendering ──────────────────────────────────────────────────
   function colorFor(i) { return COLORS[i % COLORS.length]; }
 
   function renderTrack(device, points) {
     const idx    = devices.findIndex(d => d.id === device.id);
     const color  = colorFor(idx);
     const hidden = hiddenDevices.has(device.id);
-
-    if (layersByDevice[device.id]) {
-      layersByDevice[device.id].forEach(l => map.removeLayer(l));
-    }
+    if (layersByDevice[device.id]) layersByDevice[device.id].forEach(l => map.removeLayer(l));
     layersByDevice[device.id] = [];
     if (hidden || !points.length) return;
 
     const latlngs = points.map(p => [p.lat, p.lon]);
-    const line = L.polyline(latlngs, { color, weight: 3, opacity: 0.75 }).addTo(map);
-    layersByDevice[device.id].push(line);
+    layersByDevice[device.id].push(L.polyline(latlngs, { color, weight: 3, opacity: 0.7 }).addTo(map));
 
-    const last   = points[points.length - 1];
-    const ageSec = Math.floor(Date.now() / 1000) - last.timestamp;
-    const bat    = device.battery != null ? `<br>Battery: ${Math.round(device.battery * 100)}%` : '';
-    const spd    = last.speed != null && last.speed > 0.5
-      ? `<br>Speed: ${(last.speed * 2.237).toFixed(1)} mph` : '';
-
+    const last = points[points.length - 1];
+    const age  = Math.floor(Date.now() / 1000) - last.timestamp;
+    const bat  = device.battery != null ? `<br>Battery: ${Math.round(device.battery * 100)}%` : '';
+    const spd  = last.speed && last.speed > 0.5 ? `<br>Speed: ${(last.speed * 2.237).toFixed(1)} mph` : '';
     const marker = L.marker([last.lat, last.lon], { icon: makeDeviceIcon(color) })
       .addTo(map)
-      .bindPopup(`<b>${esc(device.name)}</b><br>${fmtAge(ageSec)}${bat}${spd}`);
+      .bindPopup(`<b>${esc(device.name)}</b><br>${fmtAge(age)}${bat}${spd}`);
     layersByDevice[device.id].push(marker);
   }
 
@@ -1067,32 +1551,6 @@
       <circle cx="11" cy="11" r="4" fill="#0c1729"/>
     </svg>`;
     return L.divIcon({ html: svg, className: '', iconSize: [22, 30], iconAnchor: [11, 30], popupAnchor: [0, -30] });
-  }
-
-  async function loadStats() {
-    try {
-      const res   = await fetch(`${WORKER}/gps/stats`, { headers: { 'Authorization': 'Bearer ' + token } });
-      const rows  = await res.json();
-      const el    = document.getElementById('storage-info');
-      if (!rows.length) { el.textContent = ''; return; }
-      const total  = rows.reduce((s, r) => s + r.total_points, 0);
-      const oldest = rows.reduce((m, r) => Math.min(m, r.oldest), Infinity);
-      const span   = oldest < Infinity ? Math.ceil((Date.now() / 1000 - oldest) / 86400) : 0;
-      el.textContent = `${total.toLocaleString()} points stored · ${span}d history`;
-    } catch {}
-  }
-
-  function fitMap() {
-    const pts = [];
-    Object.values(layersByDevice).forEach(layers =>
-      layers.forEach(l => {
-        if (l.getLatLngs) { const ll = l.getLatLngs(); if (Array.isArray(ll)) ll.forEach(p => pts.push(p)); }
-        else if (l.getLatLng) pts.push(l.getLatLng());
-      })
-    );
-    if (pts.length) {
-      try { map.fitBounds(L.latLngBounds(pts), { padding: [44, 44], maxZoom: 16 }); } catch {}
-    }
   }
 
   function renderDeviceList() {
@@ -1107,8 +1565,7 @@
       const hidden = hiddenDevices.has(d.id);
       const age    = d.last_seen ? fmtAge(Math.floor(Date.now() / 1000) - d.last_seen) : 'never';
       const bat    = d.battery != null ? ` · ${Math.round(d.battery * 100)}%` : '';
-
-      const row = document.createElement('div');
+      const row    = document.createElement('div');
       row.className = 'device-row' + (hidden ? ' hidden-layer' : '');
       row.innerHTML = `
         <div class="device-dot" style="background:${color};color:${color}"></div>
@@ -1116,38 +1573,52 @@
           <div class="device-name">${esc(d.name)}</div>
           <div class="device-meta">${age}${bat}</div>
         </div>
-        <span class="device-del" title="Remove device">
+        <span class="row-del" title="Remove device">
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
             <path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </span>
       `;
-
-      row.addEventListener('click', function (e) {
-        if (e.target.closest('.device-del')) return;
+      row.addEventListener('click', e => {
+        if (e.target.closest('.row-del')) return;
         hiddenDevices.has(d.id) ? hiddenDevices.delete(d.id) : hiddenDevices.add(d.id);
         renderDeviceList();
-        devices.forEach(dev => {
-          (layersByDevice[dev.id] || []).forEach(l => map.removeLayer(l));
-          layersByDevice[dev.id] = [];
-        });
+        devices.forEach(dev => { (layersByDevice[dev.id] || []).forEach(l => map.removeLayer(l)); layersByDevice[dev.id] = []; });
         Promise.all(devices.map(loadTrack));
       });
-
-      row.querySelector('.device-del').addEventListener('click', async function (e) {
+      row.querySelector('.row-del').addEventListener('click', async e => {
         e.stopPropagation();
         if (!confirm(`Remove "${d.name}" and all its history?`)) return;
-        await fetch(`${WORKER}/gps/devices/${d.id}`, {
-          method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token },
-        });
+        await fetch(`${WORKER}/gps/devices/${d.id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
         refresh();
       });
-
       list.appendChild(row);
     });
   }
 
-  // ── Add device dialog ─────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const res  = await fetch(`${WORKER}/gps/stats`, { headers: { 'Authorization': 'Bearer ' + token } });
+      const rows = await res.json();
+      const el   = document.getElementById('storage-info');
+      if (!rows.length) { el.textContent = ''; return; }
+      const total  = rows.reduce((s, r) => s + r.total_points, 0);
+      const oldest = rows.reduce((m, r) => Math.min(m, r.oldest), Infinity);
+      const span   = oldest < Infinity ? Math.ceil((Date.now() / 1000 - oldest) / 86400) : 0;
+      el.textContent = `${total.toLocaleString()} pts · ${span}d history`;
+    } catch {}
+  }
+
+  function fitMap() {
+    const pts = [];
+    Object.values(layersByDevice).forEach(layers => layers.forEach(l => {
+      if (l.getLatLngs) { const ll = l.getLatLngs(); if (Array.isArray(ll)) ll.forEach(p => pts.push(p)); }
+      else if (l.getLatLng) pts.push(l.getLatLng());
+    }));
+    if (pts.length) try { map.fitBounds(L.latLngBounds(pts), { padding: [44, 44], maxZoom: 16 }); } catch {}
+  }
+
+  // ── Add device dialog ─────────────────────────────────────────────────
   function openAddDeviceDialog() {
     document.getElementById('new-device-name').value = '';
     document.getElementById('new-device-key-block').className = '';
@@ -1157,23 +1628,19 @@
     document.getElementById('add-device-dialog').classList.add('open');
     setTimeout(() => document.getElementById('new-device-name').focus(), 50);
   }
-
   function closeAddDeviceDialog() {
     document.getElementById('add-device-dialog').classList.remove('open');
     refresh();
   }
-
   async function createDevice() {
     const name = document.getElementById('new-device-name').value.trim();
     const btn  = document.getElementById('dialog-create-btn');
     const msg  = document.getElementById('dialog-msg');
     if (!name) { msg.textContent = 'Enter a device name.'; return; }
-    btn.disabled = true;
-    btn.textContent = 'Creating…';
+    btn.disabled = true; btn.textContent = 'Creating…';
     try {
       const res  = await fetch(`${WORKER}/gps/devices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ name }),
       });
       const data = await res.json();
@@ -1184,52 +1651,36 @@
       document.getElementById('new-device-key-block').className = 'show';
       msg.textContent = 'Device created. Copy the URL for Overland.';
       btn.textContent = 'Done';
-    } catch {
-      msg.textContent = 'Connection failed.';
-      btn.disabled = false;
-      btn.textContent = 'Create';
-    }
+    } catch { msg.textContent = 'Connection failed.'; btn.disabled = false; btn.textContent = 'Create'; }
   }
 
-  // ── Utilities ─────────────────────────────────────────────────────────────
+  // ── Utilities ─────────────────────────────────────────────────────────
   function fmtAge(s) {
     if (s < 60)    return `${s}s ago`;
     if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
     if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
     return `${Math.floor(s / 86400)}d ago`;
   }
-
   function fmtDuration(s) {
-    if (s < 60)    return `${s}s`;
-    if (s < 3600)  return `${Math.floor(s / 60)}m`;
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
+    if (s < 60)   return `${s}s`;
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   }
-
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-
   function setStatus(live, text) {
-    const bar = document.getElementById('status-bar');
-    bar.className = live ? 'live' : '';
+    document.getElementById('status-bar').className = live ? 'live' : '';
     document.getElementById('status-text').textContent = text;
   }
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
+  // ── Boot ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('auth-login-btn').addEventListener('click', login);
-    document.getElementById('auth-email').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('auth-password').focus();
-    });
-    document.getElementById('auth-password').addEventListener('keydown', e => {
-      if (e.key === 'Enter') login();
-    });
-    document.getElementById('new-device-name').addEventListener('keydown', e => {
-      if (e.key === 'Enter') createDevice();
-    });
-
+    document.getElementById('auth-email').addEventListener('keydown',    e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+    document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+    document.getElementById('new-device-name').addEventListener('keydown', e => { if (e.key === 'Enter') createDevice(); });
     if (getToken()) initMap();
   });
 })();
