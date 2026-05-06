@@ -425,6 +425,15 @@ export default {
       return json(await stStats(userId, "AND strftime('%Y', s.started_at) = ?", [year]));
     }
 
+    // ── GET /st/stats/month ───────────────────────────────────────────────────
+    if (path === '/st/stats/month' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const now = new Date();
+      const monthStart = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
+      return json(await stStats(userId, "AND date(s.started_at) >= ?", [monthStart]));
+    }
+
     // ── GET /st/stats/lifetime ────────────────────────────────────────────────
     if (path === '/st/stats/lifetime' && request.method === 'GET') {
       const userId = await getUserId(request, env);
@@ -432,11 +441,12 @@ export default {
       return json(await stStats(userId, '', []));
     }
 
-    // ── GET /st/streak ────────────────────────────────────────────────────────
-    // Returns distinct active days per category over the last 30 days.
+    // ── GET /st/streak?window=30 ──────────────────────────────────────────────
+    // Returns distinct active days per category over the last 7 or 30 days.
     if (path === '/st/streak' && request.method === 'GET') {
       const userId = await getUserId(request, env);
       if (!userId) return err('Unauthorized', 401);
+      const w = url.searchParams.get('window') === '7' ? 7 : 30;
       const { results } = await env.DB.prepare(`
         SELECT c.id AS category_id,
                COUNT(DISTINCT DATE(s.started_at)) AS active_days
@@ -444,7 +454,7 @@ export default {
         LEFT JOIN st_sessions s
           ON s.category_id = c.id AND s.user_id = c.user_id
           AND s.ended_at IS NOT NULL
-          AND s.started_at >= datetime('now', '-30 days')
+          AND s.started_at >= datetime('now', '-${w} days')
         WHERE c.user_id = ? AND c.is_active = 1
         GROUP BY c.id
       `).bind(userId).all();

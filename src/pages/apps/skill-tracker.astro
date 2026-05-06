@@ -26,8 +26,9 @@ import Layout from '../../layouts/Layout.astro';
 
       <div class="period-tabs">
         <button class="period-tab active" data-period="today">Today</button>
-        <button class="period-tab" data-period="week">This Week</button>
-        <button class="period-tab" data-period="year">This Year</button>
+        <button class="period-tab" data-period="week">Week</button>
+        <button class="period-tab" data-period="month">Month</button>
+        <button class="period-tab" data-period="year">Year</button>
         <button class="period-tab" data-period="lifetime">Lifetime</button>
       </div>
 
@@ -662,13 +663,15 @@ const PALETTE = [
 const API = 'https://squalie-account.squaliekid55.workers.dev';
 let categories: Category[]       = [];
 let activeSession: ActiveSession | null = null;
-let currentPeriod: 'today' | 'week' | 'year' | 'lifetime' = 'today';
+let currentPeriod: 'today' | 'week' | 'month' | 'year' | 'lifetime' = 'today';
 let clockInterval: ReturnType<typeof setInterval> | null = null;
 let wasConnected = false;
 let is2D = false;
 let lastStatsCats: StatsCat[] = [];
 let streakMode = false;
-let streakData: Record<number, number> = {};
+let streakWindow: 7 | 30 = 30;
+let streakData30: Record<number, number> = {};
+let streakData7:  Record<number, number> = {};
 
 // ── Three.js globals ──────────────────────────────────────────────
 let scene: THREE.Scene;
@@ -862,8 +865,8 @@ function buildPolyhedron(cats: StatsCat[]) {
     const RING_SEGS = 48;
     const ringAngles = Array.from({ length: RING_SEGS + 1 }, (_, k) => k * (2 * Math.PI / RING_SEGS));
     vertexData.forEach((v, i) => {
-      const activeDays = streakData[cats[i].id] ?? 0;
-      const factor = activeDays / 30;
+      const activeDays = getStreakData()[cats[i].id] ?? 0;
+      const factor = activeDays / streakWindow;
       const r = 0.055 + 0.075 * factor;
       const dir = v.pos.clone().normalize();
       const quat = new THREE.Quaternion().setFromUnitVectors(
@@ -1101,8 +1104,8 @@ function renderRadar(cats: StatsCat[]) {
 
     // Streak ring behind vertex dot
     if (streakMode) {
-      const activeDays = streakData[c.id] ?? 0;
-      const factor = activeDays / 30;
+      const activeDays = getStreakData()[c.id] ?? 0;
+      const factor = activeDays / streakWindow;
       const rx = cx + ax * pr, ry = cy + ay * pr;
       streakRingG.appendChild(mk('circle', {
         cx: rx.toFixed(1), cy: ry.toFixed(1),
@@ -1216,12 +1219,17 @@ async function refreshStats() {
   } catch {}
 }
 
-async function loadStreak() {
+async function loadStreak(w: 7 | 30) {
   try {
-    const rows = await api<{ category_id: number; active_days: number }[]>('/streak');
-    streakData = {};
-    for (const row of rows) streakData[row.category_id] = row.active_days;
+    const rows = await api<{ category_id: number; active_days: number }[]>(`/streak?window=${w}`);
+    const obj: Record<number, number> = {};
+    for (const row of rows) obj[row.category_id] = row.active_days;
+    if (w === 7) streakData7 = obj; else streakData30 = obj;
   } catch {}
+}
+
+function getStreakData(): Record<number, number> {
+  return streakWindow === 7 ? streakData7 : streakData30;
 }
 
 // ── Connection ────────────────────────────────────────────────────
@@ -1327,9 +1335,18 @@ document.getElementById('viewToggle')!.addEventListener('click', () => {
 });
 
 document.getElementById('streakToggle')!.addEventListener('click', async () => {
-  streakMode = !streakMode;
-  document.getElementById('streakToggle')!.classList.toggle('active', streakMode);
-  if (streakMode && Object.keys(streakData).length === 0 && wasConnected) await loadStreak();
+  const btn = document.getElementById('streakToggle')!;
+  if (!streakMode) {
+    streakMode = true; streakWindow = 30;
+    if (Object.keys(streakData30).length === 0 && wasConnected) await loadStreak(30);
+  } else if (streakWindow === 30) {
+    streakWindow = 7;
+    if (Object.keys(streakData7).length === 0 && wasConnected) await loadStreak(7);
+  } else {
+    streakMode = false;
+  }
+  btn.textContent = !streakMode ? 'Streak' : `${streakWindow}d`;
+  btn.classList.toggle('active', streakMode);
   if (is2D) renderRadar(lastStatsCats);
   else buildPolyhedron(lastStatsCats);
 });
