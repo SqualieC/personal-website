@@ -432,6 +432,25 @@ export default {
       return json(await stStats(userId, '', []));
     }
 
+    // ── GET /st/streak ────────────────────────────────────────────────────────
+    // Returns distinct active days per category over the last 30 days.
+    if (path === '/st/streak' && request.method === 'GET') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const { results } = await env.DB.prepare(`
+        SELECT c.id AS category_id,
+               COUNT(DISTINCT DATE(s.started_at)) AS active_days
+        FROM st_categories c
+        LEFT JOIN st_sessions s
+          ON s.category_id = c.id AND s.user_id = c.user_id
+          AND s.ended_at IS NOT NULL
+          AND s.started_at >= datetime('now', '-30 days')
+        WHERE c.user_id = ? AND c.is_active = 1
+        GROUP BY c.id
+      `).bind(userId).all();
+      return json(results);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // ── GPS Tracking endpoints (/gps/*) ─────────────────────────────────────
     // ════════════════════════════════════════════════════════════════════════
