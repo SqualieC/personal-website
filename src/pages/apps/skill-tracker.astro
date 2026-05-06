@@ -1353,11 +1353,11 @@ document.getElementById('viewToggle')!.addEventListener('click', () => {
 document.getElementById('streakToggle')!.addEventListener('click', async () => {
   const btn = document.getElementById('streakToggle')!;
   if (!streakMode) {
-    streakMode = true; streakWindow = 30;
-    if (Object.keys(streakData30).length === 0 && wasConnected) await loadStreak(30);
-  } else if (streakWindow === 30) {
-    streakWindow = 7;
+    streakMode = true; streakWindow = 7;
     if (Object.keys(streakData7).length === 0 && wasConnected) await loadStreak(7);
+  } else if (streakWindow === 7) {
+    streakWindow = 30;
+    if (Object.keys(streakData30).length === 0 && wasConnected) await loadStreak(30);
   } else {
     streakMode = false;
   }
