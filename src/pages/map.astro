@@ -963,6 +963,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPnI=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet-hotline@0.4.0/dist/leaflet.hotline.js"></script>
 <script is:inline>
 (function () {
   const WORKER    = 'https://squalie-account.squaliekid55.workers.dev';
@@ -1269,36 +1270,44 @@
     `;
   }
 
-  // ── Color-coded route ─────────────────────────────────────────────────
+  // ── Color-coded route (smooth gradient via Leaflet.hotline) ───────────
   function renderColoredRoute(pts, speeds, q1, q3) {
     if (tripRouteGroup) map.removeLayer(tripRouteGroup);
     tripRouteGroup = L.featureGroup();
 
-    // Group consecutive points of same speed band into single polylines
-    let seg = [[pts[0].lat, pts[0].lon]];
-    let segColor = speedColor(speeds[0], q1, q3);
+    const maxSpeed = Math.max(...speeds, 1);
+    // Anchor palette stops at Q1 and Q3 so the color transitions happen
+    // at the statistically meaningful speed boundaries for this specific trip
+    const q1n = Math.min(q1 / maxSpeed, 0.99);
+    const q3n = Math.min(q3 / maxSpeed, 0.99);
 
-    for (let i = 1; i < pts.length; i++) {
-      const c = speedColor(speeds[i], q1, q3);
-      seg.push([pts[i].lat, pts[i].lon]);
-      if (c !== segColor || i === pts.length - 1) {
-        L.polyline(seg, { color: segColor, weight: 4, opacity: 0.88 }).addTo(tripRouteGroup);
-        seg = [[pts[i].lat, pts[i].lon]];
-        segColor = c;
+    const hotline = L.hotline(
+      pts.map((p, i) => [p.lat, p.lon, speeds[i]]),
+      {
+        min: 0,
+        max: maxSpeed,
+        palette: {
+          0:   '#22c55e',  // slow  — green
+          [q1n]: '#28edc4', // Q1   — teal (site accent)
+          [q3n]: '#ff6b38', // Q3   — orange
+          1:   '#f87171',  // peak — red
+        },
+        weight: 4,
+        outlineWidth: 0,
       }
-    }
+    ).addTo(tripRouteGroup);
 
-    // Start and end markers
+    // Start and end markers sit on top of the hotline
     L.circleMarker([pts[0].lat, pts[0].lon], {
       radius: 6, fillColor: '#22c55e', fillOpacity: 1, color: '#0c1729', weight: 2,
     }).addTo(tripRouteGroup);
 
     if (pts.length > 1) {
-      const last = pts[pts.length - 1];
+      const last     = pts[pts.length - 1];
       const endColor = selectedTrip && !selectedTrip.ended_at ? '#facc15' : '#f87171';
-      const dist = selectedTrip && selectedTrip.distance_meters
+      const dist     = selectedTrip && selectedTrip.distance_meters
         ? (selectedTrip.distance_meters / 1609.34).toFixed(2) + ' mi' : '';
-      const dur  = selectedTrip && selectedTrip.duration_seconds
+      const dur      = selectedTrip && selectedTrip.duration_seconds
         ? fmtDuration(selectedTrip.duration_seconds) : '';
       L.circleMarker([last.lat, last.lon], {
         radius: 6, fillColor: endColor, fillOpacity: 1, color: '#0c1729', weight: 2,
@@ -1306,13 +1315,7 @@
     }
 
     tripRouteGroup.addTo(map);
-    try { map.fitBounds(tripRouteGroup.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
-  }
-
-  function speedColor(mph, q1, q3) {
-    if (mph <= q1) return '#22c55e';
-    if (mph <= q3) return '#28edc4';
-    return '#ff6b38';
+    try { map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
   }
 
   // ── Playback ──────────────────────────────────────────────────────────
