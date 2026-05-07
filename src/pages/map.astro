@@ -296,21 +296,30 @@
     .device-row {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
-      padding: 0.5rem 0.9rem;
+      gap: 0.5rem;
+      padding: 0.42rem 0.9rem 0.42rem 0;
       cursor: pointer;
       transition: background 0.1s;
       user-select: none;
+      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
     }
-    .device-row:hover { background: color-mix(in srgb, var(--muted), transparent 92%); }
+    .device-row:hover { background: color-mix(in srgb, var(--accent), transparent 96%); }
 
+    .device-accent-bar {
+      width: 3px;
+      height: 32px;
+      border-radius: 0 2px 2px 0;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+
+    /* Keep for POI rows */
     .device-dot {
       width: 9px;
       height: 9px;
       border-radius: 50%;
       flex-shrink: 0;
       box-shadow: 0 0 6px currentColor;
-      transition: opacity 0.15s, box-shadow 0.15s;
     }
 
     .device-info { flex: 1; min-width: 0; }
@@ -321,9 +330,26 @@
       overflow: hidden;
       text-overflow: ellipsis;
       color: var(--text);
-      transition: color 0.15s;
     }
     .device-meta { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
+    .device-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 2px;
+      flex-wrap: wrap;
+    }
+    .age-label { font-size: 0.67rem; color: var(--muted); }
+    .bat-chip {
+      font-size: 0.63rem;
+      padding: 0.1rem 0.38rem;
+      border-radius: 999px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .bat-chip.good   { background: color-mix(in srgb, #22c55e, transparent 82%); color: #4ade80; }
+    .bat-chip.medium { background: color-mix(in srgb, #facc15, transparent 82%); color: #fde047; }
+    .bat-chip.low    { background: color-mix(in srgb, #f87171, transparent 82%); color: #fca5a5; }
 
     /* ── Visibility toggle switch ── */
     .vis-toggle {
@@ -399,33 +425,67 @@
     /* ── Trip rows ── */
     .trip-row {
       display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      padding: 0.55rem 0.9rem;
+      align-items: center;
       cursor: pointer;
       transition: background 0.1s;
       user-select: none;
       border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
     }
-    .trip-row:hover { background: color-mix(in srgb, var(--muted), transparent 92%); }
-    .trip-row.active-trip { background: color-mix(in srgb, var(--accent), transparent 93%); }
+    .trip-row:hover { background: color-mix(in srgb, var(--accent), transparent 96%); }
+    .trip-row.active-trip { background: color-mix(in srgb, #facc15, transparent 96%); }
 
-    .active-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent);
+    .trip-accent-bar {
+      width: 3px;
+      align-self: stretch;
       flex-shrink: 0;
-      margin-top: 4px;
-      animation: pulse 1.5s infinite;
+      background: color-mix(in srgb, var(--accent), transparent 62%);
+      transition: background 0.15s;
     }
+    .trip-row:hover .trip-accent-bar { background: color-mix(in srgb, var(--accent), transparent 30%); }
+    .trip-row.active-trip .trip-accent-bar { background: #facc15; }
+
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
-    .trip-info { flex: 1; min-width: 0; }
-    .trip-device { font-size: 0.78rem; font-weight: 600; color: var(--text); }
-    .trip-date { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
-    .trip-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+    .trip-info { flex: 1; min-width: 0; padding: 0.55rem 0.6rem; }
+
+    .trip-row-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.4rem;
+      margin-bottom: 0.28rem;
+    }
+
+    .trip-stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      align-items: center;
+    }
+
+    .trip-device { font-size: 0.8rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .trip-date { font-size: 0.67rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+
+    .stat-pill {
+      font-size: 0.63rem;
+      padding: 0.11rem 0.42rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--card), transparent 30%);
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .live-pill {
+      font-size: 0.62rem;
+      padding: 0.1rem 0.48rem;
+      border-radius: 999px;
+      background: color-mix(in srgb, #facc15, transparent 82%);
+      color: #fde047;
+      font-weight: 600;
+      flex-shrink: 0;
+      animation: pulse 1.5s infinite;
+    }
 
     /* ── Trip detail view ── */
     #trip-detail {
@@ -881,9 +941,9 @@
       <select id="history-select" class="panel-select">
         <option value="1">Last 1 hour</option>
         <option value="6">Last 6 hours</option>
-        <option value="24" selected>Last 24 hours</option>
+        <option value="24">Last 24 hours</option>
         <option value="72">Last 3 days</option>
-        <option value="168">Last 7 days</option>
+        <option value="168" selected>Last 7 days</option>
       </select>
     </div>
     <div id="device-list" class="scrollable-list"></div>
@@ -1015,7 +1075,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPnI=" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet-hotline@0.4.0/dist/leaflet.hotline.js"></script>
 <script is:inline>
 (function () {
   const WORKER    = 'https://squalie-account.squaliekid55.workers.dev';
@@ -1024,7 +1083,7 @@
   const REFRESH   = 30_000;
 
   let map, token;
-  let devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 24;
+  let devices = [], layersByDevice = {}, hiddenDevices = new Set(), historyHours = 168;
   let trips = [], selectedTrip = null, tripRouteGroup = null;
   let pois = [], poiLayers = {};
   let addingPoi = false, pendingLatLng = null;
@@ -1206,24 +1265,32 @@
     }
     trips.forEach(trip => {
       const isActive = !trip.ended_at;
-      const dist = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi' : '—';
-      const dur  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : (isActive ? 'Active' : '—');
+      const dist = trip.distance_meters ? (trip.distance_meters / 1609.34).toFixed(2) + ' mi' : null;
+      const dur  = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : null;
       const date = new Date(trip.started_at * 1000).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
       });
       const row = document.createElement('div');
       row.className = 'trip-row' + (isActive ? ' active-trip' : '');
-      let html = '';
-      if (isActive) html += '<div class="active-dot"></div>';
-      html += `
+      const statPills = [
+        dist ? `<span class="stat-pill">${dist}</span>` : '',
+        dur  ? `<span class="stat-pill">${dur}</span>`  : '',
+        trip.avg_speed_mph ? `<span class="stat-pill">${Math.round(trip.avg_speed_mph)} avg mph</span>` : '',
+      ].join('');
+      row.innerHTML = `
+        <div class="trip-accent-bar"></div>
         <div class="trip-info">
-          <div class="trip-device">${esc(trip.device_name)}</div>
-          <div class="trip-date">${date}</div>
-          <div class="trip-meta">${dist} · ${dur}${trip.avg_speed_mph ? ' · ' + Math.round(trip.avg_speed_mph) + ' avg mph' : ''}</div>
+          <div class="trip-row-header">
+            <span class="trip-device">${esc(trip.device_name)}</span>
+            ${isActive ? '<span class="live-pill">● Live</span>' : `<span class="trip-date">${date}</span>`}
+          </div>
+          <div class="trip-stats-row">
+            ${statPills}
+            ${isActive ? `<span class="trip-date">${date}</span>` : ''}
+          </div>
         </div>
-        <button class="del-btn" title="Delete trip">${TRASH_SVG}</button>
+        <button class="del-btn" title="Delete trip" style="margin-right:0.6rem">${TRASH_SVG}</button>
       `;
-      row.innerHTML = html;
       row.addEventListener('click', e => {
         if (e.target.closest('.del-btn') || e.target.closest('.del-confirm')) return;
         openTripDetail(trip);
@@ -1337,44 +1404,35 @@
     `;
   }
 
-  // ── Color-coded route (smooth gradient via Leaflet.hotline) ───────────
+  // ── Color-coded route (batched same-color polyline segments) ────────────
   function renderColoredRoute(pts, speeds, q1, q3) {
     if (tripRouteGroup) map.removeLayer(tripRouteGroup);
     tripRouteGroup = L.featureGroup();
 
-    const maxSpeed = Math.max(...speeds, 1);
-    const q1n = Math.min(q1 / maxSpeed, 0.99);
-    const q3n = Math.min(q3 / maxSpeed, 0.99);
-
-    // Use computed float keys via toFixed so they are NOT integer indices and
-    // are iterated in insertion order — integer keys "0"/"1" come first in
-    // for…in which breaks hotline's gradient if q1n/q3n are added after 1.
-    let hotline = null;
-    try {
-      hotline = L.hotline(
-        pts.map((p, i) => [p.lat, p.lon, speeds[i]]),
-        {
-          min: 0, max: maxSpeed,
-          palette: {
-            '0.000': '#22c55e',
-            [q1n.toFixed(3)]: '#28edc4',
-            [q3n.toFixed(3)]: '#ff6b38',
-            '1.000': '#f87171',
-          },
-          weight: 4, outlineWidth: 0,
-        }
-      ).addTo(tripRouteGroup);
-    } catch (e) {
-      console.warn('Hotline failed, using plain polyline:', e);
-      L.polyline(pts.map(p => [p.lat, p.lon]), { color: '#28edc4', weight: 4, opacity: 0.9 })
-        .addTo(tripRouteGroup);
+    function speedColor(s) {
+      if (s <= q1) return '#22c55e';
+      if (s <= q3) return '#28edc4';
+      return '#ff6b38';
     }
 
-    // Start and end markers sit on top of the hotline
+    // Group consecutive same-color points into single polylines (1-pt overlap = no gaps)
+    let i = 0;
+    while (i < pts.length - 1) {
+      const color = speedColor(speeds[i]);
+      let j = i + 1;
+      while (j < pts.length - 1 && speedColor(speeds[j]) === color) j++;
+      L.polyline(pts.slice(i, j + 1).map(p => [p.lat, p.lon]), {
+        color, weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
+      }).addTo(tripRouteGroup);
+      i = j;
+    }
+
+    // Start marker
     L.circleMarker([pts[0].lat, pts[0].lon], {
       radius: 6, fillColor: '#22c55e', fillOpacity: 1, color: '#0c1729', weight: 2,
     }).addTo(tripRouteGroup);
 
+    // End marker
     if (pts.length > 1) {
       const last     = pts[pts.length - 1];
       const endColor = selectedTrip && !selectedTrip.ended_at ? '#facc15' : '#f87171';
@@ -1388,7 +1446,7 @@
     }
 
     tripRouteGroup.addTo(map);
-    try { map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
+    try { map.fitBounds(tripRouteGroup.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
   }
 
   // ── Playback ──────────────────────────────────────────────────────────
@@ -1652,21 +1710,27 @@
       return;
     }
     devices.forEach((d, i) => {
-      const color  = colorFor(i);
-      const hidden = hiddenDevices.has(d.id);
-      const age    = d.last_seen ? fmtAge(Math.floor(Date.now() / 1000) - d.last_seen) : 'never';
-      const bat    = d.battery != null ? ` · ${Math.round(d.battery * 100)}%` : '';
-      const row    = document.createElement('div');
+      const color   = colorFor(i);
+      const hidden  = hiddenDevices.has(d.id);
+      const age     = d.last_seen ? fmtAge(Math.floor(Date.now() / 1000) - d.last_seen) : 'never seen';
+      const batPct  = d.battery != null ? Math.round(d.battery * 100) : null;
+      const batCls  = batPct == null ? '' : batPct >= 60 ? 'good' : batPct >= 30 ? 'medium' : 'low';
+      const batHtml = batPct != null ? `<span class="bat-chip ${batCls}">${batPct}%</span>` : '';
+      const barOpacity = hidden ? '0.22' : '1';
+      const row     = document.createElement('div');
       row.className = 'device-row';
       row.innerHTML = `
+        <div class="device-accent-bar" style="background:${color};opacity:${barOpacity}"></div>
         <label class="vis-toggle" title="${hidden ? 'Show' : 'Hide'} layer">
           <input type="checkbox" ${!hidden ? 'checked' : ''} />
           <span class="vis-track"></span>
         </label>
-        <div class="device-dot" style="background:${color};color:${color};${hidden ? 'opacity:0.25;box-shadow:none' : ''}"></div>
         <div class="device-info">
           <div class="device-name" style="${hidden ? 'opacity:0.45' : ''}">${esc(d.name)}</div>
-          <div class="device-meta">${age}${bat}</div>
+          <div class="device-meta-row">
+            <span class="age-label">${age}</span>
+            ${batHtml}
+          </div>
         </div>
         <button class="del-btn" title="Delete device">${TRASH_SVG}</button>
       `;
