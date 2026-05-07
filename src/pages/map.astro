@@ -1343,26 +1343,32 @@
     tripRouteGroup = L.featureGroup();
 
     const maxSpeed = Math.max(...speeds, 1);
-    // Anchor palette stops at Q1 and Q3 so the color transitions happen
-    // at the statistically meaningful speed boundaries for this specific trip
     const q1n = Math.min(q1 / maxSpeed, 0.99);
     const q3n = Math.min(q3 / maxSpeed, 0.99);
 
-    const hotline = L.hotline(
-      pts.map((p, i) => [p.lat, p.lon, speeds[i]]),
-      {
-        min: 0,
-        max: maxSpeed,
-        palette: {
-          0:   '#22c55e',  // slow  — green
-          [q1n]: '#28edc4', // Q1   — teal (site accent)
-          [q3n]: '#ff6b38', // Q3   — orange
-          1:   '#f87171',  // peak — red
-        },
-        weight: 4,
-        outlineWidth: 0,
-      }
-    ).addTo(tripRouteGroup);
+    // Use computed float keys via toFixed so they are NOT integer indices and
+    // are iterated in insertion order — integer keys "0"/"1" come first in
+    // for…in which breaks hotline's gradient if q1n/q3n are added after 1.
+    let hotline = null;
+    try {
+      hotline = L.hotline(
+        pts.map((p, i) => [p.lat, p.lon, speeds[i]]),
+        {
+          min: 0, max: maxSpeed,
+          palette: {
+            '0.000': '#22c55e',
+            [q1n.toFixed(3)]: '#28edc4',
+            [q3n.toFixed(3)]: '#ff6b38',
+            '1.000': '#f87171',
+          },
+          weight: 4, outlineWidth: 0,
+        }
+      ).addTo(tripRouteGroup);
+    } catch (e) {
+      console.warn('Hotline failed, using plain polyline:', e);
+      L.polyline(pts.map(p => [p.lat, p.lon]), { color: '#28edc4', weight: 4, opacity: 0.9 })
+        .addTo(tripRouteGroup);
+    }
 
     // Start and end markers sit on top of the hotline
     L.circleMarker([pts[0].lat, pts[0].lon], {
