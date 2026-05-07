@@ -290,32 +290,30 @@
     .scrollable-list {
       overflow-y: auto;
       flex: 1;
-      padding: 0.45rem 0.65rem;
+      padding: 0.5rem 0.6rem;
       display: flex;
       flex-direction: column;
-      gap: 0.32rem;
+      gap: 0.4rem;
     }
 
-    /* ── Device rows (card style) ── */
+    /* ── Device rows (premium card) ── */
     .device-row {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
-      background: linear-gradient(135deg,
-        color-mix(in srgb, var(--card), transparent 28%),
-        color-mix(in srgb, var(--bg-soft), transparent 12%)
-      );
-      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
-      border-left: 2px solid var(--accent);
-      border-radius: 10px;
-      padding: 0.52rem 0.7rem 0.52rem 0.75rem;
+      gap: 0.6rem;
+      background: rgba(30, 52, 92, 0.96);
+      border: 1px solid rgba(184, 206, 238, 0.12);
+      border-left: 3px solid var(--accent);
+      border-radius: 12px;
+      padding: 0.65rem 0.7rem 0.65rem 0.65rem;
       cursor: pointer;
-      transition: border-color 0.14s, box-shadow 0.14s;
+      transition: background 0.12s, box-shadow 0.14s, transform 0.12s;
       user-select: none;
     }
     .device-row:hover {
-      border-color: color-mix(in srgb, var(--muted), transparent 48%);
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      background: rgba(38, 64, 110, 0.98);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.32);
+      transform: translateX(2px);
     }
 
     /* Keep for POI rows */
@@ -329,31 +327,33 @@
 
     .device-info { flex: 1; min-width: 0; }
     .device-name {
-      font-size: 0.8rem;
-      font-weight: 600;
+      font-size: 0.86rem;
+      font-weight: 700;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       color: var(--text);
+      letter-spacing: -0.01em;
     }
     .device-meta { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
     .device-meta-row {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
-      margin-top: 2px;
+      gap: 0.38rem;
+      margin-top: 3px;
     }
-    .age-label { font-size: 0.67rem; color: var(--muted); }
+    .age-label { font-size: 0.69rem; color: var(--muted); }
     .bat-chip {
       font-size: 0.63rem;
-      padding: 0.1rem 0.38rem;
+      padding: 0.1rem 0.4rem;
       border-radius: 999px;
-      font-weight: 600;
+      font-weight: 700;
       flex-shrink: 0;
+      letter-spacing: 0.01em;
     }
-    .bat-chip.good   { background: color-mix(in srgb, #22c55e, transparent 82%); color: #4ade80; }
-    .bat-chip.medium { background: color-mix(in srgb, #facc15, transparent 82%); color: #fde047; }
-    .bat-chip.low    { background: color-mix(in srgb, #f87171, transparent 82%); color: #fca5a5; }
+    .bat-chip.good   { background: rgba(34, 197, 94, 0.18);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .bat-chip.medium { background: rgba(250, 204, 21, 0.18); color: #fde047; border: 1px solid rgba(250,204,21,0.3); }
+    .bat-chip.low    { background: rgba(248, 113, 113, 0.18); color: #fca5a5; border: 1px solid rgba(248,113,113,0.3); }
 
     /* ── Visibility toggle switch ── */
     .vis-toggle {
@@ -426,60 +426,73 @@
       padding: 0.2rem 0.4rem; font-size: 0.7rem; font-family: inherit; cursor: pointer;
     }
 
-    /* ── Trip rows (card style) ── */
+    /* ── Trip rows (premium card) ── */
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
     .trip-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      background: linear-gradient(135deg,
-        color-mix(in srgb, var(--card), transparent 28%),
-        color-mix(in srgb, var(--bg-soft), transparent 12%)
-      );
-      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
-      border-left: 2px solid color-mix(in srgb, var(--accent), transparent 52%);
-      border-radius: 10px;
-      padding: 0.58rem 0.65rem 0.58rem 0.75rem;
+      background: rgba(30, 52, 92, 0.96);
+      border: 1px solid rgba(184, 206, 238, 0.12);
+      border-left: 3px solid rgba(40, 237, 196, 0.45);
+      border-radius: 12px;
+      padding: 0.7rem 0.6rem 0.7rem 0.72rem;
       cursor: pointer;
-      transition: border-color 0.14s, box-shadow 0.14s, border-left-color 0.14s;
+      transition: background 0.12s, box-shadow 0.14s, transform 0.12s, border-left-color 0.14s;
       user-select: none;
     }
     .trip-row:hover {
-      border-color: color-mix(in srgb, var(--accent), transparent 42%);
+      background: rgba(38, 64, 110, 0.98);
       border-left-color: var(--accent);
-      box-shadow: 0 2px 14px color-mix(in srgb, var(--accent), transparent 87%);
+      box-shadow: 0 4px 22px rgba(40, 237, 196, 0.13);
+      transform: translateX(2px);
     }
     .trip-row.active-trip {
       border-left-color: #facc15;
-      background: linear-gradient(135deg,
-        color-mix(in srgb, #facc15, transparent 93%),
-        color-mix(in srgb, var(--bg-soft), transparent 12%)
-      );
+      background: rgba(38, 34, 10, 0.85);
     }
 
     .trip-info { flex: 1; min-width: 0; }
     .trip-row-header {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 0.4rem;
-      margin-bottom: 0.2rem;
+      margin-bottom: 0.26rem;
     }
-    .trip-device { font-size: 0.8rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .trip-device {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      letter-spacing: -0.01em;
+    }
     .trip-date { font-size: 0.67rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-    .trip-stats { font-size: 0.68rem; color: var(--muted); line-height: 1.4; }
+    .trip-stats { font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
+
+    .trip-chevron {
+      font-size: 1rem;
+      color: rgba(184, 206, 238, 0.3);
+      flex-shrink: 0;
+      transition: color 0.12s, transform 0.12s;
+      line-height: 1;
+    }
+    .trip-row:hover .trip-chevron { color: var(--accent); transform: translateX(2px); }
 
     .live-badge {
-      font-size: 0.6rem;
+      font-size: 0.58rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
       color: #facc15;
-      background: color-mix(in srgb, #facc15, transparent 85%);
-      border: 1px solid color-mix(in srgb, #facc15, transparent 60%);
+      background: rgba(250, 204, 21, 0.15);
+      border: 1px solid rgba(250, 204, 21, 0.4);
       border-radius: 4px;
-      padding: 0.1rem 0.35rem;
+      padding: 0.08rem 0.38rem;
       flex-shrink: 0;
       animation: pulse 1.5s infinite;
     }
@@ -1134,6 +1147,9 @@
 
     map = L.map('map', { zoomControl: false }).setView([39.5, -98.35], 4);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+    map.createPane('tripRoute');
+    map.getPane('tripRoute').style.zIndex = '450';
+    map.getPane('tripRoute').style.pointerEvents = 'none';
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd', maxZoom: 19,
@@ -1282,6 +1298,7 @@
           <div class="trip-stats">${statsText || (isActive ? date : '—')}</div>
         </div>
         <button class="del-btn" title="Delete trip">${TRASH_SVG}</button>
+        <span class="trip-chevron">›</span>
       `;
       row.addEventListener('click', e => {
         if (e.target.closest('.del-btn') || e.target.closest('.del-confirm')) return;
@@ -1396,68 +1413,60 @@
     `;
   }
 
-  // ── Color-coded route (smooth gradient via custom canvas layer) ─────────
+  // ── Color-coded route (binned canvas renderer in dedicated pane) ─────────
   function renderColoredRoute(pts, speeds, q1, q3) {
     if (tripRouteGroup) map.removeLayer(tripRouteGroup);
     tripRouteGroup = L.featureGroup();
 
     const maxS = Math.max(...speeds, 1);
-    const t1 = Math.min(q1 / maxS, 0.97);
-    const t3 = Math.min(Math.max(q3 / maxS, t1 + 0.02), 0.99);
+    const t1   = Math.min(q1 / maxS, 0.97);
+    const t3   = Math.min(Math.max(q3 / maxS, t1 + 0.02), 0.99);
 
-    function lerpRgb(a, b, f) {
-      f = Math.max(0, Math.min(1, f));
-      return [
-        Math.round(a[0] + (b[0] - a[0]) * f),
-        Math.round(a[1] + (b[1] - a[1]) * f),
-        Math.round(a[2] + (b[2] - a[2]) * f),
-      ];
-    }
-    // 4-stop gradient anchored at q1 and q3 percentiles
-    function speedRgb(s) {
+    // 4-stop gradient: green → teal → orange → red, anchored at q1/q3 percentiles
+    function speedHex(s) {
       const t = Math.min(s / maxS, 1);
-      if (t <= t1)  return lerpRgb([34,197,94],  [40,237,196], t1 > 0 ? t / t1 : 0);
-      if (t <= t3)  return lerpRgb([40,237,196], [255,107,56], (t - t1) / (t3 - t1));
-      return             lerpRgb([255,107,56],   [248,113,113], (t - t3) / (1 - t3));
+      let r, g, b;
+      if (t <= t1) {
+        const f = t1 > 0 ? t / t1 : 0;
+        r = Math.round(34  + (40  - 34 ) * f);
+        g = Math.round(197 + (237 - 197) * f);
+        b = Math.round(94  + (196 - 94 ) * f);
+      } else if (t <= t3) {
+        const f = (t - t1) / (t3 - t1);
+        r = Math.round(40  + (255 - 40 ) * f);
+        g = Math.round(237 + (107 - 237) * f);
+        b = Math.round(196 + (56  - 196) * f);
+      } else {
+        const f = (t - t3) / (1 - t3);
+        r = Math.round(255 + (248 - 255) * f);
+        g = Math.round(107 + (113 - 107) * f);
+        b = Math.round(56  + (113 - 56 ) * f);
+      }
+      return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
     }
 
-    // Custom canvas layer — redraws on pan/zoom
-    const GradLayer = L.Layer.extend({
-      onAdd(m) {
-        this._map = m;
-        this._cvs = L.DomUtil.create('canvas', '', m.getPanes().overlayPane);
-        this._cvs.style.cssText = 'position:absolute;pointer-events:none;';
-        m.on('moveend zoomend viewreset resize', this._draw, this);
-        this._draw();
-      },
-      onRemove(m) { this._cvs.remove(); m.off('moveend zoomend viewreset resize', this._draw, this); },
-      getBounds() { return L.latLngBounds(pts.map(p => [p.lat, p.lon])); },
-      _draw() {
-        const m = this._map, cvs = this._cvs;
-        const sz = m.getSize();
-        const nw = m.containerPointToLayerPoint([0, 0]);
-        cvs.width = sz.x; cvs.height = sz.y;
-        L.DomUtil.setPosition(cvs, nw);
-        const ctx = cvs.getContext('2d');
-        ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p1 = m.latLngToLayerPoint([pts[i].lat,     pts[i].lon]);
-          const p2 = m.latLngToLayerPoint([pts[i+1].lat,   pts[i+1].lon]);
-          const x1 = p1.x - nw.x, y1 = p1.y - nw.y;
-          const x2 = p2.x - nw.x, y2 = p2.y - nw.y;
-          const [r1,g1,b1] = speedRgb(speeds[i]);
-          const [r2,g2,b2] = speedRgb(speeds[i+1] ?? speeds[i]);
-          const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-          grad.addColorStop(0, `rgb(${r1},${g1},${b1})`);
-          grad.addColorStop(1, `rgb(${r2},${g2},${b2})`);
-          ctx.beginPath(); ctx.strokeStyle = grad;
-          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-        }
-      },
-    });
-    new GradLayer().addTo(tripRouteGroup);
+    // Quantize into 32 bins so consecutive same-bin points form one polyline
+    // (smooth-looking without creating thousands of objects)
+    const BINS = 32;
+    function bin(s) { return Math.min(Math.floor(s / maxS * BINS), BINS - 1); }
 
-    // Start / end markers on top
+    // Canvas renderer in dedicated tripRoute pane (z-index 450 > device tracks 400)
+    const rend = L.canvas({ pane: 'tripRoute', padding: 0.5 });
+
+    let i = 0;
+    while (i < pts.length - 1) {
+      const b0 = bin(speeds[i]);
+      let j = i + 1;
+      while (j < pts.length - 1 && bin(speeds[j]) === b0) j++;
+      const avgS = speeds.slice(i, j + 1).reduce((a, v) => a + v, 0) / (j - i + 1);
+      L.polyline(
+        pts.slice(i, j + 1).map(p => [p.lat, p.lon]),
+        { color: speedHex(avgS), weight: 5, opacity: 1, renderer: rend, smoothFactor: 0 }
+      ).addTo(tripRouteGroup);
+      i = j;
+    }
+
+    // Start / end markers (markerPane z-index 600 — always on top)
     L.circleMarker([pts[0].lat, pts[0].lon], {
       radius: 6, fillColor: '#22c55e', fillOpacity: 1, color: '#0c1729', weight: 2,
     }).addTo(tripRouteGroup);
