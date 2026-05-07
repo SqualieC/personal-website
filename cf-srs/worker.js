@@ -487,8 +487,22 @@ export default {
         .bind(tripId).first();
       if (!trip) return;
       const duration = endPos.timestamp - trip.started_at;
-      const avgSpeedMph = duration > 0 && distance > 0
-        ? (distance / 1609.34) / (duration / 3600) : 0;
+
+      // Moving average: only count time intervals where speed > 5 mph.
+      // This excludes parked/walking time while preserving slow traffic.
+      // dt < 120 guards against counting gaps when the phone went offline.
+      const { results: segs } = await env.DB
+        .prepare(`SELECT speed, LEAD(timestamp) OVER (ORDER BY timestamp) - timestamp AS dt
+                  FROM gps_positions
+                  WHERE device_id=? AND timestamp BETWEEN ? AND ?`)
+        .bind(deviceId, trip.started_at, endPos.timestamp).all();
+      const movingSeconds = segs.reduce((acc, s) => {
+        if (s.dt > 0 && s.dt < 120 && (s.speed ?? 0) * 2.237 > 5) acc += s.dt;
+        return acc;
+      }, 0);
+      const avgSpeedMph = movingSeconds > 30 && distance > 0
+        ? (distance / 1609.34) / (movingSeconds / 3600)
+        : (duration > 0 && distance > 0 ? (distance / 1609.34) / (duration / 3600) : 0);
       await env.DB.prepare(`
         UPDATE gps_trips
         SET ended_at=?, end_lat=?, end_lon=?,
