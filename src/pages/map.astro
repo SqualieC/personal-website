@@ -290,27 +290,32 @@
     .scrollable-list {
       overflow-y: auto;
       flex: 1;
+      padding: 0.45rem 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.32rem;
     }
 
-    /* ── Device rows ── */
+    /* ── Device rows (card style) ── */
     .device-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.42rem 0.9rem 0.42rem 0;
+      gap: 0.55rem;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--card), transparent 28%),
+        color-mix(in srgb, var(--bg-soft), transparent 12%)
+      );
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
+      border-left: 2px solid var(--accent);
+      border-radius: 10px;
+      padding: 0.52rem 0.7rem 0.52rem 0.75rem;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: border-color 0.14s, box-shadow 0.14s;
       user-select: none;
-      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
     }
-    .device-row:hover { background: color-mix(in srgb, var(--accent), transparent 96%); }
-
-    .device-accent-bar {
-      width: 3px;
-      height: 32px;
-      border-radius: 0 2px 2px 0;
-      flex-shrink: 0;
-      transition: opacity 0.15s;
+    .device-row:hover {
+      border-color: color-mix(in srgb, var(--muted), transparent 48%);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
     }
 
     /* Keep for POI rows */
@@ -337,7 +342,6 @@
       align-items: center;
       gap: 0.35rem;
       margin-top: 2px;
-      flex-wrap: wrap;
     }
     .age-label { font-size: 0.67rem; color: var(--muted); }
     .bat-chip {
@@ -422,67 +426,60 @@
       padding: 0.2rem 0.4rem; font-size: 0.7rem; font-family: inherit; cursor: pointer;
     }
 
-    /* ── Trip rows ── */
+    /* ── Trip rows (card style) ── */
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
+
     .trip-row {
       display: flex;
       align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--card), transparent 28%),
+        color-mix(in srgb, var(--bg-soft), transparent 12%)
+      );
+      border: 1px solid color-mix(in srgb, var(--muted), transparent 75%);
+      border-left: 2px solid color-mix(in srgb, var(--accent), transparent 52%);
+      border-radius: 10px;
+      padding: 0.58rem 0.65rem 0.58rem 0.75rem;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: border-color 0.14s, box-shadow 0.14s, border-left-color 0.14s;
       user-select: none;
-      border-bottom: 1px solid color-mix(in srgb, var(--muted), transparent 92%);
     }
-    .trip-row:hover { background: color-mix(in srgb, var(--accent), transparent 96%); }
-    .trip-row.active-trip { background: color-mix(in srgb, #facc15, transparent 96%); }
-
-    .trip-accent-bar {
-      width: 3px;
-      align-self: stretch;
-      flex-shrink: 0;
-      background: color-mix(in srgb, var(--accent), transparent 62%);
-      transition: background 0.15s;
+    .trip-row:hover {
+      border-color: color-mix(in srgb, var(--accent), transparent 42%);
+      border-left-color: var(--accent);
+      box-shadow: 0 2px 14px color-mix(in srgb, var(--accent), transparent 87%);
     }
-    .trip-row:hover .trip-accent-bar { background: color-mix(in srgb, var(--accent), transparent 30%); }
-    .trip-row.active-trip .trip-accent-bar { background: #facc15; }
+    .trip-row.active-trip {
+      border-left-color: #facc15;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, #facc15, transparent 93%),
+        color-mix(in srgb, var(--bg-soft), transparent 12%)
+      );
+    }
 
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
-
-    .trip-info { flex: 1; min-width: 0; padding: 0.55rem 0.6rem; }
-
+    .trip-info { flex: 1; min-width: 0; }
     .trip-row-header {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 0.4rem;
-      margin-bottom: 0.28rem;
+      margin-bottom: 0.2rem;
     }
-
-    .trip-stats-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem;
-      align-items: center;
-    }
-
     .trip-device { font-size: 0.8rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .trip-date { font-size: 0.67rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .trip-stats { font-size: 0.68rem; color: var(--muted); line-height: 1.4; }
 
-    .stat-pill {
-      font-size: 0.63rem;
-      padding: 0.11rem 0.42rem;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--card), transparent 30%);
-      border: 1px solid color-mix(in srgb, var(--muted), transparent 80%);
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .live-pill {
-      font-size: 0.62rem;
-      padding: 0.1rem 0.48rem;
-      border-radius: 999px;
-      background: color-mix(in srgb, #facc15, transparent 82%);
-      color: #fde047;
-      font-weight: 600;
+    .live-badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #facc15;
+      background: color-mix(in srgb, #facc15, transparent 85%);
+      border: 1px solid color-mix(in srgb, #facc15, transparent 60%);
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
       flex-shrink: 0;
       animation: pulse 1.5s infinite;
     }
@@ -1272,24 +1269,19 @@
       });
       const row = document.createElement('div');
       row.className = 'trip-row' + (isActive ? ' active-trip' : '');
-      const statPills = [
-        dist ? `<span class="stat-pill">${dist}</span>` : '',
-        dur  ? `<span class="stat-pill">${dur}</span>`  : '',
-        trip.avg_speed_mph ? `<span class="stat-pill">${Math.round(trip.avg_speed_mph)} avg mph</span>` : '',
-      ].join('');
+      const statsText = [
+        dist, dur,
+        trip.avg_speed_mph ? Math.round(trip.avg_speed_mph) + ' avg mph' : null,
+      ].filter(Boolean).join(' · ');
       row.innerHTML = `
-        <div class="trip-accent-bar"></div>
         <div class="trip-info">
           <div class="trip-row-header">
             <span class="trip-device">${esc(trip.device_name)}</span>
-            ${isActive ? '<span class="live-pill">● Live</span>' : `<span class="trip-date">${date}</span>`}
+            ${isActive ? '<span class="live-badge">Live</span>' : `<span class="trip-date">${date}</span>`}
           </div>
-          <div class="trip-stats-row">
-            ${statPills}
-            ${isActive ? `<span class="trip-date">${date}</span>` : ''}
-          </div>
+          <div class="trip-stats">${statsText || (isActive ? date : '—')}</div>
         </div>
-        <button class="del-btn" title="Delete trip" style="margin-right:0.6rem">${TRASH_SVG}</button>
+        <button class="del-btn" title="Delete trip">${TRASH_SVG}</button>
       `;
       row.addEventListener('click', e => {
         if (e.target.closest('.del-btn') || e.target.closest('.del-confirm')) return;
@@ -1404,35 +1396,72 @@
     `;
   }
 
-  // ── Color-coded route (batched same-color polyline segments) ────────────
+  // ── Color-coded route (smooth gradient via custom canvas layer) ─────────
   function renderColoredRoute(pts, speeds, q1, q3) {
     if (tripRouteGroup) map.removeLayer(tripRouteGroup);
     tripRouteGroup = L.featureGroup();
 
-    function speedColor(s) {
-      if (s <= q1) return '#22c55e';
-      if (s <= q3) return '#28edc4';
-      return '#ff6b38';
+    const maxS = Math.max(...speeds, 1);
+    const t1 = Math.min(q1 / maxS, 0.97);
+    const t3 = Math.min(Math.max(q3 / maxS, t1 + 0.02), 0.99);
+
+    function lerpRgb(a, b, f) {
+      f = Math.max(0, Math.min(1, f));
+      return [
+        Math.round(a[0] + (b[0] - a[0]) * f),
+        Math.round(a[1] + (b[1] - a[1]) * f),
+        Math.round(a[2] + (b[2] - a[2]) * f),
+      ];
+    }
+    // 4-stop gradient anchored at q1 and q3 percentiles
+    function speedRgb(s) {
+      const t = Math.min(s / maxS, 1);
+      if (t <= t1)  return lerpRgb([34,197,94],  [40,237,196], t1 > 0 ? t / t1 : 0);
+      if (t <= t3)  return lerpRgb([40,237,196], [255,107,56], (t - t1) / (t3 - t1));
+      return             lerpRgb([255,107,56],   [248,113,113], (t - t3) / (1 - t3));
     }
 
-    // Group consecutive same-color points into single polylines (1-pt overlap = no gaps)
-    let i = 0;
-    while (i < pts.length - 1) {
-      const color = speedColor(speeds[i]);
-      let j = i + 1;
-      while (j < pts.length - 1 && speedColor(speeds[j]) === color) j++;
-      L.polyline(pts.slice(i, j + 1).map(p => [p.lat, p.lon]), {
-        color, weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
-      }).addTo(tripRouteGroup);
-      i = j;
-    }
+    // Custom canvas layer — redraws on pan/zoom
+    const GradLayer = L.Layer.extend({
+      onAdd(m) {
+        this._map = m;
+        this._cvs = L.DomUtil.create('canvas', '', m.getPanes().overlayPane);
+        this._cvs.style.cssText = 'position:absolute;pointer-events:none;';
+        m.on('moveend zoomend viewreset resize', this._draw, this);
+        this._draw();
+      },
+      onRemove(m) { this._cvs.remove(); m.off('moveend zoomend viewreset resize', this._draw, this); },
+      getBounds() { return L.latLngBounds(pts.map(p => [p.lat, p.lon])); },
+      _draw() {
+        const m = this._map, cvs = this._cvs;
+        const sz = m.getSize();
+        const nw = m.containerPointToLayerPoint([0, 0]);
+        cvs.width = sz.x; cvs.height = sz.y;
+        L.DomUtil.setPosition(cvs, nw);
+        const ctx = cvs.getContext('2d');
+        ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p1 = m.latLngToLayerPoint([pts[i].lat,     pts[i].lon]);
+          const p2 = m.latLngToLayerPoint([pts[i+1].lat,   pts[i+1].lon]);
+          const x1 = p1.x - nw.x, y1 = p1.y - nw.y;
+          const x2 = p2.x - nw.x, y2 = p2.y - nw.y;
+          const [r1,g1,b1] = speedRgb(speeds[i]);
+          const [r2,g2,b2] = speedRgb(speeds[i+1] ?? speeds[i]);
+          const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+          grad.addColorStop(0, `rgb(${r1},${g1},${b1})`);
+          grad.addColorStop(1, `rgb(${r2},${g2},${b2})`);
+          ctx.beginPath(); ctx.strokeStyle = grad;
+          ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+      },
+    });
+    new GradLayer().addTo(tripRouteGroup);
 
-    // Start marker
+    // Start / end markers on top
     L.circleMarker([pts[0].lat, pts[0].lon], {
       radius: 6, fillColor: '#22c55e', fillOpacity: 1, color: '#0c1729', weight: 2,
     }).addTo(tripRouteGroup);
 
-    // End marker
     if (pts.length > 1) {
       const last     = pts[pts.length - 1];
       const endColor = selectedTrip && !selectedTrip.ended_at ? '#facc15' : '#f87171';
@@ -1446,7 +1475,7 @@
     }
 
     tripRouteGroup.addTo(map);
-    try { map.fitBounds(tripRouteGroup.getBounds(), { padding: [50, 50], maxZoom: 16 }); } catch {}
+    try { map.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [50, 50], maxZoom: 16 }); } catch {}
   }
 
   // ── Playback ──────────────────────────────────────────────────────────
@@ -1598,6 +1627,7 @@
     pois.forEach(poi => {
       const row = document.createElement('div');
       row.className = 'device-row';
+      row.style.borderLeftColor = '#a78bfa';
       row.innerHTML = `
         <div class="device-dot" style="background:#a78bfa;color:#a78bfa;border-radius:2px;transform:rotate(45deg)"></div>
         <div class="device-info">
@@ -1716,17 +1746,16 @@
       const batPct  = d.battery != null ? Math.round(d.battery * 100) : null;
       const batCls  = batPct == null ? '' : batPct >= 60 ? 'good' : batPct >= 30 ? 'medium' : 'low';
       const batHtml = batPct != null ? `<span class="bat-chip ${batCls}">${batPct}%</span>` : '';
-      const barOpacity = hidden ? '0.22' : '1';
       const row     = document.createElement('div');
       row.className = 'device-row';
+      row.style.borderLeftColor = hidden ? 'color-mix(in srgb, ' + color + ', transparent 70%)' : color;
       row.innerHTML = `
-        <div class="device-accent-bar" style="background:${color};opacity:${barOpacity}"></div>
         <label class="vis-toggle" title="${hidden ? 'Show' : 'Hide'} layer">
           <input type="checkbox" ${!hidden ? 'checked' : ''} />
           <span class="vis-track"></span>
         </label>
         <div class="device-info">
-          <div class="device-name" style="${hidden ? 'opacity:0.45' : ''}">${esc(d.name)}</div>
+          <div class="device-name" style="${hidden ? 'opacity:0.42' : ''}">${esc(d.name)}</div>
           <div class="device-meta-row">
             <span class="age-label">${age}</span>
             ${batHtml}
