@@ -1273,7 +1273,6 @@
         playBtn.innerHTML = 'No GPS data';
         return;
       }
-      playBtn.disabled = false;
 
       const speeds = pts.map(p => (p.speed || 0) * 2.237);
       const sorted = [...speeds].sort((a, b) => a - b);
@@ -1285,9 +1284,13 @@
 
       pb.positions = pts;
       pb.trip = trip;
-      document.getElementById('play-trip-btn').textContent = '';
-      document.getElementById('play-trip-btn').innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg> Play Trip';
-    } catch {}
+      playBtn.disabled = false;
+      playBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg> Play Trip';
+    } catch (e) {
+      console.error('Trip load failed:', e);
+      playBtn.disabled = false;
+      playBtn.innerHTML = 'Retry';
+    }
   }
 
   // ── Speed chart ───────────────────────────────────────────────────────
