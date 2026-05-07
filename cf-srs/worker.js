@@ -675,6 +675,16 @@ export default {
       return json({ result: 'ok', stored: toInsert.length });
     }
 
+    // ── DELETE /gps/trips/:id ─────────────────────────────────────────────────
+    if (path.match(/^\/gps\/trips\/\d+$/) && request.method === 'DELETE') {
+      const userId = await getUserId(request, env);
+      if (!userId) return err('Unauthorized', 401);
+      const tripId = parseInt(path.split('/')[3]);
+      if (!tripId) return err('Invalid id');
+      await env.DB.prepare('DELETE FROM gps_trips WHERE id=? AND user_id=?').bind(tripId, userId).run();
+      return json({ ok: true });
+    }
+
     // ── GET /gps/devices ─────────────────────────────────────────────────────
     if (path === '/gps/devices' && request.method === 'GET') {
       const userId = await getUserId(request, env);
@@ -779,7 +789,7 @@ export default {
       if (!trip) return err('Trip not found', 404);
       const endTs = trip.ended_at ?? Math.floor(Date.now() / 1000);
       const { results } = await env.DB
-        .prepare('SELECT lat, lon, speed, timestamp FROM gps_positions WHERE device_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC LIMIT 2000')
+        .prepare('SELECT lat, lon, speed, timestamp FROM gps_positions WHERE device_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC LIMIT 5000')
         .bind(trip.device_id, trip.started_at, endTs).all();
       return json(results);
     }
