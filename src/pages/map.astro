@@ -1785,11 +1785,15 @@
     const latlngs = points.map(p => [p.lat, p.lon]);
     layersByDevice[device.id].push(L.polyline(latlngs, { color, weight: 3, opacity: 0.7 }).addTo(map));
 
-    const last = points[points.length - 1];
-    const age  = Math.floor(Date.now() / 1000) - last.timestamp;
+    // Always use the device's authoritative last position, not the last point
+    // in the history window (which may be truncated or outside the time range).
+    const markerLat = device.last_lat ?? points[points.length - 1].lat;
+    const markerLon = device.last_lon ?? points[points.length - 1].lon;
+    const age  = Math.floor(Date.now() / 1000) - (device.last_seen ?? points[points.length - 1].timestamp);
     const bat  = device.battery != null ? `<br>Battery: ${Math.round(device.battery * 100)}%` : '';
+    const last = points[points.length - 1];
     const spd  = last.speed && last.speed > 0.5 ? `<br>Speed: ${(last.speed * 2.237).toFixed(1)} mph` : '';
-    const marker = L.marker([last.lat, last.lon], { icon: makeDeviceIcon(color) })
+    const marker = L.marker([markerLat, markerLon], { icon: makeDeviceIcon(color) })
       .addTo(map)
       .bindPopup(`<b>${esc(device.name)}</b><br>${fmtAge(age)}${bat}${spd}`);
     layersByDevice[device.id].push(marker);

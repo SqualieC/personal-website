@@ -577,9 +577,14 @@ export default {
             tripId    = null; tripState = 'idle';
             distance  = 0; maxSpeed = 0; pointCount = 0;
           }
-          // Drift anchor when idle
+          // Drift anchor when idle, but only if nearly stationary.
+          // If moving at driving speed, keep the anchor fixed so distFromAnchor
+          // grows until it exceeds 50 m and the trip detection triggers.
           if (tripState === 'idle') {
-            anchorLat = pos.lat; anchorLon = pos.lon; anchorTime = pos.timestamp;
+            const speedMph_idle = (pos.speed ?? 0) * 2.237;
+            if (speedMph_idle < 3.0) {
+              anchorLat = pos.lat; anchorLon = pos.lon; anchorTime = pos.timestamp;
+            }
           }
         }
       }
@@ -752,8 +757,15 @@ export default {
         .bind(deviceId, userId).first();
       if (!device) return err('Device not found', 404);
       const since = Math.floor(Date.now() / 1000) - hours * 3600;
+      // Get the most recent 2000 points (not oldest 2000) so the track and
+      // marker always reflect the current path, not a window truncated mid-trip.
       const { results } = await env.DB
-        .prepare('SELECT lat, lon, speed, battery, timestamp FROM gps_positions WHERE device_id=? AND timestamp>=? ORDER BY timestamp ASC LIMIT 2000')
+        .prepare(`SELECT lat, lon, speed, battery, timestamp FROM (
+          SELECT lat, lon, speed, battery, timestamp
+          FROM gps_positions
+          WHERE device_id=? AND timestamp>=?
+          ORDER BY timestamp DESC LIMIT 2000
+        ) ORDER BY timestamp ASC`)
         .bind(deviceId, since).all();
       return json(results);
     }
