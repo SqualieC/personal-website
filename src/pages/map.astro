@@ -290,29 +290,40 @@
     .scrollable-list {
       overflow-y: auto;
       flex: 1;
-      padding: 0.5rem 0.6rem;
+      padding: 0.55rem 0.6rem;
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.45rem;
+      background: rgba(5, 11, 24, 0.38);
     }
 
-    /* ── Device rows (premium card) ── */
+    /* ── Device rows ── */
     .device-row {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
-      background: rgba(30, 52, 92, 0.96);
-      border: 1px solid rgba(184, 206, 238, 0.12);
+      gap: 0.65rem;
+      background: linear-gradient(160deg, rgba(22, 44, 86, 0.99), rgba(13, 26, 54, 0.99));
+      border: 1px solid rgba(184, 206, 238, 0.11);
       border-left: 3px solid var(--accent);
-      border-radius: 12px;
-      padding: 0.65rem 0.7rem 0.65rem 0.65rem;
+      border-radius: 14px;
+      padding: 0.72rem 0.75rem 0.72rem 0.72rem;
       cursor: pointer;
-      transition: background 0.12s, box-shadow 0.14s, transform 0.12s;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.13s;
       user-select: none;
     }
+    .device-row::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 3px; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(40, 237, 196, 0.22), transparent 65%);
+      pointer-events: none;
+    }
     .device-row:hover {
-      background: rgba(38, 64, 110, 0.98);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.32);
+      background: linear-gradient(160deg, rgba(30, 58, 108, 0.99), rgba(18, 36, 70, 0.99));
+      box-shadow: 0 6px 28px rgba(0,0,0,0.35);
       transform: translateX(2px);
     }
 
@@ -327,33 +338,32 @@
 
     .device-info { flex: 1; min-width: 0; }
     .device-name {
-      font-size: 0.86rem;
+      font-size: 0.9rem;
       font-weight: 700;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: var(--text);
-      letter-spacing: -0.01em;
+      color: #eef5ff;
+      letter-spacing: -0.015em;
     }
     .device-meta { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
     .device-meta-row {
       display: flex;
       align-items: center;
-      gap: 0.38rem;
-      margin-top: 3px;
+      gap: 0.4rem;
+      margin-top: 4px;
     }
-    .age-label { font-size: 0.69rem; color: var(--muted); }
+    .age-label { font-size: 0.7rem; color: #8aadd4; }
     .bat-chip {
-      font-size: 0.63rem;
-      padding: 0.1rem 0.4rem;
+      font-size: 0.64rem;
+      padding: 0.1rem 0.42rem;
       border-radius: 999px;
       font-weight: 700;
       flex-shrink: 0;
-      letter-spacing: 0.01em;
     }
-    .bat-chip.good   { background: rgba(34, 197, 94, 0.18);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-    .bat-chip.medium { background: rgba(250, 204, 21, 0.18); color: #fde047; border: 1px solid rgba(250,204,21,0.3); }
-    .bat-chip.low    { background: rgba(248, 113, 113, 0.18); color: #fca5a5; border: 1px solid rgba(248,113,113,0.3); }
+    .bat-chip.good   { background: rgba(34,197,94,0.2);   color: #4ade80; border: 1px solid rgba(34,197,94,0.35); }
+    .bat-chip.medium { background: rgba(250,204,21,0.2);  color: #fde047; border: 1px solid rgba(250,204,21,0.35); }
+    .bat-chip.low    { background: rgba(248,113,113,0.2); color: #fca5a5; border: 1px solid rgba(248,113,113,0.35); }
 
     /* ── Visibility toggle switch ── */
     .vis-toggle {
@@ -403,7 +413,8 @@
       transition: opacity 0.12s, color 0.12s, background 0.12s;
     }
     .device-row:hover .del-btn,
-    .trip-row:hover   .del-btn { opacity: 1; }
+    .trip-row:hover   .del-btn,
+    .trip-row-actions:hover .del-btn { opacity: 1; }
     .del-btn:hover { color: #f87171; background: color-mix(in srgb, #f87171, transparent 88%); }
 
     /* ── Inline two-step delete confirmation ── */
@@ -426,62 +437,126 @@
       padding: 0.2rem 0.4rem; font-size: 0.7rem; font-family: inherit; cursor: pointer;
     }
 
-    /* ── Trip rows (premium card) ── */
+    /* ── Trip rows ── */
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.35; } }
 
     .trip-row {
       display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: rgba(30, 52, 92, 0.96);
-      border: 1px solid rgba(184, 206, 238, 0.12);
-      border-left: 3px solid rgba(40, 237, 196, 0.45);
-      border-radius: 12px;
-      padding: 0.7rem 0.6rem 0.7rem 0.72rem;
+      flex-direction: column;
+      background: linear-gradient(160deg, rgba(22, 44, 86, 0.99), rgba(13, 26, 54, 0.99));
+      border: 1px solid rgba(184, 206, 238, 0.11);
+      border-left: 3px solid rgba(40, 237, 196, 0.32);
+      border-radius: 14px;
+      padding: 0.82rem 0.78rem 0.76rem 0.82rem;
       cursor: pointer;
-      transition: background 0.12s, box-shadow 0.14s, transform 0.12s, border-left-color 0.14s;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.13s, border-left-color 0.15s;
       user-select: none;
     }
+    .trip-row::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 3px; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(40, 237, 196, 0.22), transparent 65%);
+      pointer-events: none;
+    }
     .trip-row:hover {
-      background: rgba(38, 64, 110, 0.98);
+      background: linear-gradient(160deg, rgba(30, 58, 108, 0.99), rgba(18, 36, 70, 0.99));
       border-left-color: var(--accent);
-      box-shadow: 0 4px 22px rgba(40, 237, 196, 0.13);
+      box-shadow: 0 6px 30px rgba(40, 237, 196, 0.13), 0 2px 10px rgba(0,0,0,0.38);
       transform: translateX(2px);
     }
     .trip-row.active-trip {
       border-left-color: #facc15;
-      background: rgba(38, 34, 10, 0.85);
+      background: linear-gradient(160deg, rgba(40, 32, 6, 0.99), rgba(26, 20, 2, 0.99));
+    }
+    .trip-row.active-trip::before {
+      background: linear-gradient(90deg, rgba(250, 204, 21, 0.22), transparent 65%);
     }
 
-    .trip-info { flex: 1; min-width: 0; }
     .trip-row-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.4rem;
-      margin-bottom: 0.26rem;
+      gap: 0.5rem;
+      margin-bottom: 0.62rem;
     }
     .trip-device {
-      font-size: 0.88rem;
+      font-size: 0.85rem;
       font-weight: 700;
-      color: var(--text);
+      color: rgba(238, 245, 255, 0.92);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 0;
       letter-spacing: -0.01em;
     }
-    .trip-date { font-size: 0.67rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-    .trip-stats { font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
-
-    .trip-chevron {
-      font-size: 1rem;
-      color: rgba(184, 206, 238, 0.3);
+    .trip-date {
+      font-size: 0.63rem;
+      color: rgba(184, 206, 238, 0.5);
+      white-space: nowrap;
       flex-shrink: 0;
-      transition: color 0.12s, transform 0.12s;
+    }
+
+    /* Stats row — value+label blocks */
+    .trip-stats-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 0;
+    }
+    .trip-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .trip-stat + .trip-stat {
+      border-left: 1px solid rgba(184, 206, 238, 0.1);
+      padding-left: 0.58rem;
+      margin-left: 0.58rem;
+    }
+    .trip-stat-value {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: #eef5ff;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .trip-stat-unit {
+      font-size: 0.58rem;
+      color: rgba(184, 206, 238, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 500;
       line-height: 1;
     }
-    .trip-row:hover .trip-chevron { color: var(--accent); transform: translateX(2px); }
+
+    /* Actions live inside the stats row, pushed right */
+    .trip-row-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.1rem;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .trip-chevron {
+      font-size: 1.1rem;
+      color: rgba(184, 206, 238, 0.2);
+      line-height: 1;
+      transition: color 0.13s, transform 0.13s;
+    }
+    .trip-row:hover .trip-chevron { color: var(--accent); transform: translateX(3px); }
+
+    /* del-confirm appended to trip-row as column child */
+    .trip-row > .del-confirm {
+      justify-content: flex-end;
+      border-top: 1px solid rgba(184, 206, 238, 0.08);
+      padding-top: 0.4rem;
+      margin-top: 0.12rem;
+      margin-left: 0;
+    }
 
     .live-badge {
       font-size: 0.58rem;
@@ -489,13 +564,15 @@
       letter-spacing: 0.07em;
       text-transform: uppercase;
       color: #facc15;
-      background: rgba(250, 204, 21, 0.15);
-      border: 1px solid rgba(250, 204, 21, 0.4);
+      background: rgba(250,204,21,0.15);
+      border: 1px solid rgba(250,204,21,0.4);
       border-radius: 4px;
       padding: 0.08rem 0.38rem;
       flex-shrink: 0;
       animation: pulse 1.5s infinite;
     }
+
+    .trip-info { flex: 1; min-width: 0; }
 
     /* ── Trip detail view ── */
     #trip-detail {
@@ -625,18 +702,19 @@
     }
 
     .add-btn {
-      background: transparent;
-      border: 1px dashed color-mix(in srgb, var(--muted), transparent 60%);
-      border-radius: 8px;
-      color: var(--muted);
+      background: rgba(40, 237, 196, 0.07);
+      border: 1px solid rgba(40, 237, 196, 0.25);
+      border-radius: 9px;
+      color: var(--accent);
       cursor: pointer;
       font-size: 0.78rem;
+      font-weight: 600;
       font-family: inherit;
-      padding: 0.42rem;
+      padding: 0.48rem;
       width: 100%;
-      transition: border-color 0.14s, color 0.14s;
+      transition: background 0.13s, border-color 0.13s;
     }
-    .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-btn:hover { background: rgba(40, 237, 196, 0.14); border-color: rgba(40, 237, 196, 0.5); }
 
     /* ── Storage info ── */
     #storage-info {
@@ -1285,20 +1363,26 @@
       });
       const row = document.createElement('div');
       row.className = 'trip-row' + (isActive ? ' active-trip' : '');
-      const statsText = [
-        dist, dur,
-        trip.avg_speed_mph ? Math.round(trip.avg_speed_mph) + ' avg mph' : null,
-      ].filter(Boolean).join(' · ');
+      const distVal  = trip.distance_meters  ? (trip.distance_meters / 1609.34).toFixed(2) : null;
+      const durVal   = trip.duration_seconds ? fmtDuration(trip.duration_seconds) : null;
+      const speedVal = trip.avg_speed_mph    ? Math.round(trip.avg_speed_mph) : null;
+      const statBlocks = [
+        distVal  ? `<div class="trip-stat"><span class="trip-stat-value">${distVal}</span><span class="trip-stat-unit">mi</span></div>` : '',
+        durVal   ? `<div class="trip-stat"><span class="trip-stat-value">${durVal}</span><span class="trip-stat-unit">duration</span></div>` : '',
+        speedVal ? `<div class="trip-stat"><span class="trip-stat-value">${speedVal}</span><span class="trip-stat-unit">avg mph</span></div>` : '',
+      ].filter(Boolean).join('');
       row.innerHTML = `
-        <div class="trip-info">
-          <div class="trip-row-header">
-            <span class="trip-device">${esc(trip.device_name)}</span>
-            ${isActive ? '<span class="live-badge">Live</span>' : `<span class="trip-date">${date}</span>`}
-          </div>
-          <div class="trip-stats">${statsText || (isActive ? date : '—')}</div>
+        <div class="trip-row-header">
+          <span class="trip-device">${esc(trip.device_name)}</span>
+          ${isActive ? '<span class="live-badge">Live</span>' : `<span class="trip-date">${date}</span>`}
         </div>
-        <button class="del-btn" title="Delete trip">${TRASH_SVG}</button>
-        <span class="trip-chevron">›</span>
+        <div class="trip-stats-row">
+          ${statBlocks || `<div class="trip-stat"><span class="trip-stat-value">${isActive ? 'Live' : '—'}</span><span class="trip-stat-unit">no data</span></div>`}
+          <div class="trip-row-actions">
+            <button class="del-btn" title="Delete trip">${TRASH_SVG}</button>
+            <span class="trip-chevron">›</span>
+          </div>
+        </div>
       `;
       row.addEventListener('click', e => {
         if (e.target.closest('.del-btn') || e.target.closest('.del-confirm')) return;
