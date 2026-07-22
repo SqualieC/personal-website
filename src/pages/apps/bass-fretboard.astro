@@ -244,17 +244,10 @@ import Layout from '../../layouts/Layout.astro';
     if (hover) {
       const x = slotX(hover.fret);
       const y = stringY(hover.si);
-      const hoverMidi = BASS_STRINGS[hover.si].midi + hover.fret;
-      const hoverNote = NOTE_NAMES[((hoverMidi % 12) + 12) % 12];
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.45;
       ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#0b0e12';
-      ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(hoverNote, x, y);
     }
 
     ctx.restore();
