@@ -1,0 +1,367 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout
+  title="Bass Fretboard | SqualieC"
+  description="Interactive 24-fret bass guitar fretboard. Practice finding every position of a given note across all four strings."
+>
+  <section class="hero hero-surface">
+    <p class="eyebrow">Music Tool</p>
+    <h1>Bass Fretboard</h1>
+    <p class="lead">
+      Find every position of a given note across the full 24-fret, 4-string bass neck.
+      Click each spot where the note can be played to advance to the next note.
+    </p>
+  </section>
+
+  <section class="fret-shell card section-title">
+    <div class="quiz-bar">
+      <div class="quiz-left">
+        <p class="quiz-idle" id="quizIdle">Press <strong>Start</strong> to begin.</p>
+        <p class="quiz-prompt" id="quizPrompt" hidden>
+          Find all &nbsp;<strong id="targetName">—</strong>&nbsp; notes
+        </p>
+        <p class="feedback" id="feedback" aria-live="polite"></p>
+      </div>
+      <div class="quiz-right">
+        <div class="stat-row">
+          <span class="stat" id="foundStat">Found: —</span>
+          <span class="stat" id="scoreStat">Score: —</span>
+        </div>
+        <button id="startBtn" class="btn btn-primary" type="button">Start</button>
+      </div>
+    </div>
+
+    <div class="fb-wrap">
+      <canvas id="fretboard" class="fb-canvas"></canvas>
+    </div>
+    <p class="fb-note">Frets 1–24 shown. Strings: E (bottom, thickest) → G (top, thinnest).</p>
+  </section>
+</Layout>
+
+<style>
+  .fret-shell {
+    padding: 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .quiz-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .quiz-left  { flex: 1; min-width: 200px; }
+  .quiz-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+
+  .quiz-idle  { margin: 0 0 0.25rem; font-size: 1.05rem; color: var(--muted); }
+  .quiz-prompt {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .quiz-prompt strong { color: var(--accent); font-size: 1.6rem; }
+
+  .feedback {
+    margin: 0;
+    min-height: 1.4em;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .feedback.correct { color: var(--accent); }
+  .feedback.wrong   { color: var(--accent-2); }
+
+  .stat-row { display: flex; gap: 1rem; }
+  .stat { font-size: 0.88rem; font-weight: 700; color: var(--muted); }
+
+  .fb-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    background: #1c1f24;
+  }
+
+  .fb-canvas {
+    display: block;
+    width: 100%;
+    min-width: 700px;
+    height: 200px;
+    border-radius: 10px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .fb-note {
+    margin: 0;
+    font-size: 0.78rem;
+    color: color-mix(in srgb, var(--muted), transparent 45%);
+  }
+</style>
+
+<script is:inline>
+(function () {
+  'use strict';
+
+  /* ── Constants ─────────────────────────────────────────────── */
+  const NOTE_NAMES   = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const BASS_STRINGS = [
+    { name: 'E', midi: 28 },   // si=0 → drawn at bottom
+    { name: 'A', midi: 33 },
+    { name: 'D', midi: 38 },
+    { name: 'G', midi: 43 },   // si=3 → drawn at top
+  ];
+  const FRETS        = 24;
+  const INLAY_FRETS  = new Set([3, 5, 7, 9, 12, 15, 17, 19, 21, 24]);
+  const STR_THICK    = [2.5, 2.0, 1.5, 1.0];  // E→G thicknesses
+
+  // Canvas padding (CSS pixels, before DPR scaling)
+  const PAD_L = 32, PAD_R = 14, PAD_T = 24, PAD_B = 14;
+
+  /* ── Quiz state ─────────────────────────────────────────────── */
+  const quiz = {
+    active:   false,
+    targetPc: null,  // pitch class 0–11
+    found:    [],    // 'si-fret' strings for found positions
+    allPos:   [],    // { si, fret, key } for every valid position
+    correct:  0,     // total correct taps across all notes
+    total:    0,     // total taps (correct + wrong)
+  };
+
+  /* ── Helpers ────────────────────────────────────────────────── */
+  function positionsForPc(pc) {
+    const out = [];
+    BASS_STRINGS.forEach((s, si) => {
+      for (let f = 1; f <= FRETS; f++) {
+        if (((s.midi + f) % 12 + 12) % 12 === pc)
+          out.push({ si, fret: f, key: `${si}-${f}` });
+      }
+    });
+    return out;
+  }
+
+  /* ── Drawing ────────────────────────────────────────────────── */
+  function draw() {
+    const canvas = document.getElementById('fretboard');
+    if (!canvas) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cW = canvas.clientWidth, cH = canvas.clientHeight;
+    if (canvas.width  !== Math.round(cW * dpr)) canvas.width  = Math.round(cW * dpr);
+    if (canvas.height !== Math.round(cH * dpr)) canvas.height = Math.round(cH * dpr);
+
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const W = cW, H = cH;
+    const lx = PAD_L, rx = W - PAD_R, ty = PAD_T, by = H - PAD_B;
+    const rw = rx - lx, rh = by - ty;
+    const STRS = 4;
+    const fW = rw / FRETS;  // width of one fret slot
+
+    function slotX(fret)  { return lx + fW * (fret - 0.5); }  // center of fret slot
+    function stringY(si)  { return ty + rh * (STRS - 1 - si) / (STRS - 1); }
+
+    /* Background */
+    ctx.fillStyle = '#1c1f24';
+    ctx.fillRect(0, 0, W, H);
+
+    /* Fret numbers (only at inlay frets, along the top) */
+    ctx.fillStyle = '#596070';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let f = 1; f <= FRETS; f++) {
+      if (INLAY_FRETS.has(f)) ctx.fillText(String(f), slotX(f), 2);
+    }
+
+    /* Fret wires */
+    for (let f = 0; f <= FRETS; f++) {
+      const x = lx + fW * f;
+      ctx.strokeStyle = f === 0 ? '#e2a86f' : '#3a3f47';
+      ctx.lineWidth   = f === 0 ? 4 : 1;
+      ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x, by); ctx.stroke();
+    }
+
+    /* Strings */
+    for (let si = 0; si < STRS; si++) {
+      const y = stringY(si);
+      ctx.strokeStyle = '#c8cbd1';
+      ctx.lineWidth   = STR_THICK[si];
+      ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(rx, y); ctx.stroke();
+    }
+
+    /* Inlay dots */
+    const midY = ty + rh / 2;
+    ctx.fillStyle = '#3a3f47';
+    for (const f of INLAY_FRETS) {
+      const x = slotX(f);
+      if (f === 12 || f === 24) {
+        const off = rh * 0.28;
+        ctx.beginPath(); ctx.arc(x, midY - off, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, midY + off, 4, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(x, midY, 4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    /* String labels (E at bottom → G at top) */
+    ctx.fillStyle = '#b8ceee';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const strLabels = ['E', 'A', 'D', 'G'];
+    for (let si = 0; si < STRS; si++) {
+      ctx.fillText(strLabels[si], PAD_L - 5, stringY(si));
+    }
+
+    /* Found note dots */
+    if (quiz.active && quiz.allPos.length) {
+      const foundSet = new Set(quiz.found);
+      for (const pos of quiz.allPos) {
+        if (!foundSet.has(pos.key)) continue;
+        const x = slotX(pos.fret);
+        const y = stringY(pos.si);
+        ctx.fillStyle = '#3ddc84';
+        ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#0b0e12';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(NOTE_NAMES[quiz.targetPc], x, y);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /* ── Interaction ────────────────────────────────────────────── */
+  function handleClick(clientX, clientY) {
+    if (!quiz.active) return;
+
+    const canvas = document.getElementById('fretboard');
+    const rect = canvas.getBoundingClientRect();
+    const cx = clientX - rect.left;
+    const cy = clientY - rect.top;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const lx = PAD_L, rx = W - PAD_R, ty = PAD_T, by = H - PAD_B;
+    const rw = rx - lx, rh = by - ty;
+    const STRS = 4;
+    const fW = rw / FRETS;
+
+    if (cx < lx || cx > rx || cy < ty || cy > by) return;
+
+    /* Closest string */
+    let closestSi = 0, bestYDist = Infinity;
+    for (let si = 0; si < STRS; si++) {
+      const sy = ty + rh * (STRS - 1 - si) / (STRS - 1);
+      const d = Math.abs(cy - sy);
+      if (d < bestYDist) { bestYDist = d; closestSi = si; }
+    }
+
+    /* Closest fret slot */
+    let closestFret = -1, bestXDist = Infinity;
+    for (let f = 1; f <= FRETS; f++) {
+      const fx = lx + fW * (f - 0.5);
+      const d = Math.abs(cx - fx);
+      if (d < bestXDist) { bestXDist = d; closestFret = f; }
+    }
+    if (bestXDist > fW * 0.65) return;
+
+    const strObj = BASS_STRINGS[closestSi];
+    const midi   = strObj.midi + closestFret;
+    const pc     = ((midi % 12) + 12) % 12;
+    const key    = `${closestSi}-${closestFret}`;
+    const fb     = document.getElementById('feedback');
+
+    if (pc !== quiz.targetPc) {
+      quiz.total++;
+      fb.textContent = `✗ That's ${NOTE_NAMES[pc]}, not ${NOTE_NAMES[quiz.targetPc]}`;
+      fb.className   = 'feedback wrong';
+      updateStats();
+      return;
+    }
+
+    if (quiz.found.includes(key)) {
+      fb.textContent = `Already found ${NOTE_NAMES[pc]} on ${strObj.name} string, fret ${closestFret}`;
+      fb.className   = 'feedback';
+      return;
+    }
+
+    quiz.found.push(key);
+    quiz.total++;
+    quiz.correct++;
+    fb.textContent = `✓ ${NOTE_NAMES[pc]} on ${strObj.name} string, fret ${closestFret}`;
+    fb.className   = 'feedback correct';
+    updateStats();
+    draw();
+
+    if (quiz.found.length >= quiz.allPos.length) {
+      const name = NOTE_NAMES[quiz.targetPc];
+      setTimeout(() => {
+        fb.textContent = `All ${name}s found! Next note…`;
+        fb.className   = 'feedback correct';
+        setTimeout(pickTarget, 1100);
+      }, 300);
+    }
+  }
+
+  /* ── Quiz flow ──────────────────────────────────────────────── */
+  function updateStats() {
+    document.getElementById('foundStat').textContent = `Found: ${quiz.found.length} / ${quiz.allPos.length}`;
+    document.getElementById('scoreStat').textContent = `Score: ${quiz.correct} / ${quiz.total}`;
+  }
+
+  function pickTarget() {
+    const pc = Math.floor(Math.random() * 12);
+    quiz.targetPc = pc;
+    quiz.found    = [];
+    quiz.allPos   = positionsForPc(pc);
+
+    document.getElementById('targetName').textContent = NOTE_NAMES[pc];
+    document.getElementById('quizPrompt').hidden = false;
+    document.getElementById('quizIdle').hidden   = true;
+
+    const fb = document.getElementById('feedback');
+    fb.textContent = `Tap every ${NOTE_NAMES[pc]} on the fretboard — ${quiz.allPos.length} positions.`;
+    fb.className   = 'feedback';
+    updateStats();
+    draw();
+  }
+
+  function startQuiz() {
+    quiz.active  = true;
+    quiz.correct = 0;
+    quiz.total   = 0;
+    document.getElementById('startBtn').textContent = 'Reset';
+    pickTarget();
+  }
+
+  /* ── Init ───────────────────────────────────────────────────── */
+  function init() {
+    document.getElementById('startBtn').addEventListener('click', startQuiz);
+
+    const canvas = document.getElementById('fretboard');
+    canvas.addEventListener('click', e => handleClick(e.clientX, e.clientY));
+    canvas.addEventListener('touchend', e => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      handleClick(t.clientX, t.clientY);
+    }, { passive: false });
+
+    window.addEventListener('resize', draw);
+    draw();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
