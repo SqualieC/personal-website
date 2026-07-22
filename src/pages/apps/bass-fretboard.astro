@@ -122,6 +122,9 @@ import Layout from '../../layouts/Layout.astro';
   // Canvas padding (CSS pixels, before DPR scaling)
   const PAD_L = 32, PAD_R = 14, PAD_T = 24, PAD_B = 14;
 
+  /* ── Hover state ───────────────────────────────────────────── */
+  let hover = null;  // { si, fret } or null
+
   /* ── Quiz state ─────────────────────────────────────────────── */
   const quiz = {
     active:   false,
@@ -237,13 +240,28 @@ import Layout from '../../layouts/Layout.astro';
       }
     }
 
+    /* Hover preview dot */
+    if (hover) {
+      const x = slotX(hover.fret);
+      const y = stringY(hover.si);
+      const hoverMidi = BASS_STRINGS[hover.si].midi + hover.fret;
+      const hoverNote = NOTE_NAMES[((hoverMidi % 12) + 12) % 12];
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#0b0e12';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hoverNote, x, y);
+    }
+
     ctx.restore();
   }
 
-  /* ── Interaction ────────────────────────────────────────────── */
-  function handleClick(clientX, clientY) {
-    if (!quiz.active) return;
-
+  /* ── Hit testing (shared by hover and click) ───────────────── */
+  function hitTest(clientX, clientY) {
     const canvas = document.getElementById('fretboard');
     const rect = canvas.getBoundingClientRect();
     const cx = clientX - rect.left;
@@ -253,10 +271,11 @@ import Layout from '../../layouts/Layout.astro';
     const rw = rx - lx, rh = by - ty;
     const STRS = 4;
     const fW = rw / FRETS;
+    const STR_MARGIN = 18;  // extra px above/below outer strings that still register
 
-    if (cx < lx || cx > rx || cy < ty || cy > by) return;
+    if (cx < lx || cx > rx) return null;
+    if (cy < ty - STR_MARGIN || cy > by + STR_MARGIN) return null;
 
-    /* Closest string */
     let closestSi = 0, bestYDist = Infinity;
     for (let si = 0; si < STRS; si++) {
       const sy = ty + rh * (STRS - 1 - si) / (STRS - 1);
@@ -264,15 +283,25 @@ import Layout from '../../layouts/Layout.astro';
       if (d < bestYDist) { bestYDist = d; closestSi = si; }
     }
 
-    /* Closest fret slot */
     let closestFret = -1, bestXDist = Infinity;
     for (let f = 1; f <= FRETS; f++) {
       const fx = lx + fW * (f - 0.5);
       const d = Math.abs(cx - fx);
       if (d < bestXDist) { bestXDist = d; closestFret = f; }
     }
-    if (bestXDist > fW * 0.65) return;
+    if (bestXDist > fW * 0.65) return null;
 
+    return { si: closestSi, fret: closestFret };
+  }
+
+  /* ── Interaction ────────────────────────────────────────────── */
+  function handleClick(clientX, clientY) {
+    if (!quiz.active) return;
+
+    const hit = hitTest(clientX, clientY);
+    if (!hit) return;
+
+    const { si: closestSi, fret: closestFret } = hit;
     const strObj = BASS_STRINGS[closestSi];
     const midi   = strObj.midi + closestFret;
     const pc     = ((midi % 12) + 12) % 12;
@@ -353,6 +382,18 @@ import Layout from '../../layouts/Layout.astro';
       const t = e.changedTouches[0];
       handleClick(t.clientX, t.clientY);
     }, { passive: false });
+
+    canvas.addEventListener('mousemove', e => {
+      const h = hitTest(e.clientX, e.clientY);
+      if (h && (hover === null || hover.si !== h.si || hover.fret !== h.fret)) {
+        hover = h;
+        draw();
+      } else if (!h && hover !== null) {
+        hover = null;
+        draw();
+      }
+    });
+    canvas.addEventListener('mouseleave', () => { hover = null; draw(); });
 
     window.addEventListener('resize', draw);
     draw();
