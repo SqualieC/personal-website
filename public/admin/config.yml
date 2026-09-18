@@ -102,7 +102,7 @@ collections:
         fields:
           - { label: Image, name: image, widget: image, media_folder: "../../assets/photo-sets", public_folder: "../../assets/photo-sets" }
           - { label: Photo Title, name: title, widget: string, required: false }
-          - { label: Date/Time Taken, name: takenAt, widget: datetime, required: false }
+          - { label: Date/Time Taken (override), name: takenAt, widget: datetime, required: false, hint: "Leave blank — the site reads this automatically from the photo's own EXIF data. Only set this to override that (e.g. a scan with no EXIF, or a wrong camera clock)." }
 
   # ── About Page ───────────────────────────────────────────────────────────────
   - name: about

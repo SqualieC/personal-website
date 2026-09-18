@@ -11,9 +11,14 @@
  * Copies every image in <source-folder> into the shared src/assets/photo-sets/
  * folder (same flat folder the Decap admin's Photo Sets field uses — see
  * public/admin/config.yml) and writes src/content/photoSets/<slug>.mdx with
- * a `photos` list matching the photoSets schema (image + optional title +
- * optional takenAt per photo). Files are renamed <slug>--<original-name> on
- * copy so two shoots can never collide in the shared folder.
+ * a `photos` list matching the photoSets schema (image + optional title).
+ * Files are renamed <slug>--<original-name> on copy so two shoots can never
+ * collide in the shared folder.
+ *
+ * Each photo's date/time-taken doesn't need to be written here at all — the
+ * site reads it directly from the photo file's own EXIF data at build time
+ * (src/pages/photos/[slug].astro), so there's nothing to set unless you want
+ * to override it later via the CMS.
  *
  * The first photo in sort order becomes photos[0] — the set's cover
  * thumbnail on /photos — unless --cover picks a different file.
@@ -30,10 +35,11 @@
  *   --cover <filename>     Filename (within the source folder) to sort first /
  *                           use as the cover. Defaults to the first photo in
  *                           sort order.
- *   --order name|mtime     Photo order. Defaults to "name" (natural sort).
- *   --no-taken-at          Don't set each photo's takenAt from its file mtime
- *                           (on by default — it's an approximation, not real
- *                           EXIF capture time; edit precisely via the CMS).
+ *   --order name|mtime|exif  Photo order. Defaults to "name" (natural sort —
+ *                           usually already chronological for one camera's
+ *                           sequential filenames). "exif" sorts by each
+ *                           photo's real EXIF capture time (falls back to
+ *                           file mtime for any photo with no EXIF date).
  *   --force                Overwrite an existing entry for this slug.
  *
  * Per-photo titles aren't settable from the CLI for an entire batch — add
@@ -42,12 +48,14 @@
  *
  * Example:
  *   node scripts/add-photo-set.js ~/Photos/rainier --title "Mount Rainier" \
- *     --location "Mount Rainier, WA" --note "Labor Day backpacking trip."
+ *     --location "Mount Rainier, WA" --note "Labor Day backpacking trip." \
+ *     --order exif
  */
 
 import { readdirSync, statSync, mkdirSync, copyFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import exifr from 'exifr';
 
 const ROOT = path.resolve(fileURLToPath(import.meta.url), '..', '..');
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif']);
@@ -58,7 +66,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
-      if (key === 'force' || key === 'no-taken-at') {
+      if (key === 'force') {
         args[key] = true;
       } else {
         args[key] = argv[++i];
@@ -93,7 +101,7 @@ const sourceDir = args._[0];
 
 if (!sourceDir) {
   fail(
-    'Usage: node scripts/add-photo-set.js <source-folder> --title "My Title" [--slug ...] [--location ...] [--note ...] [--date YYYY-MM-DD] [--cover file.jpg] [--order name|mtime] [--no-taken-at] [--force]'
+    'Usage: node scripts/add-photo-set.js <source-folder> --title "My Title" [--slug ...] [--location ...] [--note ...] [--date YYYY-MM-DD] [--cover file.jpg] [--order name|mtime|exif] [--force]'
   );
 }
 if (!args.title) {
@@ -112,7 +120,7 @@ if (!slug) {
 
 const date = args.date || new Date().toISOString().slice(0, 10);
 
-const order = args.order === 'mtime' ? 'mtime' : 'name';
+const order = ['mtime', 'exif'].includes(args.order) ? args.order : 'name';
 let files = readdirSync(resolvedSource).filter((f) => IMAGE_EXTENSIONS.has(path.extname(f).toLowerCase()));
 
 if (files.length === 0) {
@@ -126,6 +134,21 @@ if (order === 'mtime') {
     .map((f) => ({ f, mtime: mtimeOf(f).getTime() }))
     .sort((a, b) => a.mtime - b.mtime)
     .map(({ f }) => f);
+} else if (order === 'exif') {
+  const withTimes = await Promise.all(
+    files.map(async (f) => {
+      let time = mtimeOf(f).getTime();
+      try {
+        const exif = await exifr.parse(path.join(resolvedSource, f), ['DateTimeOriginal', 'CreateDate']);
+        const captured = exif?.DateTimeOriginal ?? exif?.CreateDate;
+        if (captured instanceof Date) time = captured.getTime();
+      } catch {
+        // no EXIF, unsupported format, or unreadable — mtime fallback above stands
+      }
+      return { f, time };
+    })
+  );
+  files = withTimes.sort((a, b) => a.time - b.time).map(({ f }) => f);
 } else {
   files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
@@ -156,15 +179,7 @@ for (const file of files) {
 }
 
 const relImagePath = (file) => `../../assets/photo-sets/${destName(file)}`;
-const includeTakenAt = !args['no-taken-at'];
-
-const photoLines = files.flatMap((file) => {
-  const lines = [`  - image: ${yamlString(relImagePath(file))}`];
-  if (includeTakenAt) {
-    lines.push(`    takenAt: ${yamlString(mtimeOf(file).toISOString())}`);
-  }
-  return lines;
-});
+const photoLines = files.map((file) => `  - image: ${yamlString(relImagePath(file))}`);
 
 const lines = [
   '---',
@@ -184,7 +199,7 @@ writeFileSync(contentFile, lines.join('\n'));
 console.log(`\nAdded photo set "${args.title}" (${slug})`);
 console.log(`  ${files.length} photo${files.length === 1 ? '' : 's'} copied to ${path.relative(ROOT, assetDir)} (prefixed "${slug}--")`);
 console.log(`  Cover:   ${destName(files[0])} (photos[0])`);
-console.log(`  takenAt: ${includeTakenAt ? 'set from each file’s mtime (approximate — edit precisely via the CMS if needed)' : 'not set'}`);
+console.log(`  Order:   ${order}`);
 console.log(`  Entry:   ${path.relative(ROOT, contentFile)}`);
 console.log(
   `\nPreview with \`npm run dev\`, then publish:\n  git add ${path.relative(ROOT, assetDir)} ${path.relative(

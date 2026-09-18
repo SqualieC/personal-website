@@ -2,6 +2,10 @@
 import { getCollection } from 'astro:content';
 import { Image, getImage } from 'astro:assets';
 import Layout from '../../layouts/Layout.astro';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { load as loadYaml } from 'js-yaml';
+import exifr from 'exifr';
 
 export async function getStaticPaths() {
   const sets = await getCollection('photoSets');
@@ -23,17 +27,50 @@ const formatTakenAt = (d: Date) =>
     minute: '2-digit'
   });
 
+// Astro's image() schema helper resolves each photo to just {src, width,
+// height, format} — it deliberately doesn't expose the original file's
+// path. To read a photo's real EXIF capture date, independently re-read
+// this entry's own raw frontmatter (the one place we still have the
+// original "../../assets/photo-sets/<file>" path string) and resolve each
+// photo back to its actual file on disk.
+//
+// process.cwd() rather than import.meta.url-relative pathing: at build
+// time this page module gets bundled into dist/chunks/, so import.meta.url
+// there resolves relative to the *output* location, not the source file —
+// process.cwd() is the project root regardless of how the page is bundled.
+const CONTENT_DIR = path.join(process.cwd(), 'src', 'content', 'photoSets');
+const rawFrontmatter = readFileSync(path.join(CONTENT_DIR, `${set.slug}.mdx`), 'utf-8');
+const frontmatterMatch = rawFrontmatter.match(/^---\n([\s\S]*?)\n---/);
+const rawPhotos = (frontmatterMatch ? loadYaml(frontmatterMatch[1]) : {})?.photos ?? [];
+
+const exifTakenAt = await Promise.all(
+  rawPhotos.map(async (raw: { image?: string }) => {
+    if (!raw?.image) return null;
+    try {
+      const absPath = path.resolve(CONTENT_DIR, raw.image);
+      const exif = await exifr.parse(absPath, ['DateTimeOriginal', 'CreateDate']);
+      const captured = exif?.DateTimeOriginal ?? exif?.CreateDate;
+      return captured instanceof Date ? captured : null;
+    } catch {
+      return null; // no EXIF, unsupported format, or unreadable — just skip it
+    }
+  })
+);
+
 // Precompute a larger version of each photo for the lightbox, so the grid
-// only ever ships thumbnail-sized images.
+// only ever ships thumbnail-sized images. A manually-set takenAt in the CMS
+// always wins (e.g. for scans with no EXIF, or to correct a wrong camera
+// clock); otherwise fall back to the photo file's own EXIF capture time.
 const lightboxPhotos = await Promise.all(
-  photos.map(async (photo) => {
+  photos.map(async (photo, i) => {
     const large = await getImage({ src: photo.image, width: Math.min(photo.image.width, 1800) });
+    const takenAt = photo.takenAt ?? exifTakenAt[i] ?? null;
     return {
       src: large.src,
       width: large.attributes.width,
       height: large.attributes.height,
       title: photo.title ?? '',
-      takenAt: photo.takenAt ? formatTakenAt(photo.takenAt) : ''
+      takenAt: takenAt ? formatTakenAt(takenAt) : ''
     };
   })
 );
@@ -181,12 +218,19 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     transition: transform 180ms ease;
   }
 
-  /* transform-origin is set from JS to the exact clicked point before this
-     class is applied, so the image scales up anchored at that point instead
-     of from its center. */
+  /* The actual scale/translate values are set from JS via inline style
+     (translate carries the pan offset, which changes continuously while
+     dragging — a static class rule can't express that). This class only
+     needs to override the cursor; is-dragging additionally drops the
+     transition so panning tracks the pointer with no easing lag. */
   .lightbox-image-wrap img.is-zoomed {
-    transform: scale(2);
-    cursor: zoom-out;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .lightbox-image-wrap img.is-zoomed.is-dragging {
+    cursor: grabbing;
+    transition: none;
   }
 
   .lightbox-figure figcaption {
@@ -265,18 +309,45 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     if (!dataEl || !overlay) return;
 
     const photos = JSON.parse(dataEl.textContent || '[]');
+    const wrap = document.getElementById('lightboxImageWrap');
     const imgEl = document.getElementById('lightboxImg');
     const captionEl = document.getElementById('lightboxCaption');
     const closeBtn = document.getElementById('lightboxClose');
     const prevBtn = document.getElementById('lightboxPrev');
     const nextBtn = document.getElementById('lightboxNext');
+    const ZOOM_SCALE = 2;
     let currentIndex = 0;
     let lastFocused = null;
     let isZoomed = false;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragMoved = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    function applyTransform() {
+      imgEl.style.transform = isZoomed ? `translate(${panX}px, ${panY}px) scale(${ZOOM_SCALE})` : '';
+    }
+
+    // Keeps a drag from throwing the image far outside the frame — clamps
+    // to a generous but bounded range relative to the frame's own size
+    // rather than computing exact scaled-image edges.
+    function clampPan() {
+      const maxPanX = wrap.clientWidth * 0.5;
+      const maxPanY = wrap.clientHeight * 0.5;
+      panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+      panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+    }
 
     function setZoomed(zoomed) {
       isZoomed = zoomed;
+      panX = 0;
+      panY = 0;
       imgEl.classList.toggle('is-zoomed', zoomed);
+      applyTransform();
     }
 
     function render() {
@@ -291,21 +362,52 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     }
 
     // Anchors the zoom at the exact point clicked: transform-origin is set
-    // to that point (as a % of the image box) before scale(2) is applied,
-    // so the clicked spot stays fixed in place while everything around it
+    // to that point (as a % of the image box) before scale() is applied, so
+    // the clicked spot stays fixed in place while everything around it
     // grows — a plain CSS transform, so there's no scroll math or layout
     // race to get wrong.
-    function toggleZoom(clientX, clientY) {
-      if (isZoomed) {
-        setZoomed(false);
-        return;
-      }
+    function zoomInAt(clientX, clientY) {
       const rect = imgEl.getBoundingClientRect();
       const fracX = ((clientX - rect.left) / rect.width) * 100;
       const fracY = ((clientY - rect.top) / rect.height) * 100;
       imgEl.style.transformOrigin = `${fracX}% ${fracY}%`;
       setZoomed(true);
     }
+
+    // Mouse AND touch (Pointer Events unify both): while zoomed, dragging
+    // pans the image via translate() instead of native scroll (there's
+    // nothing to scroll — the wrap is overflow: hidden). A drag's trailing
+    // click is swallowed via dragMoved so it doesn't also zoom back out.
+    imgEl.addEventListener('pointerdown', (e) => {
+      if (!isZoomed) return;
+      isDragging = true;
+      dragMoved = false;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      panStartX = panX;
+      panStartY = panY;
+      imgEl.setPointerCapture(e.pointerId);
+      imgEl.classList.add('is-dragging');
+    });
+
+    imgEl.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true;
+      panX = panStartX + dx;
+      panY = panStartY + dy;
+      clampPan();
+      applyTransform();
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      imgEl.classList.remove('is-dragging');
+    }
+    imgEl.addEventListener('pointerup', endDrag);
+    imgEl.addEventListener('pointercancel', endDrag);
 
     function open(index) {
       currentIndex = index;
@@ -339,7 +441,17 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     });
 
     imgEl.addEventListener('click', (e) => {
-      toggleZoom(e.clientX, e.clientY);
+      // A drag-to-pan gesture also fires a trailing click on release —
+      // swallow that one so dragging doesn't immediately zoom back out.
+      if (dragMoved) {
+        dragMoved = false;
+        return;
+      }
+      if (isZoomed) {
+        setZoomed(false);
+      } else {
+        zoomInAt(e.clientX, e.clientY);
+      }
     });
 
     closeBtn.addEventListener('click', close);
