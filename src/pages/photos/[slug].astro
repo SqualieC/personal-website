@@ -1,6 +1,6 @@
 ---
 import { getCollection } from 'astro:content';
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import Layout from '../../layouts/Layout.astro';
 
 export async function getStaticPaths() {
@@ -9,7 +9,39 @@ export async function getStaticPaths() {
 }
 
 const { set } = Astro.props;
-const { title, date, location, note, cover, images } = set.data;
+const { title, date, location, note, photos } = set.data;
+
+const formatDate = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const formatTakenAt = (d: Date) =>
+  d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+
+// Precompute a larger version of each photo for the lightbox, so the grid
+// only ever ships thumbnail-sized images and the full-size ones load on
+// demand when a photo is actually opened.
+const lightboxPhotos = await Promise.all(
+  photos.map(async (photo) => {
+    const large = await getImage({ src: photo.image, width: 1800 });
+    return {
+      src: large.src,
+      width: large.attributes.width,
+      height: large.attributes.height,
+      title: photo.title ?? '',
+      takenAt: photo.takenAt ? formatTakenAt(photo.takenAt) : ''
+    };
+  })
+);
+
+// Escape "<" so a title/caption containing "</script>" can't break out of
+// the embedded JSON data island below.
+const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
 ---
 
 <Layout title={`${title} | Photos`} description={note ?? `Photo set from ${location ?? 'the archive'}.`}>
@@ -18,54 +50,59 @@ const { title, date, location, note, cover, images } = set.data;
     <h1>{title}</h1>
     {note && <p class="lead">{note}</p>}
     <div class="meta-row">
-      <span class="badge">{date.toISOString().slice(0, 10)}</span>
+      <span class="badge">{formatDate(date)}</span>
       {location && <span class="badge">{location}</span>}
-      <span class="badge">{images.length} photo{images.length === 1 ? '' : 's'}</span>
+      <span class="badge">{photos.length} photo{photos.length === 1 ? '' : 's'}</span>
     </div>
     <div class="btn-row">
       <a class="btn btn-secondary" href="/photos">All photo sets</a>
     </div>
   </article>
 
-  <section class="section-title">
-    <Image
-      class="photo-set-hero-cover"
-      src={cover}
-      alt={title}
-      width={1400}
-      height={840}
-      priority
-    />
+  <section class="section-title photo-gallery">
+    {photos.map((photo, i) => (
+      <button type="button" class="photo-gallery-item" data-index={i} aria-label={`View ${photo.title || `photo ${i + 1}`} larger`}>
+        <Image src={photo.image} alt={photo.title || `${title} — photo ${i + 1}`} width={640} />
+        {photo.title && <span class="photo-caption">{photo.title}</span>}
+      </button>
+    ))}
   </section>
 
-  {images.length > 0 && (
-    <section class="section-title photo-gallery">
-      {images.map((photo, i) => (
-        <figure class="photo-gallery-item">
-          <Image src={photo} alt={`${title} — photo ${i + 1}`} width={900} />
-        </figure>
-      ))}
-    </section>
-  )}
+  <div id="lightbox" class="lightbox-overlay" aria-hidden="true">
+    <button type="button" id="lightboxClose" class="lightbox-close" aria-label="Close">✕</button>
+    {photos.length > 1 && (
+      <>
+        <button type="button" id="lightboxPrev" class="lightbox-nav lightbox-prev" aria-label="Previous photo">‹</button>
+        <button type="button" id="lightboxNext" class="lightbox-nav lightbox-next" aria-label="Next photo">›</button>
+      </>
+    )}
+    <figure class="lightbox-figure">
+      <img id="lightboxImg" src="" alt="" />
+      <figcaption id="lightboxCaption"></figcaption>
+    </figure>
+  </div>
+
+  <script type="application/json" id="photo-gallery-data" set:html={lightboxJson} />
 </Layout>
 
 <style>
-  .photo-set-hero-cover {
-    width: 100%;
-    max-height: 70vh;
-    object-fit: cover;
-    border-radius: 16px;
-    background: var(--bg-soft);
-  }
-
   .photo-gallery {
     display: grid;
     gap: 1.25rem;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
   .photo-gallery-item {
     margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: zoom-in;
+    display: flex;
+    flex-direction: column;
+    font: inherit;
+    color: inherit;
+    text-align: left;
   }
 
   .photo-gallery-item :global(img) {
@@ -73,5 +110,191 @@ const { title, date, location, note, cover, images } = set.data;
     height: auto;
     border-radius: 14px;
     display: block;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .photo-gallery-item:hover :global(img),
+  .photo-gallery-item:focus-visible :global(img) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--accent), transparent 78%);
+  }
+
+  .photo-caption {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(6px);
+  }
+
+  .lightbox-overlay.is-open {
+    display: flex;
+  }
+
+  .lightbox-figure {
+    margin: 0;
+    max-width: min(1400px, 92vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .lightbox-figure img {
+    max-width: 100%;
+    max-height: 78vh;
+    width: auto;
+    height: auto;
+    border-radius: 12px;
+    display: block;
+  }
+
+  .lightbox-figure figcaption {
+    margin-top: 0.9rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    text-align: center;
+  }
+
+  .lightbox-figure figcaption:empty {
+    display: none;
+  }
+
+  .lightbox-close,
+  .lightbox-nav {
+    position: fixed;
+    background: color-mix(in srgb, var(--bg-soft), transparent 10%);
+    border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+    color: var(--text);
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: border-color 120ms ease, color 120ms ease;
+  }
+
+  .lightbox-close:hover,
+  .lightbox-nav:hover {
+    border-color: color-mix(in srgb, var(--accent), transparent 40%);
+    color: var(--accent);
+  }
+
+  .lightbox-close {
+    top: 1.25rem;
+    right: 1.25rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.1rem;
+  }
+
+  .lightbox-nav {
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.8rem;
+  }
+
+  .lightbox-prev {
+    left: 1.25rem;
+  }
+
+  .lightbox-next {
+    right: 1.25rem;
+  }
+
+  @media (max-width: 640px) {
+    .lightbox-overlay {
+      padding: 1rem;
+    }
+
+    .lightbox-nav {
+      width: 2.4rem;
+      height: 2.4rem;
+      font-size: 1.4rem;
+    }
   }
 </style>
+
+<script is:inline>
+  (function () {
+    const dataEl = document.getElementById('photo-gallery-data');
+    const overlay = document.getElementById('lightbox');
+    if (!dataEl || !overlay) return;
+
+    const photos = JSON.parse(dataEl.textContent || '[]');
+    const imgEl = document.getElementById('lightboxImg');
+    const captionEl = document.getElementById('lightboxCaption');
+    const closeBtn = document.getElementById('lightboxClose');
+    const prevBtn = document.getElementById('lightboxPrev');
+    const nextBtn = document.getElementById('lightboxNext');
+    let currentIndex = 0;
+    let lastFocused = null;
+
+    function render() {
+      const photo = photos[currentIndex];
+      if (!photo) return;
+      imgEl.src = photo.src;
+      imgEl.width = photo.width;
+      imgEl.height = photo.height;
+      imgEl.alt = photo.title || '';
+      captionEl.textContent = [photo.title, photo.takenAt].filter(Boolean).join(' — ');
+    }
+
+    function open(index) {
+      currentIndex = index;
+      lastFocused = document.activeElement;
+      render();
+      overlay.classList.add('is-open');
+      overlay.removeAttribute('aria-hidden');
+      document.body.style.overflow = 'hidden';
+      closeBtn.focus();
+    }
+
+    function close() {
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (lastFocused && lastFocused.focus) lastFocused.focus();
+    }
+
+    function next() {
+      currentIndex = (currentIndex + 1) % photos.length;
+      render();
+    }
+
+    function prev() {
+      currentIndex = (currentIndex - 1 + photos.length) % photos.length;
+      render();
+    }
+
+    document.querySelectorAll('.photo-gallery-item').forEach((btn) => {
+      btn.addEventListener('click', () => open(Number(btn.dataset.index)));
+    });
+
+    closeBtn.addEventListener('click', close);
+    prevBtn?.addEventListener('click', prev);
+    nextBtn?.addEventListener('click', next);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!overlay.classList.contains('is-open')) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+    });
+  })();
+</script>

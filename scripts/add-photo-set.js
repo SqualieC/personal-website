@@ -6,29 +6,39 @@
  * time (verified against its source — handlePersist() takes files[0] and
  * discards the rest, even on a multi-file drop). For a whole shoot, it's
  * much faster to drop the folder straight into the repo and generate the
- * frontmatter here instead of clicking "+ Add Image" N times in the browser.
+ * frontmatter here instead of clicking "+ Add Photo" N times in the browser.
  *
  * Copies every image in <source-folder> into the shared src/assets/photo-sets/
- * folder (same flat folder the Decap admin's Photo Sets fields use — see
+ * folder (same flat folder the Decap admin's Photo Sets field uses — see
  * public/admin/config.yml) and writes src/content/photoSets/<slug>.mdx with
- * matching frontmatter. Files are renamed <slug>--<original-name> on copy so
- * two shoots can never collide in the shared folder.
+ * a `photos` list matching the photoSets schema (image + optional title +
+ * optional takenAt per photo). Files are renamed <slug>--<original-name> on
+ * copy so two shoots can never collide in the shared folder.
+ *
+ * The first photo in sort order becomes photos[0] — the set's cover
+ * thumbnail on /photos — unless --cover picks a different file.
  *
  * Usage:
  *   node scripts/add-photo-set.js <source-folder> --title "My Title" [options]
  *
  * Options:
- *   --slug <slug>        URL segment + filename (/photos/<slug>). Defaults to a
- *                         slugified --title.
- *   --date <YYYY-MM-DD>  Defaults to today.
- *   --location <text>    Optional.
- *   --note <text>        Optional — short blurb shown on the set page.
- *   --cover <filename>   Filename (within the source folder) to use as the cover.
- *                         Defaults to the first photo in sort order.
- *   --order name|mtime   Gallery sort order. Defaults to "name" (natural sort).
- *   --include-cover      Also include the cover photo in the gallery grid
- *                         (by default the cover is only used as the hero image).
- *   --force              Overwrite an existing entry/asset folder for this slug.
+ *   --slug <slug>          URL segment + filename (/photos/<slug>). Defaults to
+ *                           a slugified --title.
+ *   --date <YYYY-MM-DD>    Set date. Defaults to today.
+ *   --location <text>      Optional.
+ *   --note <text>          Optional — short blurb shown on the set page.
+ *   --cover <filename>     Filename (within the source folder) to sort first /
+ *                           use as the cover. Defaults to the first photo in
+ *                           sort order.
+ *   --order name|mtime     Photo order. Defaults to "name" (natural sort).
+ *   --no-taken-at          Don't set each photo's takenAt from its file mtime
+ *                           (on by default — it's an approximation, not real
+ *                           EXIF capture time; edit precisely via the CMS).
+ *   --force                Overwrite an existing entry for this slug.
+ *
+ * Per-photo titles aren't settable from the CLI for an entire batch — add
+ * them afterward via the CMS (Photos list → Photo Title) for any photos
+ * that need one; it's optional per photo.
  *
  * Example:
  *   node scripts/add-photo-set.js ~/Photos/rainier --title "Mount Rainier" \
@@ -48,7 +58,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
-      if (key === 'include-cover' || key === 'force') {
+      if (key === 'force' || key === 'no-taken-at') {
         args[key] = true;
       } else {
         args[key] = argv[++i];
@@ -83,7 +93,7 @@ const sourceDir = args._[0];
 
 if (!sourceDir) {
   fail(
-    'Usage: node scripts/add-photo-set.js <source-folder> --title "My Title" [--slug ...] [--location ...] [--note ...] [--date YYYY-MM-DD] [--cover file.jpg] [--order name|mtime] [--include-cover] [--force]'
+    'Usage: node scripts/add-photo-set.js <source-folder> --title "My Title" [--slug ...] [--location ...] [--note ...] [--date YYYY-MM-DD] [--cover file.jpg] [--order name|mtime] [--no-taken-at] [--force]'
   );
 }
 if (!args.title) {
@@ -109,21 +119,24 @@ if (files.length === 0) {
   fail(`No image files (${[...IMAGE_EXTENSIONS].join(', ')}) found in ${resolvedSource}`);
 }
 
+const mtimeOf = (f) => statSync(path.join(resolvedSource, f)).mtime;
+
 if (order === 'mtime') {
   files = files
-    .map((f) => ({ f, mtime: statSync(path.join(resolvedSource, f)).mtimeMs }))
+    .map((f) => ({ f, mtime: mtimeOf(f).getTime() }))
     .sort((a, b) => a.mtime - b.mtime)
     .map(({ f }) => f);
 } else {
   files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
-const coverFile = args.cover || files[0];
-if (!files.includes(coverFile)) {
-  fail(`--cover "${coverFile}" was not found among the images in ${resolvedSource}`);
+if (args.cover) {
+  if (!files.includes(args.cover)) {
+    fail(`--cover "${args.cover}" was not found among the images in ${resolvedSource}`);
+  }
+  // Move the chosen cover to the front so it lands as photos[0].
+  files = [args.cover, ...files.filter((f) => f !== args.cover)];
 }
-
-const galleryFiles = args['include-cover'] ? files : files.filter((f) => f !== coverFile);
 
 const assetDir = path.join(ROOT, 'src', 'assets', 'photo-sets');
 const contentFile = path.join(ROOT, 'src', 'content', 'photoSets', `${slug}.mdx`);
@@ -143,6 +156,15 @@ for (const file of files) {
 }
 
 const relImagePath = (file) => `../../assets/photo-sets/${destName(file)}`;
+const includeTakenAt = !args['no-taken-at'];
+
+const photoLines = files.flatMap((file) => {
+  const lines = [`  - image: ${yamlString(relImagePath(file))}`];
+  if (includeTakenAt) {
+    lines.push(`    takenAt: ${yamlString(mtimeOf(file).toISOString())}`);
+  }
+  return lines;
+});
 
 const lines = [
   '---',
@@ -150,9 +172,8 @@ const lines = [
   `date: ${yamlString(date)}`,
   args.location ? `location: ${yamlString(args.location)}` : null,
   args.note ? `note: ${yamlString(args.note)}` : null,
-  `cover: ${yamlString(relImagePath(coverFile))}`,
-  'images:',
-  ...galleryFiles.map((file) => `  - ${yamlString(relImagePath(file))}`),
+  'photos:',
+  ...photoLines,
   '---',
   ''
 ].filter((line) => line !== null);
@@ -162,12 +183,8 @@ writeFileSync(contentFile, lines.join('\n'));
 
 console.log(`\nAdded photo set "${args.title}" (${slug})`);
 console.log(`  ${files.length} photo${files.length === 1 ? '' : 's'} copied to ${path.relative(ROOT, assetDir)} (prefixed "${slug}--")`);
-console.log(`  Cover:   ${destName(coverFile)}`);
-console.log(
-  `  Gallery: ${galleryFiles.length} photo${galleryFiles.length === 1 ? '' : 's'}${
-    args['include-cover'] ? ' (cover included)' : ''
-  }`
-);
+console.log(`  Cover:   ${destName(files[0])} (photos[0])`);
+console.log(`  takenAt: ${includeTakenAt ? 'set from each file’s mtime (approximate — edit precisely via the CMS if needed)' : 'not set'}`);
 console.log(`  Entry:   ${path.relative(ROOT, contentFile)}`);
 console.log(
   `\nPreview with \`npm run dev\`, then publish:\n  git add ${path.relative(ROOT, assetDir)} ${path.relative(

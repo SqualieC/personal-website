@@ -59,10 +59,15 @@ const site = defineCollection({
 });
 
 // Photo sets live under src/content/photoSets/<slug>.mdx with their images
-// stored under src/assets/photo-sets/<slug>/. Using the image() schema
-// helper means every cover + gallery photo is imported through Vite and run
-// through Astro's build-time image pipeline (resize/format/optimize) instead
-// of being served as-is from /public.
+// stored under src/assets/photo-sets/. Using the image() schema helper means
+// every photo is imported through Vite and run through Astro's build-time
+// image pipeline (resize/format/optimize) instead of being served as-is
+// from /public.
+//
+// `photos` is a single ordered list — there's no separate "cover" field.
+// The set's thumbnail on /photos is just photos[0].image, so every photo
+// (including the one used as the thumbnail) carries the same optional
+// title/takenAt and gets the same click-to-enlarge treatment on the set page.
 const photoSets = defineCollection({
   type: 'content',
   schema: ({ image }) =>
@@ -71,13 +76,15 @@ const photoSets = defineCollection({
       date: z.coerce.date(),
       location: z.string().optional(),
       note: z.string().optional(),
-      cover: image(),
-      // Decap's list widget stores each selected image as a bare array item
-      // (not an object) when the list uses `field:` instead of `fields:` —
-      // that's what lets the media library batch-add many photos at once
-      // instead of one item at a time. Alt text is auto-generated from the
-      // set title on the page rather than edited per photo.
-      images: z.array(image()).default([])
+      photos: z
+        .array(
+          z.object({
+            image: image(),
+            title: z.string().optional(),
+            takenAt: z.coerce.date().optional()
+          })
+        )
+        .min(1)
     })
 });
 

@@ -72,9 +72,13 @@ collections:
   # media_folder proved unreliable in practice — it templated correctly for
   # where the file was physically written, but not for the path string
   # saved into frontmatter, producing a broken reference. A static path
-  # avoids that mismatch entirely, and every field below repeats the exact
-  # same value (not the '' "inherit" shorthand, which also didn't work
-  # correctly for the nested list field) so there's no ambiguity.
+  # avoids that mismatch entirely, and the nested Image field below repeats
+  # the exact same value explicitly (nested fields don't reliably inherit
+  # the collection-level setting) so there's no ambiguity.
+  #
+  # There's no separate "cover" field — photos[0] is used as the set's
+  # thumbnail on /photos, so drag the photo you want as the thumbnail to the
+  # top of this list.
   - name: photoSets
     label: Photo Sets
     folder: src/content/photoSets
@@ -89,18 +93,16 @@ collections:
       - { label: Date, name: date, widget: datetime, format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
       - { label: Location, name: location, widget: string, required: false }
       - { label: Note, name: note, widget: text, required: false, hint: "Short blurb shown on the set page" }
-      - { label: Cover Image, name: cover, widget: image, hint: "Used on the /photos index card and as the set's hero image" }
-      - label: Images
-        name: images
+      - label: Photos
+        name: photos
         widget: list
-        label_singular: Image
-        hint: "Files land in the same shared folder as the Cover field, so anything you've already uploaded to a Photo Set shows up here too. Drag items to reorder."
-        field:
-          label: Photo
-          name: image
-          widget: image
-          media_folder: "../../assets/photo-sets"
-          public_folder: "../../assets/photo-sets"
+        label_singular: Photo
+        summary: "{{fields.title}}"
+        hint: "The FIRST photo here is used as the set's cover thumbnail on /photos — drag to reorder. Each photo can have its own title and the date/time it was taken, shown when a viewer clicks it open."
+        fields:
+          - { label: Image, name: image, widget: image, media_folder: "../../assets/photo-sets", public_folder: "../../assets/photo-sets" }
+          - { label: Photo Title, name: title, widget: string, required: false }
+          - { label: Date/Time Taken, name: takenAt, widget: datetime, required: false }
 
   # ── About Page ───────────────────────────────────────────────────────────────
   - name: about
