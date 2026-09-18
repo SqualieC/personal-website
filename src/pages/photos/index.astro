@@ -1,0 +1,61 @@
+---
+import { getCollection } from 'astro:content';
+import { Image } from 'astro:assets';
+import Layout from '../../layouts/Layout.astro';
+
+const sets = (await getCollection('photoSets')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+---
+
+<Layout title="Photos | SqualieC" description="Photo sets — small collections of shots with notes on where and when they were taken.">
+  <section class="hero hero-surface">
+    <p class="eyebrow">Photography</p>
+    <h1>Photo Sets</h1>
+    <p class="lead">Small, ordered collections of photos with a bit of context on each — where they're from and what was going on.</p>
+  </section>
+
+  <section class="projects-list">
+    {sets.length === 0 ? (
+      <p class="lead">No photo sets published yet — check back soon.</p>
+    ) : (
+      <div class="grid photo-set-grid">
+        {sets.map((set) => (
+          <a class="card photo-set-card" href={`/photos/${set.slug}`}>
+            <Image
+              class="photo-set-cover"
+              src={set.data.cover}
+              alt={set.data.title}
+              width={640}
+              height={440}
+            />
+            <h3>{set.data.title}</h3>
+            <div class="meta-row">
+              <span class="badge">{set.data.date.toISOString().slice(0, 10)}</span>
+              {set.data.location && <span class="badge">{set.data.location}</span>}
+              <span class="badge">{set.data.images.length} photo{set.data.images.length === 1 ? '' : 's'}</span>
+            </div>
+            {set.data.note && <p>{set.data.note}</p>}
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .photo-set-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .photo-set-cover {
+    width: 100%;
+    aspect-ratio: 16 / 11;
+    object-fit: cover;
+    border-radius: 12px;
+    margin-bottom: 0.9rem;
+    background: var(--bg-soft);
+  }
+</style>

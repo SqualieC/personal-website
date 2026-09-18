@@ -58,4 +58,43 @@ const site = defineCollection({
   })
 });
 
-export const collections = { projects, blog, tools, site };
+// Photo sets live under src/content/photo-sets/<slug>.mdx with their images
+// stored alongside in src/assets/photo-sets/<slug>/. Using the image() schema
+// helper means every cover + gallery photo is imported through Vite and run
+// through Astro's build-time image pipeline (resize/format/optimize) instead
+// of being served as-is from /public.
+const photoSets = defineCollection({
+  type: 'content',
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      date: z.coerce.date(),
+      location: z.string().optional(),
+      note: z.string().optional(),
+      cover: image(),
+      images: z
+        .array(
+          z.object({
+            src: image(),
+            alt: z.string(),
+            caption: z.string().optional()
+          })
+        )
+        .default([])
+    })
+});
+
+// Single editable About page. Body markdown holds the bio copy; frontmatter
+// holds the small structured bits (tagline + optional portrait).
+const about = defineCollection({
+  type: 'content',
+  schema: ({ image }) =>
+    z.object({
+      title: z.string().default('About'),
+      tagline: z.string().optional(),
+      photo: image().optional(),
+      updatedAt: z.coerce.date().optional()
+    })
+});
+
+export const collections = { projects, blog, tools, site, photoSets, about };

@@ -64,6 +64,54 @@ collections:
       - { label: Featured, name: featured, widget: boolean, default: false }
       - { label: Body, name: body, widget: markdown }
 
+  # ── Photo Sets ───────────────────────────────────────────────────────────────
+  # Images live in src/assets/photo-sets/<slug>/ (not public/) so Astro's
+  # image() content-collection helper can import + optimize them at build
+  # time. media_folder/public_folder are relative (no leading slash), which
+  # tells Decap to write the saved path as a relative reference from the
+  # entry file to the image — exactly what image() expects in frontmatter.
+  - name: photoSets
+    label: Photo Sets
+    folder: src/content/photoSets
+    create: true
+    slug: "{{slug}}"
+    extension: mdx
+    format: frontmatter
+    media_folder: "../../assets/photo-sets/{{slug}}"
+    public_folder: "../../assets/photo-sets/{{slug}}"
+    fields:
+      - { label: Title, name: title, widget: string }
+      - { label: Date, name: date, widget: datetime, format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: Location, name: location, widget: string, required: false }
+      - { label: Note, name: note, widget: text, required: false, hint: "Short blurb shown on the set page" }
+      - { label: Cover Image, name: cover, widget: image, hint: "Used on the /photos index card and as the set's hero image" }
+      - label: Images
+        name: images
+        widget: list
+        label_singular: Image
+        summary: "{{fields.alt}}"
+        hint: "Drag to reorder — gallery order on the set page matches this list"
+        fields:
+          - { label: Image, name: src, widget: image }
+          - { label: Alt Text, name: alt, widget: string, hint: "Required for accessibility" }
+          - { label: Caption, name: caption, widget: string, required: false }
+
+  # ── About Page ───────────────────────────────────────────────────────────────
+  - name: about
+    label: About Page
+    files:
+      - label: About
+        name: about
+        file: src/content/about/about.mdx
+        media_folder: "../../assets/about"
+        public_folder: "../../assets/about"
+        fields:
+          - { label: Title, name: title, widget: string, default: About }
+          - { label: Tagline, name: tagline, widget: text, required: false, hint: "Shown under the heading" }
+          - { label: Portrait, name: photo, widget: image, required: false }
+          - { label: Updated At, name: updatedAt, widget: datetime, format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, required: false }
+          - { label: Body, name: body, widget: markdown }
+
   # ── Site Settings ────────────────────────────────────────────────────────────
   - name: settings
     label: Site Settings
