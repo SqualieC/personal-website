@@ -89,12 +89,13 @@ collections:
         name: images
         widget: list
         label_singular: Image
-        summary: "{{fields.alt}}"
-        hint: "Drag to reorder — gallery order on the set page matches this list"
-        fields:
-          - { label: Image, name: src, widget: image }
-          - { label: Alt Text, name: alt, widget: string, hint: "Required for accessibility" }
-          - { label: Caption, name: caption, widget: string, required: false }
+        hint: "Open the media library and select multiple files at once to batch-add a whole shoot — each selected photo becomes its own ordered item. Drag items to reorder afterward."
+        field:
+          label: Photo
+          name: image
+          widget: image
+          media_folder: ''
+          public_folder: ''
 
   # ── About Page ───────────────────────────────────────────────────────────────
   - name: about

@@ -58,8 +58,8 @@ const site = defineCollection({
   })
 });
 
-// Photo sets live under src/content/photo-sets/<slug>.mdx with their images
-// stored alongside in src/assets/photo-sets/<slug>/. Using the image() schema
+// Photo sets live under src/content/photoSets/<slug>.mdx with their images
+// stored under src/assets/photo-sets/<slug>/. Using the image() schema
 // helper means every cover + gallery photo is imported through Vite and run
 // through Astro's build-time image pipeline (resize/format/optimize) instead
 // of being served as-is from /public.
@@ -72,15 +72,12 @@ const photoSets = defineCollection({
       location: z.string().optional(),
       note: z.string().optional(),
       cover: image(),
-      images: z
-        .array(
-          z.object({
-            src: image(),
-            alt: z.string(),
-            caption: z.string().optional()
-          })
-        )
-        .default([])
+      // Decap's list widget stores each selected image as a bare array item
+      // (not an object) when the list uses `field:` instead of `fields:` —
+      // that's what lets the media library batch-add many photos at once
+      // instead of one item at a time. Alt text is auto-generated from the
+      // set title on the page rather than edited per photo.
+      images: z.array(image()).default([])
     })
 });
 

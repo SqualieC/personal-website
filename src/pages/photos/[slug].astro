@@ -40,10 +40,9 @@ const { title, date, location, note, cover, images } = set.data;
 
   {images.length > 0 && (
     <section class="section-title photo-gallery">
-      {images.map((photo) => (
+      {images.map((photo, i) => (
         <figure class="photo-gallery-item">
-          <Image src={photo.src} alt={photo.alt} width={900} />
-          {photo.caption && <figcaption>{photo.caption}</figcaption>}
+          <Image src={photo} alt={`${title} — photo ${i + 1}`} width={900} />
         </figure>
       ))}
     </section>
@@ -74,11 +73,5 @@ const { title, date, location, note, cover, images } = set.data;
     height: auto;
     border-radius: 14px;
     display: block;
-  }
-
-  .photo-gallery-item figcaption {
-    margin-top: 0.5rem;
-    color: var(--muted);
-    font-size: 0.85rem;
   }
 </style>
