@@ -65,11 +65,16 @@ collections:
       - { label: Body, name: body, widget: markdown }
 
   # ── Photo Sets ───────────────────────────────────────────────────────────────
-  # Images live in src/assets/photo-sets/<slug>/ (not public/) so Astro's
-  # image() content-collection helper can import + optimize them at build
-  # time. media_folder/public_folder are relative (no leading slash), which
-  # tells Decap to write the saved path as a relative reference from the
-  # entry file to the image — exactly what image() expects in frontmatter.
+  # Images live in src/assets/photo-sets/ (not public/) so Astro's image()
+  # content-collection helper can import + optimize them at build time.
+  # media_folder/public_folder are a single FLAT relative folder (no
+  # leading slash, no {{slug}}). {{slug}} in a folder collection's
+  # media_folder proved unreliable in practice — it templated correctly for
+  # where the file was physically written, but not for the path string
+  # saved into frontmatter, producing a broken reference. A static path
+  # avoids that mismatch entirely, and every field below repeats the exact
+  # same value (not the '' "inherit" shorthand, which also didn't work
+  # correctly for the nested list field) so there's no ambiguity.
   - name: photoSets
     label: Photo Sets
     folder: src/content/photoSets
@@ -77,8 +82,8 @@ collections:
     slug: "{{slug}}"
     extension: mdx
     format: frontmatter
-    media_folder: "../../assets/photo-sets/{{slug}}"
-    public_folder: "../../assets/photo-sets/{{slug}}"
+    media_folder: "../../assets/photo-sets"
+    public_folder: "../../assets/photo-sets"
     fields:
       - { label: Title, name: title, widget: string }
       - { label: Date, name: date, widget: datetime, format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
@@ -89,13 +94,13 @@ collections:
         name: images
         widget: list
         label_singular: Image
-        hint: "Open the media library and select multiple files at once to batch-add a whole shoot — each selected photo becomes its own ordered item. Drag items to reorder afterward."
+        hint: "Files land in the same shared folder as the Cover field, so anything you've already uploaded to a Photo Set shows up here too. Drag items to reorder."
         field:
           label: Photo
           name: image
           widget: image
-          media_folder: ''
-          public_folder: ''
+          media_folder: "../../assets/photo-sets"
+          public_folder: "../../assets/photo-sets"
 
   # ── About Page ───────────────────────────────────────────────────────────────
   - name: about

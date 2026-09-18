@@ -8,8 +8,11 @@
  * much faster to drop the folder straight into the repo and generate the
  * frontmatter here instead of clicking "+ Add Image" N times in the browser.
  *
- * Copies every image in <source-folder> into src/assets/photo-sets/<slug>/
- * and writes src/content/photoSets/<slug>.mdx with matching frontmatter.
+ * Copies every image in <source-folder> into the shared src/assets/photo-sets/
+ * folder (same flat folder the Decap admin's Photo Sets fields use — see
+ * public/admin/config.yml) and writes src/content/photoSets/<slug>.mdx with
+ * matching frontmatter. Files are renamed <slug>--<original-name> on copy so
+ * two shoots can never collide in the shared folder.
  *
  * Usage:
  *   node scripts/add-photo-set.js <source-folder> --title "My Title" [options]
@@ -122,20 +125,24 @@ if (!files.includes(coverFile)) {
 
 const galleryFiles = args['include-cover'] ? files : files.filter((f) => f !== coverFile);
 
-const assetDir = path.join(ROOT, 'src', 'assets', 'photo-sets', slug);
+const assetDir = path.join(ROOT, 'src', 'assets', 'photo-sets');
 const contentFile = path.join(ROOT, 'src', 'content', 'photoSets', `${slug}.mdx`);
+const destName = (file) => `${slug}--${file}`;
 
 if (!args.force) {
   if (existsSync(contentFile)) fail(`${path.relative(ROOT, contentFile)} already exists — pass --force to overwrite.`);
-  if (existsSync(assetDir)) fail(`${path.relative(ROOT, assetDir)} already exists — pass --force to overwrite/merge.`);
+  const collision = files.find((f) => existsSync(path.join(assetDir, destName(f))));
+  if (collision) {
+    fail(`${path.relative(ROOT, path.join(assetDir, destName(collision)))} already exists — pass --force to overwrite.`);
+  }
 }
 
 mkdirSync(assetDir, { recursive: true });
 for (const file of files) {
-  copyFileSync(path.join(resolvedSource, file), path.join(assetDir, file));
+  copyFileSync(path.join(resolvedSource, file), path.join(assetDir, destName(file)));
 }
 
-const relImagePath = (file) => `../../assets/photo-sets/${slug}/${file}`;
+const relImagePath = (file) => `../../assets/photo-sets/${destName(file)}`;
 
 const lines = [
   '---',
@@ -154,8 +161,8 @@ mkdirSync(path.dirname(contentFile), { recursive: true });
 writeFileSync(contentFile, lines.join('\n'));
 
 console.log(`\nAdded photo set "${args.title}" (${slug})`);
-console.log(`  ${files.length} photo${files.length === 1 ? '' : 's'} copied to ${path.relative(ROOT, assetDir)}`);
-console.log(`  Cover:   ${coverFile}`);
+console.log(`  ${files.length} photo${files.length === 1 ? '' : 's'} copied to ${path.relative(ROOT, assetDir)} (prefixed "${slug}--")`);
+console.log(`  Cover:   ${destName(coverFile)}`);
 console.log(
   `  Gallery: ${galleryFiles.length} photo${galleryFiles.length === 1 ? '' : 's'}${
     args['include-cover'] ? ' (cover included)' : ''
