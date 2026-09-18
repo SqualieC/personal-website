@@ -23,21 +23,15 @@ const formatTakenAt = (d: Date) =>
     minute: '2-digit'
   });
 
-// Precompute two larger versions of each photo, so the grid only ever ships
-// thumbnail-sized images: a "fit the screen" size for the lightbox, and a
-// bigger "zoom" size (up to the source photo's native resolution) that's
-// only loaded if someone actually clicks in to inspect detail.
+// Precompute a larger version of each photo for the lightbox, so the grid
+// only ever ships thumbnail-sized images.
 const lightboxPhotos = await Promise.all(
   photos.map(async (photo) => {
     const large = await getImage({ src: photo.image, width: Math.min(photo.image.width, 1800) });
-    const zoom = await getImage({ src: photo.image, width: Math.min(photo.image.width, 3200) });
     return {
       src: large.src,
       width: large.attributes.width,
       height: large.attributes.height,
-      zoomSrc: zoom.src,
-      zoomWidth: zoom.attributes.width,
-      zoomHeight: zoom.attributes.height,
       title: photo.title ?? '',
       takenAt: photo.takenAt ? formatTakenAt(photo.takenAt) : ''
     };
@@ -164,7 +158,8 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     align-items: center;
   }
 
-  /* Fit mode: image is scaled down to fit the viewport, click to zoom in. */
+  /* overflow: hidden here means zooming can never produce scrollbars —
+     content that scales past the box edge is simply clipped, not scrolled. */
   .lightbox-image-wrap {
     max-width: 100%;
     max-height: 78vh;
@@ -183,20 +178,14 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     border-radius: 12px;
     display: block;
     cursor: zoom-in;
+    transition: transform 180ms ease;
   }
 
-  /* Zoom mode: image renders at its (larger) native size and the wrap
-     becomes a scroll/pan container instead of a fit-to-screen box. */
-  .lightbox-image-wrap.is-zoomed {
-    max-width: min(1400px, 92vw);
-    display: block;
-    overflow: auto;
-    cursor: grab;
-  }
-
-  .lightbox-image-wrap.is-zoomed img {
-    max-width: none;
-    max-height: none;
+  /* transform-origin is set from JS to the exact clicked point before this
+     class is applied, so the image scales up anchored at that point instead
+     of from its center. */
+  .lightbox-image-wrap img.is-zoomed {
+    transform: scale(2);
     cursor: zoom-out;
   }
 
@@ -276,7 +265,6 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     if (!dataEl || !overlay) return;
 
     const photos = JSON.parse(dataEl.textContent || '[]');
-    const wrap = document.getElementById('lightboxImageWrap');
     const imgEl = document.getElementById('lightboxImg');
     const captionEl = document.getElementById('lightboxCaption');
     const closeBtn = document.getElementById('lightboxClose');
@@ -285,16 +273,10 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     let currentIndex = 0;
     let lastFocused = null;
     let isZoomed = false;
-    let isDragging = false;
-    let dragMoved = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let scrollStartX = 0;
-    let scrollStartY = 0;
 
     function setZoomed(zoomed) {
       isZoomed = zoomed;
-      wrap.classList.toggle('is-zoomed', zoomed);
+      imgEl.classList.toggle('is-zoomed', zoomed);
     }
 
     function render() {
@@ -308,35 +290,21 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
       captionEl.textContent = [photo.title, photo.takenAt].filter(Boolean).join(' — ');
     }
 
-    // Zooms toward the point that was clicked: measures the click position
-    // against the currently-shown (fit-to-screen) image, then scrolls the
-    // larger zoomed-in image so that same point stays centered.
-    function zoomIn(clientX, clientY) {
-      const photo = photos[currentIndex];
-      if (!photo || !photo.zoomSrc || photo.zoomSrc === photo.src) return;
-
+    // Anchors the zoom at the exact point clicked: transform-origin is set
+    // to that point (as a % of the image box) before scale(2) is applied,
+    // so the clicked spot stays fixed in place while everything around it
+    // grows — a plain CSS transform, so there's no scroll math or layout
+    // race to get wrong.
+    function toggleZoom(clientX, clientY) {
+      if (isZoomed) {
+        setZoomed(false);
+        return;
+      }
       const rect = imgEl.getBoundingClientRect();
-      const fracX = (clientX - rect.left) / rect.width;
-      const fracY = (clientY - rect.top) / rect.height;
-
-      imgEl.src = photo.zoomSrc;
-      imgEl.width = photo.zoomWidth;
-      imgEl.height = photo.zoomHeight;
+      const fracX = ((clientX - rect.left) / rect.width) * 100;
+      const fracY = ((clientY - rect.top) / rect.height) * 100;
+      imgEl.style.transformOrigin = `${fracX}% ${fracY}%`;
       setZoomed(true);
-
-      requestAnimationFrame(() => {
-        wrap.scrollLeft = Math.max(0, fracX * wrap.scrollWidth - wrap.clientWidth / 2);
-        wrap.scrollTop = Math.max(0, fracY * wrap.scrollHeight - wrap.clientHeight / 2);
-      });
-    }
-
-    function zoomOut() {
-      const photo = photos[currentIndex];
-      if (!photo) return;
-      imgEl.src = photo.src;
-      imgEl.width = photo.width;
-      imgEl.height = photo.height;
-      setZoomed(false);
     }
 
     function open(index) {
@@ -371,49 +339,8 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     });
 
     imgEl.addEventListener('click', (e) => {
-      // A drag-to-pan gesture also fires a click on release — swallow that
-      // one click so dragging doesn't immediately zoom back out.
-      if (dragMoved) {
-        dragMoved = false;
-        return;
-      }
-      if (isZoomed) {
-        zoomOut();
-      } else {
-        zoomIn(e.clientX, e.clientY);
-      }
+      toggleZoom(e.clientX, e.clientY);
     });
-
-    // Mouse drag-to-pan while zoomed. Touch devices already get native
-    // scroll/pan on the overflow:auto wrap, so this only engages for mice.
-    wrap.addEventListener('pointerdown', (e) => {
-      if (!isZoomed || e.pointerType !== 'mouse') return;
-      isDragging = true;
-      dragMoved = false;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
-      scrollStartX = wrap.scrollLeft;
-      scrollStartY = wrap.scrollTop;
-      wrap.setPointerCapture(e.pointerId);
-      wrap.style.cursor = 'grabbing';
-    });
-
-    wrap.addEventListener('pointermove', (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
-      wrap.scrollLeft = scrollStartX - dx;
-      wrap.scrollTop = scrollStartY - dy;
-    });
-
-    function endDrag() {
-      if (!isDragging) return;
-      isDragging = false;
-      wrap.style.cursor = '';
-    }
-    wrap.addEventListener('pointerup', endDrag);
-    wrap.addEventListener('pointerleave', endDrag);
 
     closeBtn.addEventListener('click', close);
     prevBtn?.addEventListener('click', prev);
