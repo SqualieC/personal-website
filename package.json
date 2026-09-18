@@ -12,7 +12,8 @@
     "dev:host": "astro dev --host",
     "preview:local": "npm run build && npm run search:index && npm run preview",
     "cf:deploy": "npx wrangler deploy --config wrangler.jsonc",
-    "cf:build-deploy": "npm run build:search && npm run cf:deploy"
+    "cf:build-deploy": "npm run build:search && npm run cf:deploy",
+    "photos:add": "node scripts/add-photo-set.js"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.13",
