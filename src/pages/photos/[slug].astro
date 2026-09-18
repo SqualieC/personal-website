@@ -98,7 +98,7 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
   <section class="section-title photo-gallery">
     {photos.map((photo, i) => (
       <button type="button" class="photo-gallery-item" data-index={i} aria-label={`View ${photo.title || `photo ${i + 1}`} larger`}>
-        <Image src={photo.image} alt={photo.title || `${title} — photo ${i + 1}`} width={640} />
+        <Image src={photo.image} alt={photo.title || `${title} — photo ${i + 1}`} width={640} draggable="false" />
         {photo.title && <span class="photo-caption">{photo.title}</span>}
       </button>
     ))}
@@ -114,7 +114,7 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     )}
     <figure class="lightbox-figure">
       <div id="lightboxImageWrap" class="lightbox-image-wrap">
-        <img id="lightboxImg" src="" alt="" />
+        <img id="lightboxImg" src="" alt="" draggable="false" />
       </div>
       <figcaption id="lightboxCaption"></figcaption>
     </figure>
@@ -148,6 +148,17 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     text-align: left;
     break-inside: avoid;
     -webkit-column-break-inside: avoid;
+  }
+
+  /* draggable="false" (in the markup) covers the standard HTML5 drag; these
+     cover the gaps it doesn't: Safari's own drag-out gesture and iOS's
+     long-press "save/copy image" callout. None of this is real protection
+     — the file still has to reach the browser to display it — it just
+     removes the casual/easy path. */
+  .photo-gallery-item :global(img),
+  .lightbox-image-wrap img {
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
   }
 
   .photo-gallery-item :global(img) {
@@ -439,6 +450,19 @@ const lightboxJson = JSON.stringify(lightboxPhotos).replace(/</g, '\\u003c');
     document.querySelectorAll('.photo-gallery-item').forEach((btn) => {
       btn.addEventListener('click', () => open(Number(btn.dataset.index)));
     });
+
+    // draggable="false" in the markup covers the common case; this is a
+    // backstop for browsers/situations where a drag still starts anyway
+    // (it was also fighting the pan-drag handlers above — the native image
+    // drag and our pointer-based pan were competing for the same gesture).
+    // Also drops the right-click "Save image as / Open image in new tab"
+    // menu on the photos specifically, without touching the rest of the page.
+    document.querySelectorAll('.photo-gallery-item img').forEach((el) => {
+      el.addEventListener('dragstart', (e) => e.preventDefault());
+      el.addEventListener('contextmenu', (e) => e.preventDefault());
+    });
+    imgEl.addEventListener('dragstart', (e) => e.preventDefault());
+    imgEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
     imgEl.addEventListener('click', (e) => {
       // A drag-to-pan gesture also fires a trailing click on release —

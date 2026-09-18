@@ -28,6 +28,7 @@ const sets = (await getCollection('photoSets')).sort(
               alt={set.data.photos[0].title || set.data.title}
               width={640}
               height={440}
+              draggable="false"
             />
             <h3>{set.data.title}</h3>
             <div class="meta-row">
@@ -57,5 +58,17 @@ const sets = (await getCollection('photoSets')).sort(
     border-radius: 12px;
     margin-bottom: 0.9rem;
     background: var(--bg-soft);
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
   }
 </style>
+
+<script is:inline>
+  // Same casual-deterrent treatment as the set page: no native drag, no
+  // right-click "Save image as". Not real protection, just removes the
+  // easy path — see src/pages/photos/[slug].astro for the fuller version.
+  document.querySelectorAll('.photo-set-cover').forEach((el) => {
+    el.addEventListener('dragstart', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+</script>
