@@ -1,9 +1,10 @@
 ---
 import { getCollection, getEntry } from 'astro:content';
+import { Image } from 'astro:assets';
 import Layout from '../layouts/Layout.astro';
 
-const latestProject = (await getCollection('projects')).sort(
-  (a, b) => b.data.updatedAt.valueOf() - a.data.updatedAt.valueOf()
+const latestPhotoSet = (await getCollection('photoSets')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 )[0];
 
 const recentPosts = (await getCollection('blog')).sort(
@@ -11,30 +12,29 @@ const recentPosts = (await getCollection('blog')).sort(
 ).slice(0, 2);
 
 const siteSettings = await getEntry('site', 'global');
-const { heroHeading, heroSubtext, siteTagline } = siteSettings!.data;
+const { heroSubtext, siteTagline } = siteSettings!.data;
 ---
 
 <Layout
   title={siteTagline}
   description={heroSubtext}
 >
-  <section class="hero hero-surface">
-    <p class="eyebrow">Portfolio</p>
-    <p class="hero-intro">Hi, I'm <strong>Squalie</strong>. I'm a math major with a background in physics &amp; CS, and I play bass.</p>
-    <h1>{heroHeading}</h1>
-    <p class="lead">{heroSubtext}</p>
-    <div class="btn-row">
-      <a href="/projects" class="btn btn-secondary">Browse Projects</a>
-      <a href="/projects/bassprogram" class="btn btn-primary">Download BassProgram v0.1</a>
-    </div>
-    {latestProject && (
-      <div class="meta-row">
-        <a class="badge badge-link" href={`/projects/${latestProject.slug}`}>
-          Latest: {latestProject.data.title} · {latestProject.data.updatedAt.toISOString().slice(0, 10)}
-        </a>
+  {latestPhotoSet && (
+    <a href={`/photos/${latestPhotoSet.slug}`} class="featured-photo-card">
+      <Image
+        src={latestPhotoSet.data.photos[0].image}
+        alt={latestPhotoSet.data.photos[0].title || latestPhotoSet.data.title}
+        width={900}
+        height={900}
+        class="featured-photo-img"
+        draggable="false"
+      />
+      <div class="featured-photo-meta">
+        <p class="eyebrow">Latest Photos</p>
+        <h2>{latestPhotoSet.data.title}</h2>
       </div>
-    )}
-  </section>
+    </a>
+  )}
 
   <section>
     <div style="display:flex; align-items:baseline; gap:0.75rem; margin: 3rem 0 1.2rem;">
@@ -85,6 +85,41 @@ const { heroHeading, heroSubtext, siteTagline } = siteSettings!.data;
 </Layout>
 
 <style>
+  .featured-photo-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    max-width: 520px;
+  }
+
+  .featured-photo-img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 20px;
+    display: block;
+    background: var(--bg-soft);
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .featured-photo-card:hover .featured-photo-img,
+  .featured-photo-card:focus-visible .featured-photo-img {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--accent), transparent 78%);
+  }
+
+  .featured-photo-meta {
+    margin-top: 0.9rem;
+  }
+
+  .featured-photo-meta h2 {
+    margin: 0.2rem 0 0;
+    font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+    line-height: 1.12;
+  }
+
   @keyframes lfm-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.4; transform: scale(0.85); }
@@ -93,6 +128,16 @@ const { heroHeading, heroSubtext, siteTagline } = siteSettings!.data;
     animation: lfm-pulse 1.5s ease-in-out infinite;
   }
 </style>
+
+<script is:inline>
+  // Same casual-deterrent treatment as the photos pages: no native drag, no
+  // right-click "Save image as" on the featured photo. Not real protection —
+  // see src/pages/photos/[slug].astro for the fuller explanation.
+  document.querySelectorAll('.featured-photo-img').forEach((el) => {
+    el.addEventListener('dragstart', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+</script>
 
 <script>
   const API_KEY = 'be78de703d3308f682022a181da8fad3';

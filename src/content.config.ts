@@ -88,17 +88,4 @@ const photoSets = defineCollection({
     })
 });
 
-// Single editable About page. Body markdown holds the bio copy; frontmatter
-// holds the small structured bits (tagline + optional portrait).
-const about = defineCollection({
-  type: 'content',
-  schema: ({ image }) =>
-    z.object({
-      title: z.string().default('About'),
-      tagline: z.string().optional(),
-      photo: image().optional(),
-      updatedAt: z.coerce.date().optional()
-    })
-});
-
-export const collections = { projects, blog, tools, site, photoSets, about };
+export const collections = { projects, blog, tools, site, photoSets };

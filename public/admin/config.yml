@@ -104,22 +104,6 @@ collections:
           - { label: Photo Title, name: title, widget: string, required: false }
           - { label: Date/Time Taken (override), name: takenAt, widget: datetime, required: false, hint: "Leave blank — the site reads this automatically from the photo's own EXIF data. Only set this to override that (e.g. a scan with no EXIF, or a wrong camera clock)." }
 
-  # ── About Page ───────────────────────────────────────────────────────────────
-  - name: about
-    label: About Page
-    files:
-      - label: About
-        name: about
-        file: src/content/about/about.mdx
-        media_folder: "../../assets/about"
-        public_folder: "../../assets/about"
-        fields:
-          - { label: Title, name: title, widget: string, default: About }
-          - { label: Tagline, name: tagline, widget: text, required: false, hint: "Shown under the heading" }
-          - { label: Portrait, name: photo, widget: image, required: false }
-          - { label: Updated At, name: updatedAt, widget: datetime, format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, required: false }
-          - { label: Body, name: body, widget: markdown }
-
   # ── Site Settings ────────────────────────────────────────────────────────────
   - name: settings
     label: Site Settings

@@ -12,7 +12,6 @@ const sets = (await getCollection('photoSets')).sort(
   <section class="hero hero-surface">
     <p class="eyebrow">Photography</p>
     <h1>Photo Sets</h1>
-    <p class="lead">Small, ordered collections of photos with a bit of context on each — where they're from and what was going on.</p>
   </section>
 
   <section class="projects-list">
@@ -45,6 +44,24 @@ const sets = (await getCollection('photoSets')).sort(
 </Layout>
 
 <style>
+  /* Cap at 3 columns regardless of viewport width, collapsing to 2 then 1
+     on narrower screens — overrides the shared .grid class's auto-fit. */
+  .photo-set-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  @media (max-width: 900px) {
+    .photo-set-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .photo-set-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .photo-set-card {
     display: block;
     text-decoration: none;
