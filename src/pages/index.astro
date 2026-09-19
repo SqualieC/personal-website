@@ -16,37 +16,37 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
   description={heroSubtext}
 >
   {latestPhotoSet && (
-    <div class="featured-photo-row">
-      <a href={`/photos/${latestPhotoSet.slug}`} class="featured-photo-card">
-        <Image
-          src={latestPhotoSet.data.photos[0].image}
-          alt={latestPhotoSet.data.photos[0].title || latestPhotoSet.data.title}
-          width={900}
-          height={900}
-          class="featured-photo-img"
-          draggable="false"
-        />
-        <div class="featured-photo-meta">
-          <p class="eyebrow">Latest photo set</p>
-        </div>
-      </a>
+    <>
+      <div class="featured-photo-row">
+        <a href={`/photos/${latestPhotoSet.slug}`} class="featured-photo-card">
+          <Image
+            src={latestPhotoSet.data.photos[0].image}
+            alt={latestPhotoSet.data.photos[0].title || latestPhotoSet.data.title}
+            width={900}
+            height={900}
+            class="featured-photo-img"
+            draggable="false"
+          />
+        </a>
 
-      {latestPhotoSet.data.photos.length > 1 && (
-        <div class="featured-photo-strip">
-          {latestPhotoSet.data.photos.slice(1, 4).map((photo, i) => (
-            <a href={`/photos/${latestPhotoSet.slug}`} class="featured-photo-strip-item">
-              <Image
-                src={photo.image}
-                alt={photo.title || `${latestPhotoSet.data.title} — photo ${i + 2}`}
-                width={500}
-                class="featured-photo-strip-img"
-                draggable="false"
-              />
-            </a>
-          ))}
-        </div>
-      )}
-    </div>
+        {latestPhotoSet.data.photos.length > 1 && (
+          <div class="featured-photo-strip">
+            {latestPhotoSet.data.photos.slice(1, 4).map((photo, i) => (
+              <a href={`/photos/${latestPhotoSet.slug}`} class="featured-photo-strip-item">
+                <Image
+                  src={photo.image}
+                  alt={photo.title || `${latestPhotoSet.data.title} — photo ${i + 2}`}
+                  width={500}
+                  class="featured-photo-strip-img"
+                  draggable="false"
+                />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+      <p class="eyebrow featured-photo-caption">Latest photo set</p>
+    </>
   )}
 
   <section>
@@ -84,24 +84,30 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
 </Layout>
 
 <style>
+  /* Main photo takes the left 2/3, the strip the right 1/3. The row gets
+     its OWN determinate height via aspect-ratio (3/2, i.e. height = 2/3 of
+     the row's width — matching a square image filling that 2fr column) —
+     everything inside is then a plain height: 100% down the tree. This
+     replaced an earlier version that instead relied on CSS Grid's
+     align-items: stretch to propagate the main photo's height across to
+     the strip sibling; that didn't actually happen (verified with a real
+     screenshot — the strip silently collapsed to zero height), so this
+     version doesn't depend on that inference at all. */
   .featured-photo-row {
-    display: flex;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 1rem;
-    flex-wrap: wrap;
+    aspect-ratio: 3 / 2;
   }
 
   .featured-photo-card {
     display: block;
-    text-decoration: none;
-    color: inherit;
-    flex: 1 1 420px;
-    max-width: 520px;
+    height: 100%;
   }
 
   .featured-photo-img {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    height: 100%;
     object-fit: cover;
     border-radius: 20px;
     display: block;
@@ -117,24 +123,21 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
     box-shadow: 0 8px 32px color-mix(in srgb, var(--accent), transparent 78%);
   }
 
-  .featured-photo-meta {
-    margin-top: 0.9rem;
+  .featured-photo-caption {
+    margin: 0.9rem 0 0;
   }
 
-  /* Fills the space beside the square photo with a few more shots from the
-     same set — stretches to match the square photo's height, then divides
-     that height evenly among however many strip items there are. */
+  /* grid-auto-rows: 1fr divides the strip's height evenly across however
+     many photos are in it — 2 or 3, doesn't need to be hardcoded. */
   .featured-photo-strip {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-auto-rows: 1fr;
     gap: 1rem;
-    flex: 1 1 200px;
-    min-width: 140px;
+    height: 100%;
   }
 
   .featured-photo-strip-item {
     display: block;
-    flex: 1;
     border-radius: 14px;
     overflow: hidden;
   }
@@ -154,13 +157,30 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
     transform: scale(1.03);
   }
 
-  /* Once the strip wraps below the photo, a tall thin column no longer
-     makes sense — lay it out as a row of small squares instead. */
+  /* Stacking single-column on narrow screens: the strip goes below the
+     main photo full-width, as a row of small squares. The row's fixed
+     aspect-ratio only made sense for the 2-column layout, so drop it here
+     and let the main photo be square again on its own. */
   @media (max-width: 720px) {
+    .featured-photo-row {
+      grid-template-columns: 1fr;
+      aspect-ratio: auto;
+    }
+
+    .featured-photo-card {
+      height: auto;
+    }
+
+    .featured-photo-img {
+      height: auto;
+      aspect-ratio: 1 / 1;
+    }
+
     .featured-photo-strip {
-      flex-direction: row;
-      width: 100%;
-      min-width: 0;
+      grid-auto-flow: column;
+      grid-auto-rows: unset;
+      grid-auto-columns: 1fr;
+      height: auto;
     }
 
     .featured-photo-strip-item {
