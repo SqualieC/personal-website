@@ -7,10 +7,6 @@ const latestPhotoSet = (await getCollection('photoSets')).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 )[0];
 
-const recentPosts = (await getCollection('blog')).sort(
-  (a, b) => b.data.updatedAt.valueOf() - a.data.updatedAt.valueOf()
-).slice(0, 2);
-
 const siteSettings = await getEntry('site', 'global');
 const { heroSubtext, siteTagline } = siteSettings!.data;
 ---
@@ -30,8 +26,7 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
         draggable="false"
       />
       <div class="featured-photo-meta">
-        <p class="eyebrow">Latest Photos</p>
-        <h2>{latestPhotoSet.data.title}</h2>
+        <p class="eyebrow">Latest photo set</p>
       </div>
     </a>
   )}
@@ -68,20 +63,6 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
     </div>
   </section>
 
-  {recentPosts.length > 0 && (
-    <section>
-      <h2 class="section-title">Recent Posts</h2>
-      <div class="grid">
-        {recentPosts.map((post) => (
-          <article class="card">
-            <h3>{post.data.title}</h3>
-            <p>{post.data.summary}</p>
-            <a class="cta" href={`/blog/${post.slug}`}>Read post</a>
-          </article>
-        ))}
-      </div>
-    </section>
-  )}
 </Layout>
 
 <style>
@@ -112,12 +93,6 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
 
   .featured-photo-meta {
     margin-top: 0.9rem;
-  }
-
-  .featured-photo-meta h2 {
-    margin: 0.2rem 0 0;
-    font-size: clamp(1.3rem, 2.4vw, 1.8rem);
-    line-height: 1.12;
   }
 
   @keyframes lfm-pulse {
