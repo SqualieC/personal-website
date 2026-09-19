@@ -84,20 +84,30 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
 </Layout>
 
 <style>
-  /* Main photo takes the left 2/3, the strip the right 1/3. The row gets
-     its OWN determinate height via aspect-ratio (3/2, i.e. height = 2/3 of
-     the row's width — matching a square image filling that 2fr column) —
-     everything inside is then a plain height: 100% down the tree. This
-     replaced an earlier version that instead relied on CSS Grid's
-     align-items: stretch to propagate the main photo's height across to
-     the strip sibling; that didn't actually happen (verified with a real
-     screenshot — the strip silently collapsed to zero height), so this
-     version doesn't depend on that inference at all. */
+  /* Main photo takes the left 2/3, the strip the right 1/3, everything
+     inside chained down as height: 100% from a height set directly here.
+     Deliberately a concrete height (min(60vh, 520px)) rather than
+     aspect-ratio deriving it from width: with aspect-ratio + max-height,
+     the outer box's rendered height clamped correctly but the grid's
+     internal row-track sizing still computed off the *uncapped*
+     aspect-ratio value, so the height: 100% children overflowed past the
+     clamped box into the content below (confirmed with a real screenshot,
+     not just reasoning about it). A plain, unambiguous height avoids that
+     entirely — there's no separate "preferred" size for anything to
+     disagree about. */
   .featured-photo-row {
     display: grid;
     grid-template-columns: 2fr 1fr;
+    /* Without this, the implicit auto-sized row falls back to the main
+       photo's own natural aspect ratio when computing track size (since
+       height: 100% on the child is circular during that pass) and ignores
+       the explicit height below — minmax(0, 1fr) is the grid equivalent of
+       flexbox's min-height: 0 trick, forcing the row to respect the
+       container instead of its content. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 1rem;
-    aspect-ratio: 3 / 2;
+    height: min(60vh, 520px);
+    overflow: hidden;
   }
 
   .featured-photo-card {
@@ -159,12 +169,12 @@ const { heroSubtext, siteTagline } = siteSettings!.data;
 
   /* Stacking single-column on narrow screens: the strip goes below the
      main photo full-width, as a row of small squares. The row's fixed
-     aspect-ratio only made sense for the 2-column layout, so drop it here
-     and let the main photo be square again on its own. */
+     height only made sense for the 2-column layout, so drop it here and
+     let the main photo be square again on its own. */
   @media (max-width: 720px) {
     .featured-photo-row {
       grid-template-columns: 1fr;
-      aspect-ratio: auto;
+      height: auto;
     }
 
     .featured-photo-card {
